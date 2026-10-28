@@ -33,6 +33,9 @@ test('per-user components use stable HKCU key paths, folder cleanup and direct s
   const actual = configurePerUserMsi(original);
   assert.equal((actual.match(/<RegistryValue Root="HKCU"[^>]+KeyPath="yes"/g) ?? []).length, 3);
   assert.equal((actual.match(/<File[^>]+KeyPath="no"/g) ?? []).length, 3);
+  const guids = actual.match(/Guid="[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"/g) ?? [];
+  assert.equal(guids.length, 3);
+  assert.equal(new Set(guids).size, 3);
   assert.equal((actual.match(/<RemoveFolder /g) ?? []).length, 2);
   assert.match(actual, /Directory="APPLICATIONFOLDER" On="uninstall"/);
   assert.match(actual, /Directory="resources" On="uninstall"/);
@@ -45,6 +48,9 @@ test('per-user components use stable HKCU key paths, folder cleanup and direct s
     '<Component><File Source="$(var.appDir)\\new.txt" KeyPath="yes"/></Component><Component><File Source="$(var.appDir)\\LICENSE.md" KeyPath="yes"/></Component>',
   ));
   for (const registry of actual.match(/<RegistryValue[^>]+\/>/g) ?? []) assert.ok(reordered.includes(registry));
+  for (const guid of guids) assert.ok(reordered.includes(guid));
+  const fork = configurePerUserMsi(original.replace('E2FD477D-ED35-561D-8A35-B75851090FE9', 'DB607F2E-1890-4740-9DA3-51B6EEDD16AE'));
+  for (const guid of guids) assert.ok(!fork.includes(guid));
   assert.throws(() => configurePerUserMsi(original.replace('UpgradeCode=', 'Unknown=')), /upgrade identity/);
   assert.throws(() => configurePerUserMsi(original.replace('KeyPath="yes"', 'KeyPath="no"')), /keyed file/);
   assert.throws(() => configurePerUserMsi(original.replace('Advertise="yes"', 'Advertise="no"')), /advertised shortcut/);
