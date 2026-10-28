@@ -2,47 +2,77 @@
 
 # Markdown Studio
 
-A calm, local-first **Windows Markdown editor** with friendly visual editing, a source editor, paired split tabs, and **Word/PDF export**.
+A calm, local-first **Windows Markdown editor** with visual editing, **Source + Preview**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
+
+**[Download the Windows x64 installer (0.6.0)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.0/Markdown-Studio-0.6.0-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.0) · [User guide](docs/USER_GUIDE.md)
+
+The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
 **Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## See it in action
+## What's new in 0.6.0
 
-These are screenshots of the actual desktop application, using sample documents.
+All five additions below are included in the published **0.6.0 installer**, not just the source checkout.
 
-### Light: a focused writing space
+| Feature | What you can do |
+| --- | --- |
+| **Source + Preview** | Edit Markdown alongside a read-only live rendering of the same document. Optionally synchronize scrolling in either direction. Each side of a two-file pair can also use this mode. |
+| **Enhanced Find/Replace** | Search with match-case, Unicode whole-word, or regex options. Navigate Previous/Next, see counts and Source highlights, and replace the current match or all matches. Regex replacements support capture groups; expensive searches stop after two seconds instead of blocking the editor. |
+| **Refreshable table of contents** | Use **Insert > Table of contents**, then **Insert > Update table of contents** after changing headings. The marked contents block keeps its links up to date without replacing surrounding source. Duplicate headings receive distinct anchors. |
+| **Image storage choice** | Insert, paste, or drop a supported image, then choose an embedded image or a relative file in the document's **assets** folder. Save the document first to use relative assets; keep that folder with the Markdown when sharing. |
+| **Offline Mermaid diagrams** | Use **Insert > Mermaid diagram** for a starter, or write a fenced `mermaid` block. Supported diagrams render locally in Visual and Preview and become images in Word/PDF exports. Invalid or unsupported diagrams show an explicit error. |
 
-![Markdown Studio in Light theme, showing the visual editor, document outline, collapsible recent files, and sidebar theme switch](docs/images/light.png)
+See the [user guide](docs/USER_GUIDE.md#editing-features) for search options and limits, and [Mermaid diagrams](docs/USER_GUIDE.md#mermaid-diagrams) for supported diagram families and restrictions.
+
+## See 0.6.0 in action
+
+Fresh captures of the actual **0.6.0 desktop application**, using sample documents in an isolated profile. These are app screenshots, not mockups; no personal documents are shown.
+
+### Source + Preview: Markdown and the result together
+
+The editable source is on the left; the read-only preview on the right renders the table and Mermaid flowchart. **Sync scrolling** can be turned off.
+
+![Markdown Studio 0.6.0 in Light theme with editable Markdown beside its read-only live preview, a rendered Mermaid workflow, a table, and the Sync scrolling option](docs/images/source-preview.png)
+
+### Visual writing: checklists, formatting, and diagrams
+
+Write naturally in Light theme with the document outline, interactive task checkboxes, formatting controls, and editable Mermaid source with its rendered diagram.
+
+![Markdown Studio 0.6.0 Visual editor in Light theme showing a release checklist, Mermaid source and rendered workflow, document outline, and formatting toolbar](docs/images/light.png)
 
 ### Dark: two documents, one paired tab
 
-![Markdown Studio in Dark theme with two independently editable documents side by side in one combined tab](docs/images/dark-split.png)
+Keep reference notes beside a draft. Both panes are editable and have independent mode controls; Find, Save, Export, and the outline follow the active pane.
 
-## Features
+![Markdown Studio 0.6.0 in Dark theme with review notes and a writing plan paired in one tab, independent mode controls, syntax-highlighted code, checklists, and an offline Mermaid diagram](docs/images/dark-split.png)
 
-- **Visual and Source editing:** format naturally or edit the exact Markdown.
-- **Multiple files and paired split tabs:** thumbnail cards help you choose another open document to pair. Two files share one tab; other tabs remain independent. Each pane has its own mode, selection, scroll position, and undo.
-- **Markdown tools:** headings, bold, italics, lists, tasks, tables, links, images, quotes, and code blocks.
-- **Offline syntax highlighting:** searchable code-language selection and per-block Copy.
-- **Word and PDF export:** no Microsoft Word or Pandoc installation required.
-- **Light/Dark themes:** teal accents, a resizable/collapsible sidebar with remembered width, and collapsible recent history that leaves room for the outline.
-- **Keyboard shortcuts:** hover over controls, inspect menu hints, or press **F1**.
-- **Local safeguards:** unsaved-change prompts, external-edit detection, atomic saves, and recovery drafts.
-- **No account, cloud sync, document uploads, or analytics.**
+### Find/Replace: navigate and edit with confidence
 
-### New in 0.6.0
+This example searches for `Word` or `PDF` with a regex, shows both matches in Source, and prepares a capture-group replacement without changing the document.
 
-- **Source + Preview:** edit one document's Markdown alongside a read-only live preview, with optional synchronized scrolling. Two-file paired tabs remain separate.
-- **Enhanced Find/Replace:** match-case, Unicode whole-word, regex capture replacements, Previous/Next, individual/all replacements, match counts and source highlights. Regex work runs in a time-limited worker.
-- **Refreshable contents:** insert a marked table of contents and update its links after changing headings.
-- **Image storage choice:** embed an inserted/pasted/dropped image or save it in the saved document's relative `assets` folder.
-- **Offline Mermaid:** render supported diagrams in Visual/Preview and include them as images in Word/PDF exports; invalid or unsafe diagrams report errors.
+![Markdown Studio 0.6.0 Find/Replace bar with a Word-or-PDF regex, capture-group replacement, match-case and regex controls, match counts, navigation, and highlighted Source results](docs/images/find-replace.png)
+
+## More writing features
+
+| Area | Included tools |
+| --- | --- |
+| **Markdown editing** | Headings, bold, italics, strikethrough, lists, tasks, quotes, links, images, horizontal rules, and code blocks. Use Visual for formatted writing or Source for exact Markdown and unsupported syntax. |
+| **Tables** | Choose rows and columns in the Insert table dialog from the toolbar, right-click menu, or **Ctrl+T**. Add/remove rows and columns in Visual mode. |
+| **Code blocks** | Search the offline language catalog by name or alias, apply syntax highlighting, and copy a block's raw code. Code is displayed, never executed. |
+| **Tabs and paired views** | Open multiple documents; use thumbnail cards to pick a split partner. Resize the divider, work independently in each pane, or unsplit without closing files. Each tab keeps its own selection, scroll position, and undo history. |
+| **Word and PDF export** | Export the active document, including unsaved edits, supported images, syntax-highlighted code, and supported Mermaid diagrams. Export creates a separate file; it does not save the Markdown. |
+| **Workspace and navigation** | Light/Dark themes, a resizable/collapsible sidebar with remembered width, a clickable heading outline, collapsible recent files, word count, and Focus mode (**F9**). |
+| **Keyboard and context menus** | Formatting and file shortcuts, a right-click Markdown menu, tooltips with shortcut hints, and an **F1** keyboard reference. |
+| **File safeguards** | Unsaved-change prompts, external-edit detection, atomic saves, recovery drafts, Save As, and Save All. Recovery is not a backup. |
+| **Local-first privacy** | No account, document uploads, cloud sync, or analytics. Remote images are not downloaded; opening an external web/email link requires confirmation. |
+
+Switching between Visual and Source resets that tab's undo history; switching tabs preserves it. Source + Preview uses the Source history, so returning to Source keeps that history.
 
 ## Install on Windows
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.6.0** is published with all five enhancements listed above. This release is unsigned while trusted code-signing approval is pending; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **0.6.0** is published with the features shown above. This release is unsigned while trusted code-signing approval is pending; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
 1. **[Download the Windows x64 MSI installer (0.6.0)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.0/Markdown-Studio-0.6.0-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
@@ -58,7 +88,11 @@ Uninstall through **Windows Settings > Apps > Installed apps**. Your Markdown do
 
 ## Start writing
 
-Open a `.md` file or choose **New document**, write in **Visual** or **Source**, then save. **Export** creates a separate `.docx` or `.pdf`; it does not save the Markdown file. The **Save** arrow provides Save All and Save As.
+1. Open a `.md` file or choose **New document**.
+2. Choose **Visual** for formatted editing, **Source** for Markdown text, or **Source + Preview** to see both the source and its read-only rendering.
+3. Use **Ctrl+F** to search, **Ctrl+T** to insert a table, or **F1** for the keyboard reference.
+4. Save the Markdown with **Ctrl+S**. The **Save** arrow provides Save All and Save As.
+5. Use **Export** to create a separate `.docx` or `.pdf` when ready to share.
 
 Use the [complete user guide](docs/USER_GUIDE.md) for tables, images, split panes, recovery, shortcuts, and export limitations.
 
