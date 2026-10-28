@@ -8,7 +8,7 @@
 - Choose embedded images or document-relative assets for image insertion, clipboard paste and drag/drop; validate formats and refuse unsafe or unsaved asset destinations.
 - Render supported Mermaid diagrams offline in Visual/Preview, expose a starter template and explicit errors, and render diagrams independently in an isolated local export page for PDF/Word.
 
-The application and installer remain unsigned while trusted code-signing approval is pending. Previous published releases remain unchanged.
+Published with a verified Windows MSI, source ZIP, and SHA-256 checksums. The application and installer remain unsigned while trusted code-signing approval is pending. Previous published releases remain unchanged.
 
 ## 0.5.1
 

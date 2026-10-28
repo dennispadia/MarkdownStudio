@@ -30,12 +30,12 @@ npm.cmd run release:checksums
 
 For later releases, increment `version` using `npm version <version> --no-git-tag-version`, keep the lockfile synchronized, and update the changelog.
 
-**Current release status:** version **0.5.1** is published unsigned with the latest UI changes while trusted signing approval is pending. Successful Windows CI verifies the installer and extracted application, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
+**Current release status:** version **0.6.0** is published unsigned with Source + Preview, enhanced Find/Replace, refreshable contents, image storage choice, and offline Mermaid with Word/PDF export while trusted signing approval is pending. Successful Windows CI verifies the installer and extracted application, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
 
 On GitHub:
 
 1. Open the repository's **Releases > Draft a new release**.
-2. Create a tag matching the version, such as `v0.5.1`, targeting the reviewed commit.
+2. Create a tag matching the version, such as `v0.6.0`, targeting the reviewed commit.
 3. Add a description of the release, known limitations, the unsigned-installer warning, and the no-support policy.
 4. Attach these files from `release`:
    - `Markdown-Studio-<version>-x64.msi`
@@ -57,7 +57,7 @@ Review the screenshots and source archive before making the repository public. N
 
 ## Code signing policy (pending)
 
-No signing provider is configured, and no trusted certificate is currently available to this project. The existing Electron packaging configuration deliberately disables executable signing; changing a version number or passing CI does not change that status. Published 0.5.0 and 0.5.1 assets remain unsigned and must not be replaced.
+No signing provider is configured, and no trusted certificate is currently available to this project. The existing Electron packaging configuration deliberately disables executable signing; changing a version number or passing CI does not change that status. Published 0.5.0, 0.5.1, and 0.6.0 assets remain unsigned and must not be replaced.
 
 The planned no-cost route is [SignPath Foundation's open-source program](https://signpath.org/). Acceptance is discretionary, not automatic: its [conditions](https://signpath.org/terms) require an OSI-approved license, an actively maintained and already released project, verifiable project reputation/control, MFA, defined signing roles, and manual approval of signing requests. The Foundation is the certificate publisher. This preparation does not claim that the project has been accepted or that signing is already provided by SignPath.
 
@@ -74,7 +74,7 @@ The planned no-cost route is [SignPath Foundation's open-source program](https:/
 - Restrict signing to the approved repository, reviewed commits, product name/version, and artifact paths. Require maintainer approval for each release as specified by the provider.
 - Verify the final MSI and its extracted application executable have valid, trusted Authenticode signatures with the approved publisher identity. A signature merely being present is insufficient. Verify the timestamp and trust chain, and rerun installer/payload and desktop validation on the final signed artifacts.
 - Update the publisher to reject unsigned, invalidly signed, or unexpected-publisher artifacts before enabling publication. Its current digest/checksum checks do not replace signature validation.
-- Generate checksums **after** signing. Publish the exact verified signed MSI with the matching source ZIP and checksums under a new version greater than **0.5.1**. Never replace existing published assets, including the unsigned 0.5.0 and 0.5.1 releases. Update README download links only after the new release is verified live.
+- Generate checksums **after** signing. Publish the exact verified signed MSI with the matching source ZIP and checksums under a new version greater than **0.6.0**. Never replace existing published assets, including the unsigned 0.5.0, 0.5.1, and 0.6.0 releases. Update README download links only after the new release is verified live.
 
 ### Warnings and limitations
 

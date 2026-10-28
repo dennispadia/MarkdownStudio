@@ -30,7 +30,7 @@ These are screenshots of the actual desktop application, using sample documents.
 - **Local safeguards:** unsaved-change prompts, external-edit detection, atomic saves, and recovery drafts.
 - **No account, cloud sync, document uploads, or analytics.**
 
-### New in source (not in the 0.5.1 installer)
+### New in 0.6.0
 
 - **Source + Preview:** edit one document's Markdown alongside a read-only live preview, with optional synchronized scrolling. Two-file paired tabs remain separate.
 - **Enhanced Find/Replace:** match-case, Unicode whole-word, regex capture replacements, Previous/Next, individual/all replacements, match counts and source highlights. Regex work runs in a time-limited worker.
@@ -42,15 +42,15 @@ These are screenshots of the actual desktop application, using sample documents.
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.5.1** is published with sidebar resizing, Find toggling, and split preview cards. This release is unsigned while trusted code-signing approval is pending; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **0.6.0** is published with all five enhancements listed above. This release is unsigned while trusted code-signing approval is pending; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the Windows x64 MSI installer (0.5.1)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.5.1/Markdown-Studio-0.5.1-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
+1. **[Download the Windows x64 MSI installer (0.6.0)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.0/Markdown-Studio-0.6.0-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
 3. Open **Markdown Studio** from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.5.1/SHA256SUMS.txt) and a clean source ZIP are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.0/SHA256SUMS.txt) and a clean source ZIP are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
