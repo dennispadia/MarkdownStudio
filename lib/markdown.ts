@@ -1,6 +1,12 @@
 import MarkdownIt from 'markdown-it';
 
 export const parser = new MarkdownIt({ html: false, linkify: true, breaks: false });
+parser.block.ruler.before('paragraph', 'studio_toc_marker', (state, startLine, _endLine, silent) => {
+  const line = state.src.slice(state.bMarks[startLine] + state.tShift[startLine], state.eMarks[startLine]);
+  if (!/^<!-- \/?markdown-studio:toc -->$/.test(line)) return false;
+  if (!silent) state.line = startLine + 1;
+  return true;
+}, { alt: ['paragraph', 'list', 'blockquote'] });
 
 export function headings(markdown: string): { level: number; text: string; line: number }[] {
   const tokens = parser.parse(markdown, {});

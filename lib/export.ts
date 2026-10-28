@@ -7,13 +7,31 @@ import type Token from 'markdown-it/lib/token.mjs';
 import { escapeHTML, headingAnchor, isSafeLink, parser } from './markdown.js';
 import { readImage } from './images.js';
 import { highlightedHTML, highlightedSegments, syntaxCSS, type CodeSegment } from './highlight.js';
+import { diagramLimits, isMermaidLanguage, prepareMermaid } from './diagrams.js';
 
 export type ImageLoader = (source: string) => Promise<{ data: Buffer; mime: string }>;
+/** The renderer supplies locally rendered PNGs keyed by the original fence source. */
+export type DiagramImageLoader = (source: string) => Promise<{ data: Buffer; mime: 'image/png' }>;
+
+async function diagramImage(source: string, loader?: DiagramImageLoader) {
+  prepareMermaid(source);
+  if (!loader) throw new Error('Mermaid export requires a rendered diagram image. Please render the diagram before exporting.');
+  const image = await loader(source);
+  if (image.mime !== 'image/png' || !Buffer.isBuffer(image.data) || image.data.length > diagramLimits.pngBytes) {
+    throw new Error('Mermaid export requires a PNG image smaller than 8 MB.');
+  }
+  const dimensions = imageDimensions(image.data, 'png');
+  if (dimensions.width > 4096 || dimensions.height > 4096 || dimensions.width * dimensions.height > 8_000_000) {
+    throw new Error('Mermaid export image dimensions are too large.');
+  }
+  return { ...image, dimensions };
+}
 type Block = Paragraph | Table;
 type List = { kind: 'bullet' | 'ordered'; level: number; reference: string };
 
-export async function toDocx(markdown: string, loadImage: ImageLoader): Promise<Buffer> {
+export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagram?: DiagramImageLoader): Promise<Buffer> {
   const tokens = parser.parse(markdown, {});
+  if (tokens.filter(token => token.type === 'fence' && isMermaidLanguage(token.info)).length > diagramLimits.diagrams) throw new Error('An export supports at most 32 Mermaid diagrams.');
   const blocks: Block[] = [];
   const lists: List[] = [];
   const numbering: { reference: string; levels: { level: number; format: typeof LevelFormat.DECIMAL; text: string; start: number; alignment: typeof AlignmentType.START; style: { paragraph: { indent: { left: number; hanging: number } } } }[] }[] = [];
@@ -129,6 +147,20 @@ export async function toDocx(markdown: string, loadImage: ImageLoader): Promise<
       itemPending = false;
     } else if (token.type === 'fence' || token.type === 'code_block') {
       const list = lists.at(-1);
+      if (token.type === 'fence' && isMermaidLanguage(token.info)) {
+        const { data, dimensions } = await diagramImage(token.content, loadDiagram);
+        const scale = Math.min(1, 600 / dimensions.width, 760 / dimensions.height);
+        blocks.push(new Paragraph({
+          children: [new ImageRun({
+            data, type: 'png',
+            transformation: { width: Math.max(1, Math.round(dimensions.width * scale)), height: Math.max(1, Math.round(dimensions.height * scale)) },
+            altText: { title: 'Mermaid diagram', description: 'Mermaid diagram', name: 'Mermaid diagram' },
+          })],
+          indent: list ? { left: 720 * (list.level + 1) } : undefined,
+          spacing: { after: 160 },
+        }));
+        continue;
+      }
       const lines: CodeSegment[][] = [[]];
       for (const segment of highlightedSegments(token.content.replace(/\n$/, ''), token.info.trim().split(/\s+/)[0])) {
         for (const [index, part] of segment.text.split('\n').entries()) {
@@ -201,10 +233,16 @@ export const printCSS = `
   ${syntaxCSS('pre')}
 `;
 
-export async function toPrintHTML(markdown: string, documentPath: string | null): Promise<string> {
+export async function toPrintHTML(markdown: string, documentPath: string | null, loadDiagram?: DiagramImageLoader): Promise<string> {
   const tokens = parser.parse(markdown, {});
+  if (tokens.filter(token => token.type === 'fence' && isMermaidLanguage(token.info)).length > diagramLimits.diagrams) throw new Error('An export supports at most 32 Mermaid diagrams.');
   const anchors = new Map<string, number>();
   for (const [index, token] of tokens.entries()) {
+    if (token.type === 'fence' && isMermaidLanguage(token.info)) {
+      const { data } = await diagramImage(token.content, loadDiagram);
+      token.type = 'html_block';
+      token.content = `<figure class="mermaid-diagram"><img alt="Mermaid diagram" src="data:image/png;base64,${data.toString('base64')}"></figure>\n`;
+    }
     if (token.type === 'heading_open') token.attrSet('id', headingAnchor(tokens[index + 1].content, anchors));
     for (const child of token.children ?? []) {
       if (child.type === 'image') {

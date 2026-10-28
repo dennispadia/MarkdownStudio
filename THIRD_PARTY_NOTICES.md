@@ -12,6 +12,7 @@ The application depends on separately licensed open-source software, including:
 | docx | Word document generation | MIT |
 | highlight.js | Syntax highlighting | BSD-3-Clause |
 | lowlight | Syntax-highlight integration | MIT |
+| Mermaid | Offline diagram parsing and rendering | MIT |
 
 This is an overview, not a replacement for the individual license texts. Electron's `LICENSE.electron.txt` and `LICENSES.chromium.html` are distributed alongside the executable. Dependency license files are retained in the packaged application archive where supplied by those packages. Development tools have their own licenses and are not all shipped with the application.
 

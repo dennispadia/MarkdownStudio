@@ -1,5 +1,7 @@
 import { CodeBlockLowlight, type CodeBlockLowlightOptions } from '@tiptap/extension-code-block-lowlight';
 import { codeLanguages, editorHighlighter, findCodeLanguages, resolveCodeLanguage } from '../lib/highlight.js';
+import { isMermaidLanguage } from '../lib/diagrams.js';
+import { renderMermaidBlocks } from './diagrams.js';
 
 interface LanguageCodeOptions extends CodeBlockLowlightOptions {
   copyCode: (code: string) => void;
@@ -20,6 +22,8 @@ export const LanguageCodeBlock = CodeBlockLowlight.extend<LanguageCodeOptions>({
   addNodeView() {
     return ({ node, editor, getPos }) => {
       let current = node;
+      let renderTimer: ReturnType<typeof setTimeout> | undefined;
+      let destroyed = false;
       const dom = document.createElement('div');
       dom.className = 'code-block';
       const pre = document.createElement('pre');
@@ -62,10 +66,20 @@ export const LanguageCodeBlock = CodeBlockLowlight.extend<LanguageCodeOptions>({
         const raw = typeof current.attrs.language === 'string' ? current.attrs.language : '';
         const resolved = resolveCodeLanguage(raw);
         const label = codeLanguages.find(option => option.id === resolved)?.label;
-        language.textContent = `${label ?? `${raw} (plain text)`} \u25be`;
+        language.textContent = `${isMermaidLanguage(raw) ? 'Mermaid diagram' : label ?? `${raw} (plain text)`} \u25be`;
         language.title = label ?? 'Unsupported language label preserved; displayed as plain text.';
         const className = raw ? `language-${raw}` : '';
         if (code.className !== className) code.className = className;
+        if (renderTimer) clearTimeout(renderTimer);
+        if (isMermaidLanguage(raw)) {
+          renderTimer = setTimeout(() => {
+            if (!destroyed) void renderMermaidBlocks(dom, true);
+          }, 200);
+        } else {
+          void renderMermaidBlocks(dom, true);
+          dom.querySelector('.mermaid-preview')?.remove();
+          pre.hidden = false;
+        }
       };
       const closePicker = () => {
         if (picker.matches(':popover-open')) picker.hidePopover();
@@ -85,14 +99,17 @@ export const LanguageCodeBlock = CodeBlockLowlight.extend<LanguageCodeOptions>({
       };
       const renderResults = () => {
         results.replaceChildren();
-        const options = findCodeLanguages(search.value);
+        const mermaid = { id: 'mermaid', label: 'Mermaid diagram', aliases: ['diagram'] };
+        const options = [...findCodeLanguages(search.value), ...(
+          [mermaid.id, mermaid.label, ...mermaid.aliases].some(value => value.toLowerCase().includes(search.value.trim().toLowerCase())) ? [mermaid] : []
+        )];
         for (const [index, option] of options.entries()) {
           const item = document.createElement('button');
           item.type = 'button';
           item.textContent = option.label;
           item.title = [option.id, ...option.aliases].join(', ');
           item.setAttribute('role', 'option');
-          item.setAttribute('aria-selected', String(resolveCodeLanguage(current.attrs.language) === option.id));
+          item.setAttribute('aria-selected', String((isMermaidLanguage(current.attrs.language) ? 'mermaid' : resolveCodeLanguage(current.attrs.language)) === option.id));
           item.dataset.language = option.id;
           item.tabIndex = index === 0 ? 0 : -1;
           item.addEventListener('click', () => chooseLanguage(option.id));
@@ -167,6 +184,9 @@ export const LanguageCodeBlock = CodeBlockLowlight.extend<LanguageCodeOptions>({
           ? controls.contains(document.activeElement)
           : (mutation.type === 'attributes' && mutation.target === code) || !code.contains(mutation.target),
         destroy() {
+          destroyed = true;
+          if (renderTimer) clearTimeout(renderTimer);
+          dom.querySelector('.mermaid-preview')?.remove();
           closePicker();
           document.removeEventListener('scroll', onScroll, true);
           window.removeEventListener('resize', positionPicker);

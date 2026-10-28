@@ -13,6 +13,7 @@ export interface StudioAPI {
   closeDocument: (id: string) => Promise<Result<void>>;
   exportDocument: (id: string, content: string, format: 'pdf' | 'docx') => Promise<Result<string | null>>;
   insertImage: () => Promise<Result<string | null>>;
+  storeImage: (id: string, source: string, storage: 'embedded' | 'assets') => Promise<Result<string>>;
   recent: () => Promise<Result<string[]>>;
   clearRecent: () => Promise<Result<void>>;
   setTheme: (theme: Theme) => Promise<Result<void>>;

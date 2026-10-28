@@ -5,9 +5,10 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { atomicWrite, readMarkdown } from '../lib/files.js';
-import { readImage, imageMime, MAX_IMAGE_BYTES } from '../lib/images.js';
+import { readImage, imageMime, embeddedImage, storeImage, MAX_IMAGE_BYTES } from '../lib/images.js';
 import { isSafeLink, parser } from '../lib/markdown.js';
-import { toDocx, toPrintHTML } from '../lib/export.js';
+import { toDocx, toPrintHTML, type DiagramImageLoader } from '../lib/export.js';
+import { diagramLimits, isMermaidLanguage, prepareMermaid } from '../lib/diagrams.js';
 import { themes } from '../lib/themes.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
 import type { EditorContext, Result } from '../src/bridge.js';
@@ -97,6 +98,8 @@ function insertItems(): MenuItemConstructorOptions[] {
     { label: 'Code fence', accelerator: 'CmdOrCtrl+Shift+K', click: () => action('format:codeblock') },
     { label: 'Math block (Source)', accelerator: 'CmdOrCtrl+Shift+M', click: () => action('insert:math') },
     { label: 'Table of contents', click: () => action('insert:toc') },
+    { label: 'Update table of contents', click: () => action('insert:toc-update') },
+    { label: 'Mermaid diagram (Source)', click: () => action('insert:mermaid') },
     { label: 'YAML front matter (Source)', click: () => action('insert:frontmatter') },
     { type: 'separator' },
     { label: 'Paragraph before', click: () => action('insert:before') },
@@ -104,8 +107,38 @@ function insertItems(): MenuItemConstructorOptions[] {
   ];
 }
 
-async function exportPDF(content: string, documentPath: string | null): Promise<Buffer> {
-  const html = await toPrintHTML(content, documentPath);
+async function validateRaster(data: Buffer, mime: string): Promise<void> {
+  if (!nativeImage.createFromBuffer(data).isEmpty()) return;
+  // NativeImage only decodes PNG/JPEG; Chromium also validates GIF/WebP in an isolated sandbox.
+  const decoder = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      sandbox: true, contextIsolation: true, nodeIntegration: false,
+      partition: `image-decoder-${randomUUID()}`,
+    },
+  });
+  try {
+    decoder.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    decoder.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+    decoder.webContents.session.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !details.url.startsWith('data:') }));
+    await decoder.loadURL('data:text/html,<meta http-equiv="Content-Security-Policy" content="default-src %27none%27; img-src data:">');
+    const source = `data:${mime};base64,${data.toString('base64')}`;
+    const valid: unknown = await decoder.webContents.executeJavaScript(`
+      (async () => {
+        const image = new Image();
+        image.src = ${JSON.stringify(source)};
+        try {
+          await image.decode();
+          return image.naturalWidth > 0 && image.naturalHeight > 0;
+        } catch { return false; }
+      })()
+    `);
+    if (valid !== true) throw new Error('This image could not be decoded. Choose a valid PNG, JPEG, GIF, or WebP image.');
+  } finally { decoder.destroy(); }
+}
+
+async function exportPDF(content: string, documentPath: string | null, loadDiagram?: DiagramImageLoader): Promise<Buffer> {
+  const html = await toPrintHTML(content, documentPath, loadDiagram);
   const printWindow = new BrowserWindow({
     show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true },
   });
@@ -120,6 +153,57 @@ async function exportPDF(content: string, documentPath: string | null): Promise<
     `);
     return await printWindow.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true });
   } finally { printWindow.destroy(); }
+}
+
+async function exportWithDiagrams(content: string, currentPath: string | null, format: 'pdf' | 'docx'): Promise<Buffer> {
+  const diagrams = parser.parse(content, {}).filter(token => token.type === 'fence' && isMermaidLanguage(token.info));
+  if (diagrams.length > diagramLimits.diagrams) throw new Error('Export supports at most 32 Mermaid diagrams.');
+  for (const diagram of diagrams) prepareMermaid(diagram.content);
+  let renderer: BrowserWindow | undefined;
+  const images = new Map<string, { data: Buffer; mime: 'image/png' }>();
+  const loadDiagram: DiagramImageLoader = async source => {
+    const cached = images.get(source);
+    if (cached) return cached;
+    if (!renderer) {
+      renderer = new BrowserWindow({
+        show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: 'markdown-studio-diagrams' },
+      });
+      renderer.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      renderer.webContents.on('will-navigate', event => event.preventDefault());
+      renderer.webContents.session.webRequest.onBeforeRequest((request, callback) => {
+        callback({ cancel: !request.url.startsWith('file:') && !request.url.startsWith('data:') });
+      });
+      await renderer.loadFile(path.join(app.getAppPath(), 'dist', 'diagram-export.html'));
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const png: unknown = await Promise.race([
+        renderer.webContents.executeJavaScript(`window.studioRenderDiagram(${JSON.stringify(source)})`),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            renderer?.destroy();
+            reject(new Error('Mermaid export exceeded ten seconds. Simplify the diagram.'));
+          }, 10000);
+        }),
+      ]);
+      if (typeof png !== 'string' || png.length > diagramLimits.pngBytes * 4 / 3 + 32 || !png.startsWith('data:image/png;base64,')) {
+        throw new Error('Diagram renderer returned an invalid PNG.');
+      }
+      const data = Buffer.from(png.slice('data:image/png;base64,'.length), 'base64');
+      const image = nativeImage.createFromBuffer(data);
+      if (image.isEmpty()) throw new Error('Diagram PNG could not be decoded.');
+      const { width, height } = image.getSize();
+      if (width > 4096 || height > 4096 || width * height > 8_000_000) throw new Error('Diagram PNG exceeds the export dimensions.');
+      const result = { data, mime: 'image/png' as const };
+      images.set(source, result);
+      return result;
+    } finally { clearTimeout(timer); }
+  };
+  try {
+    return format === 'pdf'
+      ? await exportPDF(content, currentPath, loadDiagram)
+      : await toDocx(content, source => readImage(source, currentPath), loadDiagram);
+  } finally { if (renderer && !renderer.isDestroyed()) renderer.destroy(); }
 }
 
 function installIPC(): void {
@@ -147,6 +231,10 @@ function installIPC(): void {
     const data = image.toPNG();
     if (data.length > MAX_IMAGE_BYTES) throw new Error('The clipboard image exceeds the 20 MB image limit.');
     return `data:image/png;base64,${data.toString('base64')}`;
+  });
+  handle('document:store-image', async (id: unknown, source: unknown, storage: unknown) => {
+    const document = documentFor(id);
+    return storeImage(source, document.path, storage, validateRaster);
   });
   handle('editor:copy-image', async (id: unknown, source: unknown) => {
     contentArgument(source);
@@ -263,13 +351,16 @@ function installIPC(): void {
   });
   handle('document:image', async () => {
     const selection = await dialog.showOpenDialog(window, {
-      title: 'Insert image (embedded in Markdown)', properties: ['openFile'],
+      title: 'Insert image', properties: ['openFile'],
       filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
     });
     if (selection.canceled) return null;
     const file = selection.filePaths[0];
     if ((await stat(file)).size > MAX_IMAGE_BYTES) throw new Error('Choose an image smaller than 20 MB.');
-    return `data:${imageMime(file)};base64,${(await readFile(file)).toString('base64')}`;
+    const source = `data:${imageMime(file)};base64,${(await readFile(file)).toString('base64')}`;
+    const { data, mime } = embeddedImage(source);
+    await validateRaster(data, mime);
+    return source;
   });
   handle('document:export', async (id: unknown, content: unknown, format: unknown) => {
     const currentPath = documentFor(id).path;
@@ -284,7 +375,7 @@ function installIPC(): void {
     if ([...documents.values()].some(document => document.path && samePath(selection.filePath!, document.path))) {
       throw new Error('Export cannot replace an open Markdown source file.');
     }
-    const data = format === 'pdf' ? await exportPDF(content, currentPath) : await toDocx(content, source => readImage(source, currentPath));
+    const data = await exportWithDiagrams(content, currentPath, format);
     await atomicWrite(selection.filePath, data);
     return selection.filePath;
   });
@@ -414,6 +505,7 @@ function createWindow(): void {
     ] },
     { label: '&View', submenu: [
       { label: 'Visual / source', accelerator: 'CmdOrCtrl+/', click: send('mode') },
+      { label: 'Source + Preview', click: send('preview') },
       { label: 'Toggle sidebar', accelerator: 'CmdOrCtrl+Shift+B', click: send('sidebar') },
       { label: 'Focus mode', accelerator: 'F9', click: send('focus') },
       { label: 'Split with...', click: send('split') },

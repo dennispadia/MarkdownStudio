@@ -4,7 +4,7 @@ $manifest = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | Con
 $release = Join-Path $root 'release'
 New-Item -ItemType Directory -Path $release -Force | Out-Null
 $output = Join-Path $release "MarkdownStudio-$($manifest.version)-source.zip"
-$files = @('.gitignore', '.gitattributes', '.editorconfig', 'package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'index.html', 'Launch.cmd', 'Setup.ps1', 'README.md', 'LICENSE', 'SUPPORT.md', 'CONTRIBUTING.md', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md')
+$files = @('.gitignore', '.gitattributes', '.editorconfig', 'package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'index.html', 'diagram-export.html', 'Launch.cmd', 'Setup.ps1', 'README.md', 'LICENSE', 'SUPPORT.md', 'CONTRIBUTING.md', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md')
 $folders = @('.github', 'assets', 'docs', 'electron', 'lib', 'scripts', 'src', 'tests')
 foreach ($folder in $folders) {
     $base = Join-Path $root $folder

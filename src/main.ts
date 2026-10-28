@@ -5,7 +5,9 @@ import { TableKit } from '@tiptap/extension-table';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { Markdown } from '@tiptap/markdown';
-import { documentPreviewHTML, headingAnchor, headings, imageDisplayURL, isSafeLink, replaceAllLiteral, wordCount } from '../lib/markdown.js';
+import { documentPreviewHTML, headingAnchor, headings, imageDisplayURL, isSafeLink, wordCount } from '../lib/markdown.js';
+import { replaceSearchMatches, type SearchMatch, type SearchResult } from '../lib/search.js';
+import { tableOfContents, updateTableOfContents } from '../lib/contents.js';
 import type { Result } from './bridge.js';
 import { isTheme, restoreTheme, themes, type Theme } from '../lib/themes.js';
 import { createPair, DEFAULT_SIDEBAR_WIDTH, groupTabs, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, pairFor, sidebarWidth, splitRatio, type SplitPair } from '../lib/workspace.js';
@@ -13,6 +15,8 @@ import { formattingShortcuts } from '../lib/shortcuts.js';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, tableMarkdown, validateTableSize } from '../lib/tables.js';
 import { syntaxCSS } from '../lib/highlight.js';
 import { LanguageCodeBlock } from './code-block.js';
+import { ContentsNode } from './contents-node.js';
+import { renderMermaidBlocks } from './diagrams.js';
 import './style.css';
 
 const syntaxStyle = document.createElement('style');
@@ -117,7 +121,7 @@ app.innerHTML = `
     <div class="tabs-bar"><div id="tabs" role="tablist" aria-label="Open documents"></div>${button('new', 'New tab', 'plus', 'icon-only')}</div>
     <header class="workspace-bar topbar">
       <div class="document-name sr-only"><span id="filename">Welcome</span><span id="dirty-indicator"></span></div>
-      <div class="workspace-navigation"><button type="button" id="sidebar-toggle" data-action="sidebar" aria-controls="sidebar" aria-expanded="true" aria-label="Hide sidebar" title="Hide sidebar (Ctrl+Shift+B)">${icon('sidebar')}</button><div class="mode-switch global-modes" role="group" aria-label="Editor mode"><button id="visual-mode" data-action="visual" class="selected" aria-pressed="true">Visual</button><button id="source-mode" data-action="source" aria-pressed="false">Source</button></div></div>
+      <div class="workspace-navigation"><button type="button" id="sidebar-toggle" data-action="sidebar" aria-controls="sidebar" aria-expanded="true" aria-label="Hide sidebar" title="Hide sidebar (Ctrl+Shift+B)">${icon('sidebar')}</button><div class="mode-switch global-modes" role="group" aria-label="Editor mode"><button id="visual-mode" data-action="visual" class="selected" aria-pressed="true">Visual</button><button id="source-mode" data-action="source" aria-pressed="false">Source</button><button id="preview-mode" data-action="preview" aria-pressed="false">Source + Preview</button></div></div>
       <div class="workspace-actions">
         ${button('find', 'Find', 'search', 'quiet')}
         ${button('split', 'Split with...', 'split', 'split-control')}
@@ -140,15 +144,23 @@ app.innerHTML = `
     </div>
     <div id="table-tools" hidden><span>TABLE</span>${button('row', '+ Row')}${button('column', '+ Column')}${button('delete-row', 'Remove row')}${button('delete-column', 'Remove column')}${button('delete-table', 'Remove table')}</div>
     <section id="find-panel" hidden aria-label="Find and replace">
-      <input id="find-text" aria-label="Find text" placeholder="Find text (case-sensitive)" />
+      <input id="find-text" aria-label="Find text" placeholder="Find Markdown text" />
       <input id="replace-text" aria-label="Replacement text" placeholder="Replace with" />
-      ${button('find-next', 'Find next')}${button('replace-all', 'Replace all')}<span id="find-result" role="status"></span>${button('find-close', 'Close')}
+      <label><input id="find-case" type="checkbox" checked />Match case</label><label><input id="find-word" type="checkbox" />Whole word</label><label><input id="find-regex" type="checkbox" />Regex</label>
+      ${button('find-previous', 'Previous')}${button('find-next', 'Find next')}${button('replace-one', 'Replace')}${button('replace-all', 'Replace all')}<span id="find-result" role="status"></span>${button('find-close', 'Close')}
     </section>
     <div id="recovery-banner" hidden>Unsaved drafts from your last session are available. ${button('recover', 'Recover drafts')}${button('dismiss-recovery', 'Dismiss')}</div>
     <div class="canvas" id="canvas"><article class="paper" id="visual-editor" aria-label="Visual Markdown editor"></article><textarea id="source-editor" aria-label="Markdown source" spellcheck="false" hidden></textarea></div>
     <footer><span id="word-count">0 words</span><span id="save-status" class="sr-only" aria-live="polite">Ready to write</span></footer>
   </main>
   <div id="notification" role="status" hidden></div>
+  <dialog id="image-storage-dialog" aria-labelledby="image-storage-title"><form method="dialog">
+    <h2 id="image-storage-title">Store this image</h2>
+    <label><input type="radio" name="image-storage" value="embedded" checked />Embed in document (portable, larger Markdown file)</label>
+    <label><input type="radio" name="image-storage" value="assets" />Save in this document's assets folder</label>
+    <p id="image-storage-note">Save the document first to use an assets folder. Keep the folder with the document when sharing or moving it.</p>
+    <div class="dialog-actions"><button value="cancel">Cancel</button><button value="insert" class="primary">Insert image</button></div>
+  </form></dialog>
   <dialog id="link-dialog"><form method="dialog"><h2>Add a link</h2><label>Link text<input id="link-label" required /></label><label>Web address<input id="link-url" type="url" placeholder="https://example.com" required /></label><div class="dialog-actions"><button value="cancel" formnovalidate>Cancel</button><button value="insert" class="primary">Insert link</button></div></form></dialog>
   <dialog id="table-dialog" aria-labelledby="table-title"><form method="dialog" id="table-form">
     <h2 id="table-title">Insert table</h2>
@@ -201,17 +213,19 @@ app.innerHTML = `
     <p><b>Sidebar</b>: drag its right edge to resize, or focus the edge and use Left/Right (Home/End set limits). Double-click the edge to reset. Width is remembered between launches and limited to leave room for editing. Use the button to the left of Visual/Source or Ctrl+Shift+B to toggle outline/recent files. <b>View &gt; Focus mode</b> or F9 also hides the document header; Escape restores your previous sidebar preference.</p>
     <p><b>Find</b>: click Find or press Ctrl+F to open or close the find bar. Close and Escape also dismiss it; the search and replacement text are retained.</p>
     <p><b>Right-click</b> for Formatting, Paragraph (Heading 1-6 or normal text), Insert, Copy / Paste As, and spelling suggestions. Choose <b>Table &gt; Insert table</b> or <b>Insert &gt; Table</b> to choose rows and columns. Row/column editing controls become available inside a table.</p>
-    <p><b>Insert</b> includes images, links, tables, code fences, horizontal lines, a static table of contents, and paragraphs before/after. Footnotes, link references, math, and YAML insert editable syntax in <b>Source mode</b>. From Visual mode these go at the end, except YAML at the top. Math, footnotes, and YAML do not yet have formatted rendering or structured export support. Reinsert the contents list after changing headings.</p>
+    <p><b>Insert</b> includes images, links, tables, code fences, Mermaid, horizontal lines, a marked table of contents, and paragraphs before/after. Use <b>Update table of contents</b> after changing headings. Footnotes, link references, math, and YAML insert editable syntax in <b>Source mode</b>. From Visual mode these go at the end, except YAML at the top. Math, footnotes, and YAML do not yet have formatted rendering or structured export support.</p>
     <p><b>Source</b> lets you edit the exact Markdown text. Use it for advanced syntax or HTML the visual editor doesn't support. Visual editing may normalize Markdown syntax; switching Visual/Source modes resets that tab's undo history.</p>
     <p><b>Save</b> keeps a regular UTF-8 Markdown file. <b>Export</b> creates a separate Word or PDF document, including the active tab's unsaved edits.</p>
-    <p>Insert an image, or copy a screenshot/image and use <b>Ctrl+V</b> or right-click <b>Paste</b>. Right-click an image for <b>Copy image</b>. Pasted bitmaps are embedded as PNG and travel with the Markdown file. Relative images must be inside the document's folder. Remote images are not fetched. Word supports PNG, JPEG, and GIF; PDF also supports WebP.</p>
+    <p>Insert, paste or drop an image, then choose embedding or a saved document's <b>assets</b> folder. Clipboard bitmaps become PNG. Right-click an image for <b>Copy image</b>. Embedded images travel with the Markdown; relative assets must be kept with its folder. Remote images are not fetched. Word supports PNG, JPEG, and GIF; PDF also supports WebP.</p>
     <p><b>Ctrl+N</b> New tab &nbsp; <b>Ctrl+O</b> Open &nbsp; <b>Ctrl+S</b> Save<br><b>Ctrl+W</b> Close tab &nbsp; <b>Ctrl+Tab</b> Next tab<br><b>Ctrl+Alt+S</b> Save all &nbsp; <b>Ctrl+P</b> PDF<br><b>Ctrl+0-6</b> Paragraph / Headings &nbsp; <b>Ctrl+T</b> Table<br><b>Ctrl+F</b> Find &nbsp; <b>Ctrl+/</b> Switch mode &nbsp; <b>F9</b> Focus</p>
-    <p>Local draft recovery covers every unsaved tab. Save regularly; recovery is not a substitute for backups. This version does not support every Typora extension, such as rendered math or Mermaid.</p>
+    <p><b>Source + Preview</b> shows a read-only rendering beside your editable Markdown, with optional synchronized scrolling. Mermaid diagrams render locally. Use More formatting or Insert for a Mermaid template and to update a marked table of contents.</p>
+    <p>Local draft recovery covers every unsaved tab. Save regularly; recovery is not a substitute for backups. Rendered math is not supported.</p>
     <form method="dialog"><button class="primary">Let's write</button></form>
   </dialog>
 `;
 
 function element<T extends HTMLElement>(id: string): T { return document.getElementById(id) as T; }
+element('format-menu').insertAdjacentHTML('beforeend', '<button type="button" role="menuitem" data-action="insert:toc">Insert table of contents</button><button type="button" role="menuitem" data-action="insert:toc-update">Update table of contents</button><button type="button" role="menuitem" data-action="insert:mermaid">Mermaid diagram</button>');
 for (const shortcut of formattingShortcuts) {
   for (const control of document.querySelectorAll<HTMLElement>(`[data-command="${shortcut.command}"]`)) {
     control.title = `${shortcut.label} (${shortcut.accelerator.replace('CmdOrCtrl', 'Ctrl')})`;
@@ -251,7 +265,11 @@ let mode: 'visual' | 'source' = 'visual';
 let busy = false;
 let sourceUndo: string[] = [];
 let sourceRedo: string[] = [];
-let findPosition = 0;
+let searchMatches: SearchMatch[] = [];
+let searchIndex = -1;
+let searchTimer: ReturnType<typeof setTimeout>;
+let searchRevision = 0;
+let previewTimer: ReturnType<typeof setTimeout>;
 let draftTimer: ReturnType<typeof setTimeout>;
 let notificationTimer: ReturnType<typeof setTimeout>;
 interface RecoveryDraft { content: string; name: string }
@@ -273,6 +291,8 @@ interface DocumentTab {
   source: HTMLTextAreaElement;
   pane: HTMLElement;
   viewport: HTMLElement;
+  preview?: boolean;
+  previewMarkdown?: string;
 }
 const tabs: DocumentTab[] = [];
 const pairs: SplitPair[] = [];
@@ -375,11 +395,159 @@ function setFindOpen(open: boolean): void {
   const control = document.querySelector<HTMLButtonElement>('[data-action="find"]')!;
   control.setAttribute('aria-controls', 'find-panel');
   control.setAttribute('aria-expanded', String(open));
-  if (open) element<HTMLInputElement>('find-text').focus();
+  if (open) { element<HTMLInputElement>('find-text').focus(); scheduleSearch(); }
   else if (returnToEditor) {
     if (mode === 'source') source.focus();
     else editor.commands.focus();
   }
+  if (!open) {
+    searchRevision++;
+    clearTimeout(searchTimer);
+    for (const tab of tabs) tab.pane.querySelector('.source-highlights')?.replaceChildren();
+  }
+}
+
+function refreshPreview(tab: DocumentTab): void {
+  if (!tab.preview || tab.previewMarkdown === tab.markdown) return;
+  const content = tab.viewport.querySelector<HTMLElement>('.document-preview')!;
+  content.innerHTML = documentPreviewHTML(tab.markdown, tab.id);
+  const used = new Map<string, number>();
+  const outline = headings(tab.markdown);
+  content.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6').forEach((heading, index) => {
+    if (outline[index]) heading.id = headingAnchor(outline[index].text, used);
+  });
+  tab.previewMarkdown = tab.markdown;
+  void renderMermaidBlocks(content).catch(error => notify(`Preview diagrams failed: ${String(error)}`, true));
+}
+
+function togglePreview(): void {
+  if (!activeTab) return;
+  const enabled = !activeTab.preview;
+  if (mode !== 'source') switchMode('source');
+  activeTab.preview = enabled;
+  showMode();
+  refreshPreview(activeTab);
+  source.focus();
+}
+
+function searchKey(): string {
+  return JSON.stringify([
+    element<HTMLInputElement>('find-text').value,
+    element<HTMLInputElement>('find-case').checked, element<HTMLInputElement>('find-word').checked,
+    element<HTMLInputElement>('find-regex').checked, documentId,
+  ]);
+}
+function searchText(): string { return markdown.replace(/\r\n/g, '\n'); }
+let lastSearchKey = '';
+let lastSearchText = '';
+
+function requestSearch(text: string): Promise<SearchResult> {
+  const worker = new Worker(new URL('./search-worker.ts', import.meta.url), { type: 'module' });
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('Search exceeded two seconds. Simplify the regular expression or narrow the search.'));
+    }, 2000);
+    const finish = () => { clearTimeout(timer); worker.terminate(); };
+    worker.onmessage = (event: MessageEvent<Result<SearchResult>>) => {
+      finish();
+      if (event.data.ok) resolve(event.data.value);
+      else reject(new Error(event.data.error));
+    };
+    worker.onerror = event => { finish(); reject(new Error(`Search worker failed: ${event.message}`)); };
+    worker.postMessage({
+      text, query: element<HTMLInputElement>('find-text').value,
+      replacement: element<HTMLInputElement>('replace-text').value,
+      options: {
+        caseSensitive: element<HTMLInputElement>('find-case').checked,
+        wholeWord: element<HTMLInputElement>('find-word').checked,
+        regex: element<HTMLInputElement>('find-regex').checked,
+      },
+    });
+  });
+}
+
+function paintSearch(): void {
+  for (const tab of tabs) {
+    const layer = tab.pane.querySelector<HTMLElement>('.source-highlights')!;
+    layer.replaceChildren();
+    if (tab !== activeTab || element('find-panel').hidden || !searchMatches.length) continue;
+    let position = 0;
+    for (const [index, match] of searchMatches.entries()) {
+      layer.append(document.createTextNode(source.value.slice(position, match.from)));
+      const mark = document.createElement('mark');
+      mark.classList.toggle('current-match', index === searchIndex);
+      mark.textContent = source.value.slice(match.from, match.to) || '\u200b';
+      layer.append(mark);
+      position = match.to;
+    }
+    layer.append(document.createTextNode(source.value.slice(position) + '\n'));
+    layer.style.width = `${source.clientWidth}px`;
+    layer.scrollTop = source.scrollTop;
+    layer.scrollLeft = source.scrollLeft;
+  }
+}
+
+async function refreshSearch(): Promise<SearchResult | null> {
+  const revision = ++searchRevision;
+  const text = searchText();
+  const key = searchKey();
+  try {
+    const result = await requestSearch(text);
+    if (revision !== searchRevision || key !== searchKey() || text !== searchText()) return null;
+    if (lastSearchKey !== key || lastSearchText !== text) searchIndex = -1;
+    lastSearchKey = key;
+    lastSearchText = text;
+    searchMatches = result.matches;
+    element('find-result').textContent = `${searchIndex >= 0 ? `${searchIndex + 1} of ` : ''}${result.matches.length.toLocaleString()}${result.truncated ? '+' : ''} matches`;
+    paintSearch();
+    return result;
+  } catch (error) {
+    if (revision !== searchRevision) return null;
+    searchMatches = [];
+    paintSearch();
+    throw error;
+  }
+}
+
+function scheduleSearch(): void {
+  clearTimeout(searchTimer);
+  searchRevision++;
+  searchTimer = setTimeout(() => {
+    void refreshSearch().catch(error => {
+      element('find-result').textContent = error instanceof Error ? error.message : String(error);
+    });
+  }, 180);
+}
+
+async function navigateSearch(backward = false): Promise<void> {
+  clearTimeout(searchTimer);
+  if (!element<HTMLInputElement>('find-text').value) throw new Error('Enter some text to find.');
+  if (mode !== 'source') switchMode('source');
+  const result = await refreshSearch();
+  if (!result?.matches.length) return;
+  searchIndex = (searchIndex + (backward ? (searchIndex < 0 ? 0 : -1) : 1) + result.matches.length) % result.matches.length;
+  const match = result.matches[searchIndex];
+  source.focus();
+  source.setSelectionRange(match.from, match.to);
+  source.scrollTop = Math.max(0, markdown.slice(0, match.from).split('\n').length * 24 - 100);
+  element('find-result').textContent = `${searchIndex + 1} of ${result.matches.length.toLocaleString()}${result.truncated ? '+' : ''} matches`;
+  paintSearch();
+}
+
+async function replaceFound(all: boolean): Promise<void> {
+  clearTimeout(searchTimer);
+  if (!element<HTMLInputElement>('find-text').value) throw new Error('Enter some text to find.');
+  if (mode !== 'source') switchMode('source');
+  const result = await refreshSearch();
+  if (!result) throw new Error('The search changed. Try replacing again.');
+  if (result.truncated) throw new Error('More than 10,000 matches. Narrow the search before replacing.');
+  const matches = all ? result.matches : result.matches.slice(Math.max(0, searchIndex), Math.max(0, searchIndex) + 1);
+  const text = replaceSearchMatches(searchText(), matches);
+  source.value = text;
+  changed(text);
+  await refreshSearch();
+  element('find-result').textContent = `${matches.length.toLocaleString()} replaced`;
 }
 
 async function applyTheme(value: Theme, persist = true): Promise<void> {
@@ -418,7 +586,7 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
     }),
     LocalImage.configure({ allowBase64: true }),
     TableKit.configure({ table: { resizable: false } }),
-    TaskList, TaskItem.configure({ nested: true }), Markdown,
+    TaskList, TaskItem.configure({ nested: true }), ContentsNode, Markdown,
   ],
   content,
   contentType: 'markdown',
@@ -446,11 +614,35 @@ function createPane(host: HTMLElement, text: HTMLTextAreaElement): { pane: HTMLE
   const header = document.createElement('div');
   header.className = 'pane-header';
   header.hidden = true;
-  header.innerHTML = '<span class="pane-title"></span><div class="pane-modes" role="group" aria-label="Editor mode"><button type="button" data-pane-mode="visual">Visual</button><button type="button" data-pane-mode="source">Source</button></div>';
+  header.innerHTML = '<span class="pane-title"></span><div class="pane-modes" role="group" aria-label="Editor mode"><button type="button" data-pane-mode="visual">Visual</button><button type="button" data-pane-mode="source">Source</button><button type="button" data-pane-mode="preview">Source + Preview</button></div>';
   const viewport = document.createElement('div');
   viewport.className = 'pane-content';
   text.classList.add('document-source');
-  viewport.append(host, text);
+  const surface = document.createElement('div');
+  surface.className = 'source-surface';
+  const highlights = document.createElement('pre');
+  highlights.className = 'source-highlights';
+  highlights.setAttribute('aria-hidden', 'true');
+  surface.append(highlights, text);
+  const preview = document.createElement('section');
+  preview.className = 'live-preview';
+  preview.setAttribute('aria-label', 'Read-only Markdown preview');
+  preview.hidden = true;
+  preview.innerHTML = '<div class="preview-heading">Preview (read-only)<label><input class="preview-sync" type="checkbox" checked />Sync scrolling</label></div><article class="document-preview"></article>';
+  let synchronizing = false;
+  const sync = (from: HTMLElement, to: HTMLElement) => {
+    if (synchronizing || !preview.querySelector<HTMLInputElement>('.preview-sync')!.checked) return;
+    synchronizing = true;
+    to.scrollTop = from.scrollTop / Math.max(1, from.scrollHeight - from.clientHeight) * Math.max(0, to.scrollHeight - to.clientHeight);
+    requestAnimationFrame(() => { synchronizing = false; });
+  };
+  text.addEventListener('scroll', () => {
+    highlights.scrollTop = text.scrollTop;
+    highlights.scrollLeft = text.scrollLeft;
+    if (!preview.hidden) sync(text, preview);
+  });
+  preview.addEventListener('scroll', () => sync(preview, text));
+  viewport.append(host, surface, preview);
   pane.append(header, viewport);
   return { pane, viewport };
 }
@@ -516,8 +708,9 @@ function updatePaneHeaders(): void {
     header.hidden = !pair;
     header.querySelector<HTMLElement>('.pane-title')!.textContent = `${tab.name}${tab.markdown !== tab.savedMarkdown ? ' \u2022' : ''}`;
     for (const control of header.querySelectorAll<HTMLButtonElement>('[data-pane-mode]')) {
-      control.classList.toggle('selected', control.dataset.paneMode === tab.mode);
-      control.setAttribute('aria-pressed', String(control.dataset.paneMode === tab.mode));
+      const selected = control.dataset.paneMode === (tab.preview ? 'preview' : tab.mode);
+      control.classList.toggle('selected', selected);
+      control.setAttribute('aria-pressed', String(selected));
     }
   }
   const control = document.querySelector<HTMLButtonElement>('[data-action="split"]')!;
@@ -612,11 +805,17 @@ function renderTabs(): void {
 
 function showMode(): void {
   source.hidden = mode !== 'source';
+  source.closest<HTMLElement>('.source-surface')!.hidden = mode !== 'source';
   visual.hidden = mode !== 'visual';
+  const preview = Boolean(activeTab?.preview && mode === 'source');
+  activeTab?.viewport.classList.toggle('has-preview', preview);
+  if (activeTab) activeTab.viewport.querySelector<HTMLElement>('.live-preview')!.hidden = !preview;
   for (const type of ['visual', 'source'] as const) {
-    element(`${type}-mode`).classList.toggle('selected', mode === type);
-    element(`${type}-mode`).setAttribute('aria-pressed', String(mode === type));
+    element(`${type}-mode`).classList.toggle('selected', mode === type && !preview);
+    element(`${type}-mode`).setAttribute('aria-pressed', String(mode === type && !preview));
   }
+  element('preview-mode').classList.toggle('selected', preview);
+  element('preview-mode').setAttribute('aria-pressed', String(preview));
   document.querySelector('.toolbar')!.classList.toggle('source-toolbar', mode === 'source');
   if (activeTab) activeTab.mode = mode;
   updatePaneHeaders();
@@ -645,7 +844,8 @@ function activateTab(id: string): void {
   source.setSelectionRange(...next.selection);
   source.scrollTop = next.sourceScroll;
   next.viewport.scrollTop = next.canvasScroll;
-  findPosition = 0;
+  searchMatches = [];
+  searchIndex = -1;
   element('find-result').textContent = '';
   editor.setEditable(!busy, false);
   source.readOnly = busy;
@@ -865,6 +1065,11 @@ function update(): void {
   }
   if (!outline.childElementCount) outline.innerHTML = '<p class="empty-note">Add a heading to give your ideas a little structure.</p>';
   updateToolbar();
+  if (activeTab?.preview) {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => { if (activeTab) refreshPreview(activeTab); }, 120);
+  }
+  if (!element('find-panel').hidden) scheduleSearch();
 }
 
 function changed(content: string, record = true): void {
@@ -895,7 +1100,8 @@ function storeDraft(): void {
 }
 
 function switchMode(next: 'visual' | 'source'): void {
-  if (next === mode) return;
+  if (activeTab) activeTab.preview = false;
+  if (next === mode) { showMode(); return; }
   if (next === 'source') {
     source.value = markdown;
     sourceUndo.length = 0;
@@ -1000,17 +1206,10 @@ function insertAdvanced(kind: string): void {
 }
 
 function insertContents(): void {
-  const outline = headings(markdown);
-  if (!outline.length) throw new Error('Add headings before inserting a table of contents.');
-  const used = new Map<string, number>();
-  const entries = outline.map(item => {
-    const anchor = headingAnchor(item.text, used);
-    return `${'  '.repeat(item.level - 1)}- [${item.text.replace(/[[\]\\]/g, '\\$&')}](#${anchor})`;
-  });
-  const contents = `**Contents**\n\n${entries.join('\n')}\n\n`;
+  const contents = `${tableOfContents(markdown)}\n\n`;
   if (mode === 'source') insertSource(contents);
   else editor.chain().focus().insertContent(contents, { contentType: 'markdown' }).run();
-  notify('Inserted a static table of contents. Reinsert it after changing your headings. Links use common Markdown heading anchors.');
+  notify('Inserted a marked table of contents. Use Insert > Update table of contents after changing headings.');
 }
 
 async function save(saveAs = false): Promise<boolean> {
@@ -1101,6 +1300,22 @@ function insertEmbeddedImage(image: string): void {
   }
 }
 
+async function chooseImageStorage(image: string): Promise<void> {
+  const dialog = element<HTMLDialogElement>('image-storage-dialog');
+  const id = documentId;
+  const assets = dialog.querySelector<HTMLInputElement>('[value="assets"]')!;
+  assets.disabled = !documentPath;
+  dialog.querySelector<HTMLInputElement>('[value="embedded"]')!.checked = true;
+  dialog.returnValue = '';
+  const choice = new Promise<string>(resolve => dialog.addEventListener('close', () => resolve(dialog.returnValue), { once: true }));
+  dialog.showModal();
+  if (await choice !== 'insert') return;
+  if (id !== documentId) throw new Error('The active document changed. Insert the image again in the intended document.');
+  const storage = assets.checked ? 'assets' : 'embedded';
+  const value = unwrap(await window.studio.storeImage(id, image, storage));
+  insertEmbeddedImage(value);
+}
+
 function format(command: string): void {
   if (mode === 'source') {
     const syntax: Record<string, [string, string]> = {
@@ -1143,16 +1358,29 @@ async function dispatch(action: string): Promise<void> {
     const kind = action.slice(7);
     if (kind === 'before' || kind === 'after') insertParagraph(kind === 'after');
     else if (kind === 'toc') insertContents();
+    else if (kind === 'toc-update') {
+      const content = updateTableOfContents(markdown);
+      if (mode === 'visual') editor.commands.setContent(content, { contentType: 'markdown', emitUpdate: false });
+      else source.value = content;
+      changed(content);
+      notify('Table of contents updated. Surrounding Markdown is unchanged.');
+    }
+    else if (kind === 'mermaid') {
+      if (mode !== 'source') switchMode('source');
+      insertSource('\n```mermaid\nflowchart LR\n  A[Start] --> B[Write something]\n```\n');
+      if (!activeTab?.preview) togglePreview();
+    }
     else insertAdvanced(kind);
     return;
   }
   switch (action) {
     case 'split': openSplit(); break;
+    case 'preview': togglePreview(); break;
     case 'unsplit': unsplit(); break;
     case 'paste-image': {
       const image = unwrap(await window.studio.readClipboardImage());
       if (!image) throw new Error('The clipboard has no image to paste. Copy an image or take a screenshot first.');
-      insertEmbeddedImage(image);
+      await chooseImageStorage(image);
       break;
     }
     case 'copy-image': {
@@ -1256,31 +1484,10 @@ async function dispatch(action: string): Promise<void> {
       setFindOpen(element('find-panel').hidden);
       break;
     case 'find-close': setFindOpen(false); break;
-    case 'find-next': {
-      const query = element<HTMLInputElement>('find-text').value;
-      if (!query) throw new Error('Enter some text to find.');
-      switchMode('source');
-      let found = markdown.indexOf(query, findPosition);
-      if (found < 0) found = markdown.indexOf(query);
-      if (found < 0) { element('find-result').textContent = 'No matches'; break; }
-      source.focus();
-      source.setSelectionRange(found, found + query.length);
-      source.scrollTop = Math.max(0, (markdown.slice(0, found).match(/\n/g)?.length ?? 0) * 24 - 70);
-      findPosition = found + query.length;
-      element('find-result').textContent = `Match at character ${found + 1}`;
-      break;
-    }
-    case 'replace-all': {
-      const replacement = replaceAllLiteral(markdown, element<HTMLInputElement>('find-text').value, element<HTMLInputElement>('replace-text').value);
-      switchMode('source');
-      if (replacement.count) {
-        source.value = replacement.text;
-        changed(replacement.text);
-      }
-      element('find-result').textContent = `${replacement.count} replaced`;
-      findPosition = 0;
-      break;
-    }
+    case 'find-next': await navigateSearch(); break;
+    case 'find-previous': await navigateSearch(true); break;
+    case 'replace-one': await replaceFound(false); break;
+    case 'replace-all': await replaceFound(true); break;
     case 'link':
       linkDocumentId = documentId;
       element<HTMLInputElement>('link-label').value = mode === 'source' ? source.value.slice(source.selectionStart, source.selectionEnd) : editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
@@ -1289,7 +1496,7 @@ async function dispatch(action: string): Promise<void> {
       break;
     case 'image': {
       const image = unwrap(await window.studio.insertImage());
-      if (image) insertEmbeddedImage(image);
+      if (image) await chooseImageStorage(image);
       break;
     }
     case 'table':
@@ -1352,6 +1559,15 @@ function activateEventPane(event: Event): void {
 element('canvas').addEventListener('pointerdown', activateEventPane, true);
 element('canvas').addEventListener('focusin', activateEventPane, true);
 element('canvas').addEventListener('contextmenu', activateEventPane, true);
+for (const id of ['find-text', 'replace-text', 'find-case', 'find-word', 'find-regex']) {
+  element(id).addEventListener('input', scheduleSearch);
+}
+element('find-text').addEventListener('keydown', event => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  void run(async () => navigateSearch(event.shiftKey));
+});
+window.addEventListener('resize', () => { if (!element('find-panel').hidden) paintSearch(); });
 element('canvas').addEventListener('input', event => {
   if (!(event.target instanceof HTMLTextAreaElement) || !event.target.classList.contains('document-source')) return;
   activateEventPane(event);
@@ -1382,8 +1598,8 @@ document.addEventListener('click', event => {
     return;
   }
   const paneMode = target.closest<HTMLElement>('[data-pane-mode]')?.dataset.paneMode;
-  if (paneMode === 'visual' || paneMode === 'source') {
-    if (!busy) { activateEventPane(event); switchMode(paneMode); }
+  if (paneMode === 'visual' || paneMode === 'source' || paneMode === 'preview') {
+    if (!busy) { activateEventPane(event); if (paneMode === 'preview') togglePreview(); else switchMode(paneMode); }
     return;
   }
   const command = target.closest<HTMLElement>('[data-command]')?.dataset.command;
@@ -1563,7 +1779,30 @@ element('canvas').addEventListener('paste', event => {
       reader.onerror = () => reject(new Error('The clipboard image could not be read.'));
       reader.readAsDataURL(file);
     });
-    insertEmbeddedImage(data);
+    await chooseImageStorage(data);
+  });
+}, true);
+element('canvas').addEventListener('dragover', event => {
+  if ([...(event.dataTransfer?.items ?? [])].some(item => item.kind === 'file')) event.preventDefault();
+});
+element('canvas').addEventListener('drop', event => {
+  const files = [...(event.dataTransfer?.files ?? [])];
+  if (!files.length) return;
+  event.preventDefault();
+  event.stopPropagation();
+  activateEventPane(event);
+  void run(async () => {
+    if (files.length !== 1) throw new Error('Drop one image at a time.');
+    const file = files[0];
+    if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) throw new Error('Drop a PNG, JPEG, GIF, or WebP image.');
+    if (file.size > 20 * 1024 * 1024) throw new Error('The dropped image exceeds the 20 MB image limit.');
+    const data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('The dropped image could not be read.'));
+      reader.onerror = () => reject(new Error('The dropped image could not be read.'));
+      reader.readAsDataURL(file);
+    });
+    await chooseImageStorage(data);
   });
 }, true);
 element('canvas').addEventListener('keydown', event => {

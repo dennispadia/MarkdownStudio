@@ -35,7 +35,8 @@
     "docx": "^9.5.1",
     "highlight.js": "^11.11.1",
     "lowlight": "^3.3.0",
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.1.0",
+    "mermaid": "^12.2.0"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

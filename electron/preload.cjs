@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('studio', {
   closeDocument: (id) => ipcRenderer.invoke('document:release', id),
   exportDocument: (id, content, format) => ipcRenderer.invoke('document:export', id, content, format),
   insertImage: () => ipcRenderer.invoke('document:image'),
+  storeImage: (id, source, storage) => ipcRenderer.invoke('document:store-image', id, source, storage),
   recent: () => ipcRenderer.invoke('document:recent'),
   clearRecent: () => ipcRenderer.invoke('document:clear-recent'),
   setTheme: (theme) => ipcRenderer.invoke('app:theme', theme),

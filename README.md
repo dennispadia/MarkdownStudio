@@ -30,6 +30,14 @@ These are screenshots of the actual desktop application, using sample documents.
 - **Local safeguards:** unsaved-change prompts, external-edit detection, atomic saves, and recovery drafts.
 - **No account, cloud sync, document uploads, or analytics.**
 
+### New in source (not in the 0.5.1 installer)
+
+- **Source + Preview:** edit one document's Markdown alongside a read-only live preview, with optional synchronized scrolling. Two-file paired tabs remain separate.
+- **Enhanced Find/Replace:** match-case, Unicode whole-word, regex capture replacements, Previous/Next, individual/all replacements, match counts and source highlights. Regex work runs in a time-limited worker.
+- **Refreshable contents:** insert a marked table of contents and update its links after changing headings.
+- **Image storage choice:** embed an inserted/pasted/dropped image or save it in the saved document's relative `assets` folder.
+- **Offline Mermaid:** render supported diagrams in Visual/Preview and include them as images in Word/PDF exports; invalid or unsafe diagrams report errors.
+
 ## Install on Windows
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
@@ -70,7 +78,7 @@ See [BUILDING.md](docs/BUILDING.md) for tests, installer builds, source archives
 
 ## Boundaries and privacy
 
-Visual editing may normalize Markdown; use Source for unsupported syntax. Math/Mermaid rendering, automatic updates, cloud sync, and custom export templates are not included. Recovery is not a backup.
+Visual editing may normalize Markdown; use Source for unsupported syntax. Math rendering, automatic updates, cloud sync, and custom export templates are not included. Recovery is not a backup.
 
 Documents stay on your computer. Remote images are not downloaded. Opening an external web/email link requires confirmation and uses another application. Development dependencies and build tools require internet access. See the [user guide](docs/USER_GUIDE.md#privacy).
 
