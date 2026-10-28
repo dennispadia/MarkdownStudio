@@ -70,7 +70,7 @@ See [BUILDING.md](docs/BUILDING.md) for tests, installer builds, source archives
 
 ## Boundaries and privacy
 
-This is not complete Typora parity. Visual editing may normalize Markdown; use Source for unsupported syntax. Math/Mermaid rendering, automatic updates, cloud sync, and custom export templates are not included. Recovery is not a backup.
+Visual editing may normalize Markdown; use Source for unsupported syntax. Math/Mermaid rendering, automatic updates, cloud sync, and custom export templates are not included. Recovery is not a backup.
 
 Documents stay on your computer. Remote images are not downloaded. Opening an external web/email link requires confirmation and uses another application. Development dependencies and build tools require internet access. See the [user guide](docs/USER_GUIDE.md#privacy).
 
