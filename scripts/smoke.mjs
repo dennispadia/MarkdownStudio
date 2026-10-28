@@ -1120,7 +1120,8 @@ try {
   for (const [key, tag] of [['B', 'strong'], ['I', 'em']]) {
     await sourceEdit('Shortcut text');
     await action('visual');
-    await ui("(() => {const e=document.querySelector('#visual-editor .tiptap');e.focus();const r=document.createRange();r.selectNodeContents(e);const s=window.getSelection();s.removeAllRanges();s.addRange(r);})()");
+    await nativeShortcut('A');
+    await waitFor(async () => ui("getSelection()?.toString() === 'Shortcut text'"), 'native Visual selection');
     await nativeShortcut(key);
     await waitFor(async () => ui(`Boolean(document.querySelector('#visual-editor ${tag}'))`), `native Visual ${key}`);
     assert.equal(await ui(`document.querySelector('#visual-editor ${tag}').textContent`), 'Shortcut text');
