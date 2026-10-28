@@ -39,9 +39,9 @@ Close running copies before rebuilding. Do not run two packaging/build commands 
 
 ### Installer validation status and policy restrictions
 
-The initial 0.5.0 MSI build was blocked by Windows system policy during WiX validation (`LGHT1105`), including when run with administrator approval. No verified MSI was produced. The MSI configuration, verification script, and GitHub workflow remain unverified end-to-end until a build succeeds on a policy-permitted Windows environment.
+Local MSI validation can be blocked by Windows system policy (`LGHT1105`), including when run with administrator approval. The hosted workflow runs validation without suppressing ICE checks. Per-user file components use stable HKCU registry key paths, non-advertised shortcuts, and uninstall folder cleanup to satisfy ICE38 and ICE64.
 
-If you encounter this error, use a Windows build environment where your organization's policy permits Windows Installer validation, or ask your administrator for guidance. Do not disable security policy or suppress ICE validation. The included GitHub Actions workflow is another build option after publication, but its results must be checked; it has not yet been run for this project.
+If you encounter this error, use a Windows build environment where your organization's policy permits Windows Installer validation, or ask your administrator for guidance. Do not disable security policy or suppress ICE validation. The included GitHub Actions workflow is another build option, but confirm that packaging and verification both succeed before sharing its artifacts.
 
 The installer is intentionally per-user only, uses LocalAppData rather than Program Files, creates desktop/Start menu shortcuts, and does not launch the app automatically. Its upgrade identity is derived from `build.appId`; keep that stable for original-product updates and change it for independent forks. The narrowly checked `configure-msi.cjs` hook adjusts the builder's dual-scope template to enforce the non-elevated scope and fails if an upstream template changes.
 
