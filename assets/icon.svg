@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 240 240">
+  <title>Markdown Studio - Enchanted Quill</title>
+  <defs>
+    <linearGradient id="emerald" x2="1" y2="1">
+      <stop stop-color="#194c44"/>
+      <stop offset="1" stop-color="#092b2b"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="240" rx="56" fill="url(#emerald)"/>
+  <rect x="1" y="1" width="238" height="238" rx="55" fill="none" stroke="#7ab4a1" stroke-opacity=".25"/>
+  <path d="M78 164c-7-43 15-83 92-108 8 61-20 100-75 104Z" fill="#e4eee1"/>
+  <path d="m67 183 85-104" fill="none" stroke="#dcbc7d" stroke-width="7" stroke-linecap="round"/>
+  <path d="m110 131 29 1m-13-22 1-24" fill="none" stroke="#174039" stroke-width="5" stroke-linecap="round"/>
+  <path d="M92 188h75" fill="none" stroke="#dcbc7d" stroke-width="5" stroke-linecap="round"/>
+</svg>

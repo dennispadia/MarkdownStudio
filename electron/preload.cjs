@@ -1,0 +1,24 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('studio', {
+  open: (recentPath) => ipcRenderer.invoke('document:open', recentPath),
+  save: (id, content, saveAs) => ipcRenderer.invoke('document:save', id, content, saveAs),
+  newDocument: () => ipcRenderer.invoke('document:new'),
+  closeDocument: (id) => ipcRenderer.invoke('document:release', id),
+  exportDocument: (id, content, format) => ipcRenderer.invoke('document:export', id, content, format),
+  insertImage: () => ipcRenderer.invoke('document:image'),
+  recent: () => ipcRenderer.invoke('document:recent'),
+  clearRecent: () => ipcRenderer.invoke('document:clear-recent'),
+  setTheme: (theme) => ipcRenderer.invoke('app:theme', theme),
+  confirmUnsaved: (name) => ipcRenderer.invoke('document:confirm', name),
+  setEditorContext: (context) => ipcRenderer.send('editor:context', context),
+  readClipboard: () => ipcRenderer.invoke('editor:clipboard-read'),
+  paste: () => ipcRenderer.send('editor:paste'),
+  readClipboardImage: () => ipcRenderer.invoke('editor:clipboard-image'),
+  copyImage: (id, source) => ipcRenderer.invoke('editor:copy-image', id, source),
+  writeClipboard: (text) => ipcRenderer.invoke('editor:clipboard-write', text),
+  setDirty: (dirty) => ipcRenderer.send('document:dirty', dirty),
+  close: () => ipcRenderer.send('document:close'),
+  openExternal: (url) => ipcRenderer.invoke('app:external', url),
+  onAction: (listener) => ipcRenderer.on('app:action', (_event, action) => listener(action)),
+});

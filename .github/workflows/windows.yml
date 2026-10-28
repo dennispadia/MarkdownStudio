@@ -1,0 +1,42 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Restore locked dependencies
+        run: npm ci --registry=https://registry.npmjs.org
+      - name: Unit tests
+        run: npm test
+      - name: Build per-user MSI
+        run: npm run package:msi
+      - name: Verify installer and extracted desktop application
+        run: npm run verify:msi
+      - name: Create clean source archive
+        run: npm run package:source
+      - name: Create SHA-256 checksums
+        run: npm run release:checksums
+      - name: Upload reviewed-download candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: markdown-studio-windows-x64
+          if-no-files-found: error
+          path: |
+            release/*.msi
+            release/*-source.zip
+            release/SHA256SUMS.txt

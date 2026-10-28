@@ -1,0 +1,86 @@
+{
+  "name": "markdown-studio",
+  "version": "0.5.0",
+  "private": true,
+  "description": "A friendly, local-first Markdown desktop editor for Windows",
+  "author": "Markdown Studio",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "main": "build/electron/main.js",
+  "scripts": {
+    "generate:icon": "node scripts/generate-icon.mjs",
+    "prebuild": "npm run generate:icon",
+    "build": "tsc && vite build",
+    "start": "npm run build && electron .",
+    "test": "tsx --test tests/*.test.ts",
+    "test:desktop": "npm run build && node scripts/smoke.mjs",
+    "package": "npm run build && electron-builder --win dir --x64",
+    "package:msi": "npm run build && electron-builder --win msi --x64",
+    "verify:msi": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Test-Msi.ps1",
+    "package:source": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Export-Source.ps1",
+    "release:checksums": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Write-Checksums.ps1"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.0.0",
+    "@tiptap/extension-code-block-lowlight": "^3.32.0",
+    "@tiptap/extension-image": "^3.0.0",
+    "@tiptap/extension-table": "^3.0.0",
+    "@tiptap/extension-task-item": "^3.0.0",
+    "@tiptap/extension-task-list": "^3.0.0",
+    "@tiptap/markdown": "^3.0.0",
+    "@tiptap/starter-kit": "^3.0.0",
+    "docx": "^9.5.1",
+    "highlight.js": "^11.11.1",
+    "lowlight": "^3.3.0",
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.19.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.12",
+    "resedit": "1.7.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12"
+  },
+  "build": {
+    "appId": "com.markdownstudio.desktop",
+    "productName": "Markdown Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "build/electron/**/*",
+      "build/lib/**/*",
+      "assets/icon.png",
+      "electron/preload.cjs",
+      "package.json"
+    ],
+    "win": {
+      "target": "dir",
+      "icon": "assets/icon.ico",
+      "signExecutable": false
+    },
+    "extraFiles": [
+      { "from": "LICENSE", "to": "LICENSE.md" },
+      { "from": "SUPPORT.md", "to": "SUPPORT.md" },
+      { "from": "THIRD_PARTY_NOTICES.md", "to": "THIRD_PARTY_NOTICES.md" }
+    ],
+    "msiProjectCreated": "scripts\\configure-msi.cjs",
+    "msi": {
+      "artifactName": "Markdown-Studio-${version}-${arch}.${ext}",
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Markdown Studio"
+    }
+  }
+}

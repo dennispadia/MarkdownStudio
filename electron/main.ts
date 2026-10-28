@@ -1,0 +1,465 @@
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, protocol, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron';
+import { readFile, stat } from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { atomicWrite, readMarkdown } from '../lib/files.js';
+import { readImage, imageMime, MAX_IMAGE_BYTES } from '../lib/images.js';
+import { isSafeLink, parser } from '../lib/markdown.js';
+import { toDocx, toPrintHTML } from '../lib/export.js';
+import { themes } from '../lib/themes.js';
+import { formattingShortcuts } from '../lib/shortcuts.js';
+import type { EditorContext, Result } from '../src/bridge.js';
+
+protocol.registerSchemesAsPrivileged([{ scheme: 'studio-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+app.setName('Markdown Studio');
+const profilePath = app.commandLine.getSwitchValue('user-data-dir');
+if (profilePath) {
+  mkdirSync(profilePath, { recursive: true });
+  app.setPath('userData', profilePath);
+}
+let window: BrowserWindow;
+interface NativeDocument { path: string | null; diskContent: string | null }
+const documents = new Map<string, NativeDocument>();
+let dirty = false;
+let allowClose = false;
+let recentFiles: string[] = [];
+let editorContext: EditorContext = { mode: 'visual', active: [], heading: 0, inTable: false };
+const entryURL = pathToFileURL(path.join(app.getAppPath(), 'dist', 'index.html')).href;
+const recentPath = () => path.join(app.getPath('userData'), 'recent-files.json');
+const samePath = (left: string, right: string) => path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
+
+function documentFor(id: unknown): NativeDocument {
+  const document = typeof id === 'string' ? documents.get(id) : undefined;
+  if (!document) throw new Error('This document is no longer open.');
+  return document;
+}
+
+function assertSender(event: IpcMainInvokeEvent): void {
+  if (event.sender !== window.webContents || event.senderFrame?.url !== entryURL) throw new Error('Untrusted application request.');
+}
+
+function contentArgument(value: unknown): asserts value is string {
+  if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 10 * 1024 * 1024) {
+    throw new Error('Documents must be UTF-8 text and no larger than 10 MB.');
+  }
+}
+
+function handle<T, Args extends unknown[]>(channel: string, callback: (...args: Args) => Promise<T>): void {
+  ipcMain.handle(channel, async (event, ...args): Promise<Result<T>> => {
+    try {
+      assertSender(event);
+      return { ok: true, value: await callback(...args as Args) };
+    } catch (error) {
+      console.error(channel, error);
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+}
+
+async function remember(file: string): Promise<void> {
+  recentFiles = [file, ...recentFiles.filter(item => item !== file)].slice(0, 8);
+  try { await atomicWrite(recentPath(), JSON.stringify(recentFiles)); }
+  catch (error) {
+    console.error('Could not update recent files:', error);
+    await dialog.showMessageBox(window, { type: 'warning', message: 'Your document is safe, but the recent-file list could not be updated.', detail: String(error) });
+  }
+}
+
+function action(command: string): void { window.webContents.send('app:action', command); }
+
+function paste(): void {
+  if (!clipboard.readImage().isEmpty()) action('paste-image');
+  else window.webContents.paste();
+}
+
+function paragraphItems(): MenuItemConstructorOptions[] {
+  return Array.from({ length: 7 }, (_, index) => {
+    const level = index === 6 ? 0 : index + 1;
+    return {
+      label: level ? `Heading ${level}` : 'Paragraph',
+      id: `paragraph-${level}`,
+      type: 'checkbox', checked: editorContext.heading === level,
+      accelerator: `CmdOrCtrl+${level}`, click: () => action(`heading:${level}`),
+    };
+  });
+}
+
+function insertItems(): MenuItemConstructorOptions[] {
+  return [
+    { label: 'Image...', accelerator: 'CmdOrCtrl+Shift+I', click: () => action('image') },
+    { label: 'Footnote (Source)', click: () => action('insert:footnote') },
+    { label: 'Link...', accelerator: 'CmdOrCtrl+K', click: () => action('link') },
+    { label: 'Link reference (Source)', click: () => action('insert:reference') },
+    { label: 'Horizontal line', click: () => action('format:rule') },
+    { label: 'Table', accelerator: 'CmdOrCtrl+T', click: () => action('table') },
+    { label: 'Code fence', accelerator: 'CmdOrCtrl+Shift+K', click: () => action('format:codeblock') },
+    { label: 'Math block (Source)', accelerator: 'CmdOrCtrl+Shift+M', click: () => action('insert:math') },
+    { label: 'Table of contents', click: () => action('insert:toc') },
+    { label: 'YAML front matter (Source)', click: () => action('insert:frontmatter') },
+    { type: 'separator' },
+    { label: 'Paragraph before', click: () => action('insert:before') },
+    { label: 'Paragraph after', click: () => action('insert:after') },
+  ];
+}
+
+async function exportPDF(content: string, documentPath: string | null): Promise<Buffer> {
+  const html = await toPrintHTML(content, documentPath);
+  const printWindow = new BrowserWindow({
+    show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true },
+  });
+  try {
+    printWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    await printWindow.webContents.executeJavaScript(`
+      (async () => {
+        await document.fonts.ready;
+        await Promise.all(Array.from(document.images, image => image.decode()));
+      })()
+    `);
+    return await printWindow.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true });
+  } finally { printWindow.destroy(); }
+}
+
+function installIPC(): void {
+  ipcMain.on('editor:paste', event => { assertSender(event); paste(); });
+  handle('app:theme', async (value: unknown) => {
+    const theme = themes.find(theme => theme.id === value);
+    if (!theme) throw new Error('Unsupported color theme.');
+    nativeTheme.themeSource = theme.dark ? 'dark' : 'light';
+    window.setBackgroundColor(theme.background);
+    const item = Menu.getApplicationMenu()?.getMenuItemById(`theme-${value}`);
+    if (item) item.checked = true;
+  });
+  handle('editor:clipboard-read', async () => {
+    const text = clipboard.readText();
+    contentArgument(text);
+    return text;
+  });
+  handle('editor:clipboard-write', async (text: unknown) => {
+    contentArgument(text);
+    clipboard.writeText(text);
+  });
+  handle('editor:clipboard-image', async () => {
+    const image = clipboard.readImage();
+    if (image.isEmpty()) return null;
+    const data = image.toPNG();
+    if (data.length > MAX_IMAGE_BYTES) throw new Error('The clipboard image exceeds the 20 MB image limit.');
+    return `data:image/png;base64,${data.toString('base64')}`;
+  });
+  handle('editor:copy-image', async (id: unknown, source: unknown) => {
+    contentArgument(source);
+    const { data } = await readImage(source, documentFor(id).path);
+    const image = nativeImage.createFromBuffer(data);
+    if (image.isEmpty()) throw new Error('This image could not be decoded for copying.');
+    clipboard.writeImage(image);
+  });
+  ipcMain.on('editor:context', (event, context: EditorContext) => {
+    assertSender(event);
+    if (!context || !['visual', 'source'].includes(context.mode) || !Array.isArray(context.active)
+      || !context.active.every(item => typeof item === 'string') || !Number.isInteger(context.heading)
+      || context.heading < 0 || context.heading > 6 || typeof context.inTable !== 'boolean') {
+      console.error('Invalid editor context.');
+      return;
+    }
+    editorContext = context;
+    for (let level = 0; level <= 6; level++) {
+      const item = Menu.getApplicationMenu()?.getMenuItemById(`paragraph-${level}`);
+      if (item) item.checked = context.heading === level;
+    }
+  });
+  handle('document:recent', async () => recentFiles);
+  handle('document:clear-recent', async () => {
+    await atomicWrite(recentPath(), '[]');
+    recentFiles = [];
+  });
+  handle('document:open', async (recent?: string) => {
+    let file: string;
+    if (recent !== undefined) {
+      if (typeof recent !== 'string' || !recentFiles.includes(recent)) throw new Error('Choose a file using Open.');
+      file = recent;
+    } else {
+      const selected = await dialog.showOpenDialog(window, {
+        title: 'Open Markdown in a new tab', properties: ['openFile'],
+        filters: [{ name: 'Markdown and text', extensions: ['md', 'markdown', 'mdown', 'txt'] }, { name: 'All files', extensions: ['*'] }],
+      });
+      if (selected.canceled) return null;
+      file = selected.filePaths[0];
+    }
+    const existing = [...documents].find(([, document]) => document.path && samePath(document.path, file));
+    if (existing) {
+      await remember(file);
+      return { id: existing[0], path: file, content: existing[1].diskContent ?? '' };
+    }
+    const content = await readMarkdown(file);
+    const id = randomUUID();
+    documents.set(id, { path: file, diskContent: content });
+    await remember(file);
+    return { id, path: file, content };
+  });
+  handle('document:new', async () => {
+    const id = randomUUID();
+    documents.set(id, { path: null, diskContent: null });
+    return id;
+  });
+  handle('document:release', async (id: unknown) => {
+    documentFor(id);
+    documents.delete(String(id));
+  });
+  handle('document:save', async (id: unknown, content: unknown, saveAs: unknown) => {
+    const document = documentFor(id);
+    const currentPath = document.path;
+    contentArgument(content);
+    if (typeof saveAs !== 'boolean') throw new Error('Invalid save request.');
+    let file = currentPath;
+    if (!file || saveAs) {
+      const selected = await dialog.showSaveDialog(window, {
+        title: 'Save Markdown', defaultPath: file ?? 'Untitled.md',
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
+      });
+      if (selected.canceled || !selected.filePath) return null;
+      file = selected.filePath;
+    }
+    if ([...documents].some(([otherId, other]) => otherId !== id && other.path && samePath(other.path, file))) {
+      throw new Error('That file is already open in another tab. Switch to that tab, or choose a different filename.');
+    }
+    if (currentPath && path.dirname(file) !== path.dirname(currentPath)) {
+      const relativeImages = parser.parse(content, {}).some(token => token.children?.some(child => {
+        const source = child.attrGet('src') ?? '';
+        return child.type === 'image' && !/^[a-z][a-z\d+.-]*:/i.test(source);
+      }));
+      if (relativeImages) {
+        const approval = await dialog.showMessageBox(window, {
+          type: 'warning', message: 'This document uses relative image paths.',
+          detail: 'Saving in another folder will not copy the image files. Copy the images to the same relative locations in the new folder, or cancel and use Insert image to embed them first.',
+          buttons: ['Save in new folder', 'Cancel'], defaultId: 1, cancelId: 1,
+        });
+        if (approval.response !== 0) return null;
+      }
+    }
+    if (currentPath && samePath(file, currentPath)) {
+      let actual: string | null = null;
+      try { actual = await readMarkdown(file); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+      if (actual !== document.diskContent) {
+        throw new Error('This file changed or was removed outside Markdown Studio. Your edits have not been overwritten. Use Save As to save your version under a different name, then reopen the original to compare.');
+      }
+    }
+    await atomicWrite(file, content);
+    document.path = file;
+    document.diskContent = content;
+    await remember(file);
+    return { path: file };
+  });
+  handle('document:confirm', async (name: unknown) => {
+    if (typeof name !== 'string') throw new Error('Missing document name.');
+    const result = await dialog.showMessageBox(window, {
+      type: 'question', message: `Save changes to "${name}" before continuing?`,
+      detail: 'Unsaved changes will be lost if you choose Discard.',
+      buttons: ['Save', 'Discard', 'Cancel'], defaultId: 0, cancelId: 2, noLink: true,
+    });
+    return (['save', 'discard', 'cancel'] as const)[result.response];
+  });
+  handle('document:image', async () => {
+    const selection = await dialog.showOpenDialog(window, {
+      title: 'Insert image (embedded in Markdown)', properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+    });
+    if (selection.canceled) return null;
+    const file = selection.filePaths[0];
+    if ((await stat(file)).size > MAX_IMAGE_BYTES) throw new Error('Choose an image smaller than 20 MB.');
+    return `data:${imageMime(file)};base64,${(await readFile(file)).toString('base64')}`;
+  });
+  handle('document:export', async (id: unknown, content: unknown, format: unknown) => {
+    const currentPath = documentFor(id).path;
+    contentArgument(content);
+    if (format !== 'pdf' && format !== 'docx') throw new Error('Unsupported export format.');
+    const selection = await dialog.showSaveDialog(window, {
+      title: `Export ${format.toUpperCase()}`,
+      defaultPath: currentPath ? path.join(path.dirname(currentPath), `${path.parse(currentPath).name}.${format}`) : `Untitled.${format}`,
+      filters: [{ name: format === 'pdf' ? 'PDF document' : 'Word document', extensions: [format] }],
+    });
+    if (selection.canceled || !selection.filePath) return null;
+    if ([...documents.values()].some(document => document.path && samePath(selection.filePath!, document.path))) {
+      throw new Error('Export cannot replace an open Markdown source file.');
+    }
+    const data = format === 'pdf' ? await exportPDF(content, currentPath) : await toDocx(content, source => readImage(source, currentPath));
+    await atomicWrite(selection.filePath, data);
+    return selection.filePath;
+  });
+  handle('app:external', async (url: unknown) => {
+    if (typeof url !== 'string' || !isSafeLink(url)) throw new Error('Only web and email links can be opened.');
+    const approval = await dialog.showMessageBox(window, {
+      message: 'Open this link in your default application?', detail: url,
+      buttons: ['Open link', 'Cancel'], defaultId: 1, cancelId: 1,
+    });
+    if (approval.response === 0) await shell.openExternal(url);
+  });
+  ipcMain.on('document:dirty', (event, value: unknown) => {
+    assertSender(event);
+    if (typeof value !== 'boolean') return;
+    dirty = value;
+    window.setDocumentEdited(dirty);
+  });
+  ipcMain.on('document:close', event => { assertSender(event); allowClose = true; window.close(); });
+}
+
+function createWindow(): void {
+  window = new BrowserWindow({
+    width: 1320, height: 900, minWidth: 850, minHeight: 600, backgroundColor: '#f8faf8',
+    title: 'Markdown Studio',
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(app.getAppPath(), 'electron', 'preload.cjs'),
+      sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: true,
+    },
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('context-menu', (_event, parameters) => {
+    const items: MenuItemConstructorOptions[] = [];
+    if (parameters.misspelledWord) {
+      for (const suggestion of parameters.dictionarySuggestions) {
+        items.push({ label: suggestion, click: () => window.webContents.replaceMisspelling(suggestion) });
+      }
+      if (!parameters.dictionarySuggestions.length) items.push({ label: 'No spelling suggestions', enabled: false });
+      items.push({ type: 'separator' });
+    }
+    if (parameters.isEditable) {
+      items.push(
+        { label: 'Undo', click: () => action('undo') }, { label: 'Redo', click: () => action('redo') },
+        { type: 'separator' }, { role: 'cut' }, { role: 'copy' },
+        { label: 'Paste', accelerator: 'CmdOrCtrl+V', click: paste }, { role: 'selectAll' },
+      );
+      items.push(
+        { label: 'Delete selection', enabled: Boolean(parameters.selectionText), click: () => window.webContents.delete() },
+        { label: 'Copy / Paste As', submenu: [
+          { label: 'Copy selection as Markdown', enabled: Boolean(parameters.selectionText), click: () => action('copy-markdown') },
+          { label: 'Copy document as Markdown', click: () => action('copy-document') },
+          { type: 'separator' }, { role: 'pasteAndMatchStyle', label: 'Paste as plain text' },
+          { label: 'Paste as Markdown', click: () => action('paste-markdown') },
+          { label: 'Paste image', enabled: !clipboard.readImage().isEmpty(), click: () => action('paste-image') },
+        ] },
+        { type: 'separator' },
+        { label: 'Formatting', submenu: [
+          ...[
+            ['bold', 'Bold'], ['italic', 'Italic'], ['strike', 'Strikethrough'], ['code', 'Inline code'],
+            ['quote', 'Block quote'], ['bullet', 'Bullet list'], ['ordered', 'Numbered list'], ['task', 'Task list'],
+          ].map(([command, label]): MenuItemConstructorOptions => ({
+            label, type: 'checkbox', checked: editorContext.active.includes(command), click: () => action(`format:${command}`),
+            accelerator: formattingShortcuts.find(item => item.command === command)?.accelerator,
+            registerAccelerator: false,
+          })),
+          { type: 'separator' }, { label: 'Clear formatting', enabled: editorContext.mode === 'visual', click: () => action('format:clear') },
+        ] },
+        { label: 'Paragraph', submenu: paragraphItems() },
+        { label: 'Insert', submenu: insertItems() },
+        { label: 'Table', submenu: [
+          { label: 'Insert table...', click: () => action('table') },
+          { type: 'separator' },
+          ...[
+            ['row', 'Add row after'], ['column', 'Add column after'],
+            ['delete-row', 'Remove row'], ['delete-column', 'Remove column'],
+            ['delete-table', 'Remove table'],
+          ].map(([command, label]): MenuItemConstructorOptions => ({
+            label, enabled: editorContext.mode === 'visual' && editorContext.inTable,
+            click: () => action(command),
+          })),
+        ] },
+      );
+    } else if (parameters.selectionText) items.push({ role: 'copy' });
+    if (parameters.mediaType === 'image') {
+      items.push({ label: 'Copy image', click: () => action('copy-image') });
+    }
+    if (items.length) Menu.buildFromTemplate(items).popup({ window });
+  });
+  window.webContents.on('will-navigate', event => event.preventDefault());
+  window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+  window.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+    const allowed = ['file:', 'data:', 'studio-image:'].includes(new URL(details.url).protocol);
+    callback({ cancel: !allowed });
+  });
+  window.on('close', event => {
+    if (!allowClose && dirty) { event.preventDefault(); action('close'); }
+  });
+  window.webContents.on('render-process-gone', (_event, details) => {
+    dialog.showErrorBox('The editor stopped unexpectedly', `Reason: ${details.reason}. Reopen Markdown Studio and use Recover draft if it is available. Your saved Markdown files have not been changed.`);
+  });
+  const send = (command: string) => () => action(command);
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: '&File', submenu: [
+      { label: 'New', accelerator: 'CmdOrCtrl+N', click: send('new') },
+      { label: 'Open...', accelerator: 'CmdOrCtrl+O', click: send('open') },
+      { label: 'Save', accelerator: 'CmdOrCtrl+S', click: send('save') },
+      { label: 'Save As...', accelerator: 'CmdOrCtrl+Shift+S', click: send('save-as') },
+      { label: 'Save All', accelerator: 'CmdOrCtrl+Alt+S', click: send('save-all') },
+      { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: send('close-tab') },
+      { label: 'Clear recent files', click: send('clear-recent') },
+      { type: 'separator' },
+      { label: 'Export Word (.docx)...', click: send('export-docx') },
+      { label: 'Export PDF...', accelerator: 'CmdOrCtrl+P', click: send('export-pdf') },
+      { type: 'separator' }, { role: 'quit' },
+    ] },
+    { label: '&Edit', submenu: [
+      { label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: send('undo') },
+      { label: 'Redo', accelerator: 'CmdOrCtrl+Shift+Z', click: send('redo') },
+      { type: 'separator' }, { role: 'cut' }, { role: 'copy' },
+      { label: 'Paste', accelerator: 'CmdOrCtrl+V', click: paste }, { role: 'selectAll' },
+      { type: 'separator' }, { label: 'Find and replace...', accelerator: 'CmdOrCtrl+F', click: send('find') },
+      { label: 'Formatting', submenu: formattingShortcuts.map(item => ({
+        label: item.label, accelerator: item.accelerator, registerAccelerator: false,
+        click: send(`format:${item.command}`),
+      })) },
+      { type: 'separator' }, { label: 'Paragraph', submenu: paragraphItems() }, { label: 'Insert', submenu: insertItems() },
+    ] },
+    { label: '&View', submenu: [
+      { label: 'Visual / source', accelerator: 'CmdOrCtrl+/', click: send('mode') },
+      { label: 'Toggle sidebar', accelerator: 'CmdOrCtrl+Shift+B', click: send('sidebar') },
+      { label: 'Focus mode', accelerator: 'F9', click: send('focus') },
+      { label: 'Split with...', click: send('split') },
+      { label: 'Unsplit', click: send('unsplit') },
+      { label: 'Color theme', submenu: themes.map(theme => ({
+        id: `theme-${theme.id}`, label: theme.label, type: 'radio',
+        checked: theme.id === 'light', click: send(`theme:${theme.id}`),
+      })) },
+      { label: 'Next tab', accelerator: 'Ctrl+Tab', click: send('next-tab') },
+      { label: 'Previous tab', accelerator: 'Ctrl+Shift+Tab', click: send('previous-tab') },
+      { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' },
+    ] },
+    { label: '&Help', submenu: [{ label: 'Getting started', click: send('help') }, { label: 'Keyboard shortcuts', accelerator: 'F1', click: send('shortcuts') }, { label: 'About Markdown Studio', click: () => { void dialog.showMessageBox(window, { message: 'Markdown Studio', detail: `Version ${app.getVersion()}\nA local-first Markdown editor. Built with Electron and Tiptap.\nNo account or cloud connection required.` }); } }] },
+  ]));
+  void window.loadURL(entryURL);
+}
+
+void app.whenReady().then(async () => {
+  if (process.platform === 'win32') app.setAppUserModelId('com.markdownstudio.desktop');
+  try {
+    const saved: unknown = JSON.parse(await readFile(recentPath(), 'utf8'));
+    if (!Array.isArray(saved) || !saved.every(item => typeof item === 'string')) throw new Error('Invalid recent-file list.');
+    recentFiles = saved.slice(0, 8);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.error('Could not load recent files:', error);
+      dialog.showErrorBox('Recent files could not be loaded', String(error));
+    }
+  }
+  protocol.handle('studio-image', async request => {
+    try {
+      const parameters = new URL(request.url).searchParams;
+      const source = parameters.get('source');
+      if (!source) throw new Error('Missing image source.');
+      const { data, mime } = await readImage(source, documentFor(parameters.get('document')).path);
+      return new Response(new Uint8Array(data), { headers: { 'Content-Type': mime, 'Cache-Control': 'no-store' } });
+    } catch (error) {
+      console.error('Image could not be displayed:', error);
+      return new Response('Image unavailable. Use Insert image to embed it.', { status: 404 });
+    }
+  });
+  installIPC();
+  createWindow();
+}).catch(error => {
+  console.error('Application startup failed:', error);
+  dialog.showErrorBox('Markdown Studio could not start', String(error));
+  app.quit();
+});
+app.on('window-all-closed', () => app.quit());
