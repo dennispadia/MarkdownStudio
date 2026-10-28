@@ -1,12 +1,12 @@
 # Changelog
 
-## 0.5.1 (unreleased; signing pending)
+## 0.5.1
 
 - Resize the sidebar by dragging its right edge or using the keyboard; remember its preferred width between launches.
 - Toggle Find open and closed with the Find button or Ctrl+F without losing search/replacement text.
 - Choose a split partner from Edge-style thumbnail cards showing other unpaired open documents, including unsaved edits and local images.
 
-The release candidate is prepared, but no 0.5.1 installer has been published. Trusted code signing is not yet configured; publication is on hold pending free signing-provider approval and signed-artifact verification.
+Published with a verified Windows MSI, source ZIP, and SHA-256 checksums. The application and installer remain unsigned while free signing-provider approval is pending; Windows or browser warnings may still appear.
 
 ## 0.5.0
 
