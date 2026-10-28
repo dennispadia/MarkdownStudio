@@ -12,7 +12,7 @@ $database = $null
 function Read-MsiRows([string]$Query, [int]$Columns) {
     $view = $database.OpenView($Query)
     try {
-        $view.Execute()
+        [void]$view.Execute()
         while ($record = $view.Fetch()) {
             try {
                 $values = @()
@@ -20,7 +20,7 @@ function Read-MsiRows([string]$Query, [int]$Columns) {
                 ,$values
             } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
         }
-    } finally { $view.Close(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
+    } finally { [void]$view.Close(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
 }
 try {
     $installer = New-Object -ComObject WindowsInstaller.Installer
