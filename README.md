@@ -34,6 +34,8 @@ These are screenshots of the actual desktop application, using sample documents.
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
+**Release status:** the published installer is still **0.5.0**. Sidebar resizing, Find toggling, and split preview cards are in the **0.5.1 source candidate**, which is not yet published. Release is on hold pending trusted code-signing approval; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+
 1. **[Download the Windows x64 MSI installer (0.5.0)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.5.0/Markdown-Studio-0.5.0-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
 3. Open **Markdown Studio** from the desktop or Start menu.

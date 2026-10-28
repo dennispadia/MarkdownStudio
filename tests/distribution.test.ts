@@ -59,6 +59,8 @@ test('per-user components use stable HKCU key paths, folder cleanup and direct s
 test('distribution uses the public npm registry and ships notices without developer files', async () => {
   const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  assert.equal(lock.version, manifest.version);
+  assert.equal(lock.packages[''].version, manifest.version);
   assert.equal(manifest.build.msi.perMachine, false);
   assert.equal(manifest.build.msi.runAfterFinish, false);
   assert.equal(manifest.build.msi.createDesktopShortcut, true);
