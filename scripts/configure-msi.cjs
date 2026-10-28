@@ -30,7 +30,7 @@ function configurePerUserMsi(xml) {
       .update(Buffer.from(upgradeCode.replace(/-/g, ''), 'hex')).update(source).digest().subarray(0, 16);
     bytes[6] = (bytes[6] & 0x0f) | 0x50;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const guid = bytes.toString('hex').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5');
+    const guid = bytes.toString('hex').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5').toUpperCase();
     const directory = attributes.match(/\bDirectory="([^"]+)"/)?.[1] ?? 'APPLICATIONFOLDER';
     const shortcuts = [...contents.matchAll(/<Shortcut\b[^>]*?(?:\/>|>[\s\S]*?<\/Shortcut>)/g)].map(match => match[0]);
     contents = contents.replace(/<Shortcut\b[^>]*?(?:\/>|>[\s\S]*?<\/Shortcut>)/g, '');

@@ -33,7 +33,7 @@ test('per-user components use stable HKCU key paths, folder cleanup and direct s
   const actual = configurePerUserMsi(original);
   assert.equal((actual.match(/<RegistryValue Root="HKCU"[^>]+KeyPath="yes"/g) ?? []).length, 3);
   assert.equal((actual.match(/<File[^>]+KeyPath="no"/g) ?? []).length, 3);
-  const guids = actual.match(/Guid="[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"/g) ?? [];
+  const guids = actual.match(/Guid="[0-9A-F]{8}-[0-9A-F]{4}-5[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}"/g) ?? [];
   assert.equal(guids.length, 3);
   assert.equal(new Set(guids).size, 3);
   assert.equal((actual.match(/<RemoveFolder /g) ?? []).length, 2);
