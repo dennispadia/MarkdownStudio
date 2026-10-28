@@ -15,7 +15,7 @@ GitHub's browser uploader does not apply `.gitignore` for you. Do not drag the e
 
 ## Create release downloads
 
-**Current status:** source is prepared, but the initial MSI build was blocked by local Windows policy, even with administrator approval. Do not advertise an installer download until packaging and verification both succeed. See [installer validation status](BUILDING.md#installer-validation-status-and-policy-restrictions).
+Publish an installer only after packaging and verification both succeed. Local Windows policy may block validation even when the hosted workflow succeeds; see [installer validation and policy restrictions](BUILDING.md#installer-validation-status-and-policy-restrictions).
 
 Run the commands in order, not concurrently:
 

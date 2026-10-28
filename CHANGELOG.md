@@ -10,5 +10,6 @@
 - Searchable code-language highlighting and local Word/PDF exports.
 - Original multi-resolution quill branding.
 - Per-user x64 MSI distribution, clean source archive, Windows CI, public documentation and fork-only/no-support policy.
+- Validated per-user installer components, stable upgrade-scoped identities, direct shortcuts and uninstall folder cleanup; consistent Windows PowerShell verification in CI.
 
 Earlier local builds preceded this public-source distribution. This project is supplied as-is; this changelog is not a maintenance or future-release commitment.
