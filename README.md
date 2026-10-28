@@ -34,11 +34,13 @@ These are screenshots of the actual desktop application, using sample documents.
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-1. Download `Markdown-Studio-<version>-x64.msi` from this repository's **Releases** page, once published.
+1. **[Download the Windows x64 MSI installer (0.5.0)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.5.0/Markdown-Studio-0.5.0-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
 3. Open **Markdown Studio** from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
+
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.5.0/SHA256SUMS.txt) and a clean source ZIP are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
