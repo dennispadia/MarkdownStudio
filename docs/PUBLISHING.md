@@ -49,4 +49,6 @@ The included Windows workflow runs on pushes to `main` and on manual dispatch. I
 
 The workflow has read-only repository permissions and **does not automatically create releases or upload binaries to a public Release**. Download its build artifacts and publish reviewed release assets manually. GitHub may require you to enable Actions in a new repository or fork; Actions availability, limits and billing are controlled by GitHub.
 
+Alternatively, run **Actions > Publish verified release > Run workflow** and enter the run ID of a successful **Windows build** on `main`. This manually triggered publisher verifies the build's identity, artifact digest and file checksums, then attaches the MSI, source ZIP and checksums to a Release tagged with the built version. Only its publishing job has repository write permission. It refuses to overwrite a published release or reuse a draft targeting another build.
+
 Review the screenshots and source archive before making the repository public. No remote, account credentials, or GitHub token is embedded in this project.
