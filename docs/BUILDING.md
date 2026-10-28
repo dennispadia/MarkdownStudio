@@ -43,6 +43,8 @@ Local MSI validation can be blocked by Windows system policy (`LGHT1105`), inclu
 
 If you encounter this error, use a Windows build environment where your organization's policy permits Windows Installer validation, or ask your administrator for guidance. Do not disable security policy or suppress ICE validation. The included GitHub Actions workflow is another build option, but confirm that packaging and verification both succeed before sharing its artifacts.
 
+The workflow uses Windows PowerShell, matching the npm distribution scripts. Launching those scripts from PowerShell 7 can pass an incompatible module search path to Windows PowerShell and make built-in commands such as `Get-FileHash` unavailable.
+
 The installer is intentionally per-user only, uses LocalAppData rather than Program Files, creates desktop/Start menu shortcuts, and does not launch the app automatically. Its upgrade identity is derived from `build.appId`; keep that stable for original-product updates and change it for independent forks. The narrowly checked `configure-msi.cjs` hook adjusts the builder's dual-scope template to enforce the non-elevated scope and fails if an upstream template changes.
 
 ## Screenshots

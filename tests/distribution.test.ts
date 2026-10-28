@@ -68,6 +68,8 @@ test('distribution uses the public npm registry and ships notices without develo
     if (item.resolved) assert.equal(new URL(item.resolved).origin, 'https://registry.npmjs.org');
   }
   assert.equal(lock.packages[''].engines.node, manifest.engines.node);
+  const workflow = await readFile(new URL('../.github/workflows/windows.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /defaults:\s+run:\s+shell: powershell/);
   for (const name of ['LICENSE', 'SUPPORT.md', 'THIRD_PARTY_NOTICES.md']) {
     assert.ok(manifest.build.extraFiles.some((file: { from: string }) => file.from === name));
   }
