@@ -1,13 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 - Add same-document Source + Preview with read-only rendering and optional proportional scroll synchronization, including in either side of an existing two-file split.
 - Extend Markdown Find/Replace with match-case, Unicode whole-word and regex options, capture replacements, Previous/Next, Replace/Replace all, counts and source highlights. Bound worker execution time and match count.
 - Insert and update marked tables of contents without replacing surrounding source; retain the marked block during Visual editing.
 - Choose embedded images or document-relative assets for image insertion, clipboard paste and drag/drop; validate formats and refuse unsafe or unsaved asset destinations.
 - Render supported Mermaid diagrams offline in Visual/Preview, expose a starter template and explicit errors, and render diagrams independently in an isolated local export page for PDF/Word.
-- Preserve the published unsigned 0.5.1 installer and its download links; these additions require a future release.
+
+The application and installer remain unsigned while trusted code-signing approval is pending. Previous published releases remain unchanged.
 
 ## 0.5.1
 
