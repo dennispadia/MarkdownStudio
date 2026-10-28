@@ -1,5 +1,6 @@
 param([string]$MsiPath)
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1') -Force
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 $manifest = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json
