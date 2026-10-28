@@ -29,6 +29,18 @@ export function imageDisplayURL(source: string, documentId = ''): string {
   return `studio-image://local/image?source=${encodeURIComponent(source)}&document=${encodeURIComponent(documentId)}`;
 }
 
+export function documentPreviewHTML(markdown: string, documentId: string): string {
+  const tokens = parser.parse(markdown, {});
+  const scopeImages = (items: typeof tokens): void => {
+    for (const token of items) {
+      if (token.type === 'image') token.attrSet('src', imageDisplayURL(token.attrGet('src') ?? '', documentId));
+      if (token.children) scopeImages(token.children);
+    }
+  };
+  scopeImages(tokens);
+  return parser.renderer.render(tokens, parser.options, {});
+}
+
 export function escapeHTML(value: string): string {
   return value.replace(/[&<>"']/g, character => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',

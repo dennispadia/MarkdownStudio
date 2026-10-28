@@ -40,3 +40,13 @@ export function splitRatio(value: number): number {
   if (!Number.isFinite(value)) throw new Error('The split divider position must be a finite number.');
   return Math.max(0.25, Math.min(0.75, value));
 }
+
+export const DEFAULT_SIDEBAR_WIDTH = 220;
+export const MIN_SIDEBAR_WIDTH = 200;
+export const MAX_SIDEBAR_WIDTH = 480;
+
+export function sidebarWidth(value: number, windowWidth: number): number {
+  if (!Number.isFinite(value) || !Number.isFinite(windowWidth)) throw new Error('The sidebar width must be a finite number.');
+  const maximum = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, windowWidth - 480));
+  return Math.round(Math.max(MIN_SIDEBAR_WIDTH, Math.min(maximum, value)));
+}

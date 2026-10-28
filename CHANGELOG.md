@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Resize the sidebar by dragging its right edge or using the keyboard; remember its preferred width between launches.
+- Toggle Find open and closed with the Find button or Ctrl+F without losing search/replacement text.
+- Choose a split partner from Edge-style thumbnail cards showing other unpaired open documents, including unsaved edits and local images.
+
 ## 0.5.0
 
 - Apple-inspired Light/Dark interface with teal accents and modern formatting icons.

@@ -33,6 +33,7 @@ const executable = process.argv[2] ?? createRequire(import.meta.url)('electron')
 const packaged = Boolean(process.argv[2]);
 const child = spawn(executable, [
   ...(packaged ? [] : ['.']),
+  '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
   '--inspect=127.0.0.1:0', '--remote-debugging-port=0', `--user-data-dir=${path.join(temporary, 'profile')}`,
 ], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let log = '';
@@ -87,7 +88,7 @@ class CDP {
       this.pending.set(id, { resolve, reject });
       this.socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
       setTimeout(() => {
-        if (this.pending.delete(id)) reject(new Error(`CDP timeout: ${method}`));
+        if (this.pending.delete(id)) reject(new Error(`CDP timeout: ${method}${method === 'Runtime.evaluate' ? ` (${params.expression.slice(0, 160)})` : ''}`));
       }, 30000).unref();
     });
   }
@@ -211,14 +212,32 @@ try {
   console.log('PASS: source editing, dirty state, undo, and redo');
 
   await action('find');
+  assert.equal(await ui("document.querySelector('#find-panel').hidden"), false);
+  assert.equal(await ui("document.querySelector('[data-action=find]').getAttribute('aria-expanded')"), 'true');
+  assert.equal(await ui("document.activeElement.id"), 'find-text');
   await ui("document.querySelector('#find-text').value='answer'; document.querySelector('#replace-text').value='result'");
+  await action('find');
+  assert.equal(await ui("document.querySelector('#find-panel').hidden"), true);
+  assert.equal(await ui("document.querySelector('[data-action=find]').getAttribute('aria-expanded')"), 'false');
+  await action('find');
+  assert.equal(await ui("document.querySelector('#find-text').value"), 'answer');
+  assert.equal(await ui("document.querySelector('#replace-text').value"), 'result');
   await action('replace-all');
   assert.match(await ui("document.querySelector('#source-editor').value"), /const result = 42/);
   await menuAction('undo');
   await action('find-close');
+  assert.equal(await ui("document.querySelector('#find-panel').hidden"), true);
+  await nativeShortcut('F');
+  await waitFor(async () => ui("!document.querySelector('#find-panel').hidden"), 'native Find opens');
+  await nativeShortcut('F', ['control'], false);
+  await waitFor(async () => ui("document.querySelector('#find-panel').hidden"), 'native Find toggles closed');
+  await action('find');
+  await nativeShortcut('Escape', [], false);
+  await waitFor(async () => ui("document.querySelector('#find-panel').hidden"), 'Escape closes Find');
+  assert.equal(await ui("document.activeElement.id"), 'source-editor');
   await action('visual');
   assert.equal(await ui("document.querySelector('.tiptap h1').textContent"), 'Desktop export test');
-  console.log('PASS: find/replace and visual rendering of edited source');
+  console.log('PASS: Find button/shortcut toggling, retained query, Close/Escape, focus restoration, find/replace, and visual rendering of edited source');
 
   await writeFile(file, '# External change');
   await action('save');
@@ -445,6 +464,31 @@ try {
   assert.equal(await ui("document.querySelector('#sidebar').hidden"), true, 'Leaving Focus mode restores hidden-sidebar preference');
   await action('sidebar');
   assert.equal(await ui("document.querySelector('#sidebar').hidden"), false);
+  assert.ok(await ui("document.querySelector('#sidebar-resizer').getBoundingClientRect().width") >= 8);
+  const sidebarDrag = await ui("(() => {const handle=document.querySelector('#sidebar-resizer').getBoundingClientRect();return {x:handle.x+handle.width/2,y:handle.y+handle.height/2};})()");
+  await browser.call('Input.dispatchMouseEvent', {type:'mousePressed',x:sidebarDrag.x,y:sidebarDrag.y,button:'left',buttons:1,clickCount:1}, sessionId);
+  await browser.call('Input.dispatchMouseEvent', {type:'mouseMoved',x:sidebarDrag.x+100,y:sidebarDrag.y,button:'left',buttons:1}, sessionId);
+  await browser.call('Input.dispatchMouseEvent', {type:'mouseReleased',x:sidebarDrag.x+100,y:sidebarDrag.y,button:'left',buttons:0,clickCount:1}, sessionId);
+  await waitFor(async () => ui("localStorage.getItem('markdown-studio-sidebar-width') === '320'"), 'sidebar drag remembered');
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 320);
+  assert.equal(await ui("document.body.classList.contains('resizing-sidebar')"), false);
+  await ui("document.querySelector('#sidebar-resizer').focus()");
+  await nativeShortcut('Right', [], false);
+  await waitFor(async () => ui("document.querySelector('#sidebar-resizer').getAttribute('aria-valuenow') === '330'"), 'keyboard sidebar resize');
+  await nativeShortcut('Home', [], false);
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 200);
+  await nativeShortcut('End', [], false);
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 480);
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
+  await waitFor(async () => ui("document.querySelector('#sidebar').getBoundingClientRect().width <= window.innerWidth - 480"), 'sidebar constrained in narrow window');
+  assert.equal(await ui("localStorage.getItem('markdown-studio-sidebar-width')"), '480', 'Window resizing retains preferred width');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+  await waitFor(async () => ui("document.querySelector('#sidebar').getBoundingClientRect().width === 480"), 'sidebar preferred width restored');
+  await ui("document.querySelector('#sidebar-resizer').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))");
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 220);
+  await ui("document.querySelector('#sidebar-resizer').focus()");
+  await nativeShortcut('Right', [], false);
+  await waitFor(async () => ui("localStorage.getItem('markdown-studio-sidebar-width') === '230'"), 'sidebar reset and subsequent resize');
   await menuAction('focus');
   await action('sidebar');
   assert.equal(await ui("document.body.classList.contains('focus-mode')"), false);
@@ -482,10 +526,22 @@ try {
   await sourceEdit('# Recoverable second draft\n\nSecond unsaved words');
   const recoveredName = await ui("document.querySelector('#filename').textContent");
   await waitFor(async () => ui("JSON.parse(localStorage.getItem('markdown-studio-draft-v1'))?.documents.length === 2"), 'both recovery drafts persisted');
+  await ui("localStorage.setItem('markdown-studio-sidebar-width','invalid')");
   await browser.call('Page.reload', {}, sessionId);
   await waitFor(async () => ui("document.querySelector('#recovery-banner') && !document.querySelector('#recovery-banner').hidden && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'draft recovery');
   assert.equal(await ui("document.querySelector('#sidebar').hidden"), true, 'Sidebar preference survives reload');
   await action('sidebar');
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 220, 'Invalid sidebar width uses the default without blocking draft recovery');
+  assert.match(await ui("document.querySelector('#notification').textContent"), /Sidebar width could not be read/);
+  await ui("document.querySelector('#sidebar-resizer').focus()");
+  await nativeShortcut('Right', [], false);
+  await waitFor(async () => ui("localStorage.getItem('markdown-studio-sidebar-width') === '230'"), 'valid sidebar width saved');
+  await ui("globalThis.smokeBeforeWidthReload = true");
+  await browser.call('Page.reload', {}, sessionId);
+  await waitFor(async () => ui("!globalThis.smokeBeforeWidthReload && document.querySelector('#sidebar-resizer') && document.querySelector('#app')?.getAttribute('aria-busy') === 'false'"), 'sidebar width reload');
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 230, 'Sidebar width survives reload');
+  assert.equal(await ui("document.querySelector('#sidebar-resizer').getAttribute('aria-valuenow')"), '230');
+  console.log('PASS: sidebar drag/keyboard limits, reset, narrow-window constraint, preferred-width restoration, persistence across reload, and recovery despite invalid width');
   await action('recover');
   assert.equal(await tabCount(), 3);
   assert.match(await ui("document.querySelector('.tiptap').textContent"), /Second unsaved words/);
@@ -947,20 +1003,58 @@ try {
     await ui(`document.querySelector(${JSON.stringify(pane(id) + ` [data-pane-mode="${mode}"]`)}).click()`);
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'pane mode');
   };
-  const confirmSplit = async right => {
-    await ui(`document.querySelector('#split-document').value=${JSON.stringify(right)}; document.querySelector('#split-form').requestSubmit()`);
+  const confirmSplit = async (right, keyboard = false) => {
+    const selector = `#split-documents button[data-document-id="${right}"]`;
+    if (keyboard) {
+      await ui(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+      assert.equal(await ui(`document.activeElement.matches(${JSON.stringify(selector)})`), true);
+      await browser.call('Input.dispatchKeyEvent', {type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'}, sessionId);
+      await browser.call('Input.dispatchKeyEvent', {type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13}, sessionId);
+    } else await ui(`document.querySelector(${JSON.stringify(selector)}).click()`);
     await waitFor(async () => ui("!document.querySelector('#split-dialog').open && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'create split pair');
   };
   await selectTab(splitIds[0]);
   await action('split');
   assert.equal(await ui("document.querySelector('#split-dialog').open"), true);
+  assert.equal(await ui("document.querySelectorAll('#split-documents .split-card').length"), 4);
+  assert.equal(await ui(`Boolean(document.querySelector('#split-documents [data-document-id="${splitIds[0]}"]'))`), false, 'The current file is not offered');
+  assert.match(await ui(`document.querySelector('#split-documents [data-document-id="${splitIds[1]}"] .split-preview').textContent`), /Split right/);
+  await waitFor(async () => ui("Array.from(document.querySelectorAll('#split-documents img')).every(image => image.complete && image.naturalWidth > 0)"), 'thumbnail local images');
+  assert.deepEqual(await ui("Array.from(document.querySelectorAll('#split-documents img'), image => image.naturalWidth)"), [3,4,5]);
+  assert.equal(await activeTab(), splitIds[0], 'Opening previews does not switch the active document');
+  if (process.env.STUDIO_SCREENSHOT) {
+    const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
+    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'split-preview-picker.png'), Buffer.from(screenshot.data, 'base64'));
+  }
   await ui("document.querySelector('#split-cancel').click()");
   assert.equal(await tabCount(), 5);
+  assert.equal(await ui("document.querySelectorAll('#split-documents .split-card').length"), 0, 'Closing releases preview contents');
+  await selectTab(splitIds[1]);
+  await action('source');
+  const previewOriginal = await ui("document.querySelector('#source-editor').value");
+  await sourceEdit(previewOriginal.replace('right original paragraph.', '**Current unsaved preview.**'));
+  await selectTab(splitIds[0]);
+  await action('split');
+  assert.match(await ui(`document.querySelector('#split-documents [data-document-id="${splitIds[1]}"] .split-preview strong').textContent`), /Current unsaved preview/);
+  assert.match(await ui(`document.querySelector('#split-documents [data-document-id="${splitIds[1]}"]').getAttribute('aria-label')`), /unsaved changes/);
+  await ui("document.querySelector('#split-cancel').click()");
+  await selectTab(splitIds[1]);
+  await menuAction('undo');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), previewOriginal, 'Previewing preserves source undo history');
+  await action('visual');
+  await selectTab(splitIds[0]);
   await action('split');
   await confirmSplit(splitIds[1]);
   assert.equal(await tabCount(), 4);
   assert.equal(await ui("document.querySelectorAll('.document-tab[data-paired=true]').length"), 1);
   assert.equal(await ui("document.querySelectorAll('#canvas > .document-pane').length"), 2);
+  await selectTab(splitIds[2]);
+  await action('split');
+  assert.deepEqual(await ui("Array.from(document.querySelectorAll('#split-documents .split-card'), card => card.dataset.documentId)"), [originalSplitOrder[0], splitIds[3]], 'Already-paired files and the current file are excluded');
+  await nativeShortcut('Escape', [], false);
+  await waitFor(async () => ui("!document.querySelector('#split-dialog').open"), 'Escape cancels the preview picker');
+  assert.equal(await tabCount(), 4);
+  await selectTab(splitIds[0]);
   assert.equal(await ui("document.querySelector('.global-modes').hidden"), true, 'Split mode uses pane-specific controls only');
   assert.match(await ui("document.querySelector('.paired-tab .tab-select').textContent"), /left\.md.*right\.md/);
   await waitFor(async () => ui("Array.from(document.querySelectorAll('.document-pane .tiptap img')).every(image => image.complete && image.naturalWidth > 0)"), 'both split local images');
@@ -995,15 +1089,15 @@ try {
   await menuAction('redo');
   await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .tiptap')}).focus()`);
   await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .pane-content')}).scrollTop=220; const otherSource=document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')}); otherSource.setSelectionRange(7,12); otherSource.scrollTop=140`);
-  await ui("document.querySelector('[role=separator]').focus()");
+  await ui("document.querySelector('.split-divider').focus()");
   await browser.call('Input.dispatchKeyEvent', {type:'keyDown',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39}, sessionId);
   await browser.call('Input.dispatchKeyEvent', {type:'keyUp',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39}, sessionId);
-  assert.equal(await ui("document.querySelector('[role=separator]').getAttribute('aria-valuenow')"), '55');
-  const drag = await ui("(() => {const root=document.querySelector('#canvas').getBoundingClientRect();const divider=document.querySelector('[role=separator]').getBoundingClientRect();return {x:divider.x+divider.width/2,y:divider.y+divider.height/2,end:root.x+root.width*.62};})()");
+  assert.equal(await ui("document.querySelector('.split-divider').getAttribute('aria-valuenow')"), '55');
+  const drag = await ui("(() => {const root=document.querySelector('#canvas').getBoundingClientRect();const divider=document.querySelector('.split-divider').getBoundingClientRect();return {x:divider.x+divider.width/2,y:divider.y+divider.height/2,end:root.x+root.width*.62};})()");
   await browser.call('Input.dispatchMouseEvent', {type:'mousePressed',x:drag.x,y:drag.y,button:'left',buttons:1,clickCount:1}, sessionId);
   await browser.call('Input.dispatchMouseEvent', {type:'mouseMoved',x:drag.end,y:drag.y,button:'left',buttons:1}, sessionId);
   await browser.call('Input.dispatchMouseEvent', {type:'mouseReleased',x:drag.end,y:drag.y,button:'left',buttons:0,clickCount:1}, sessionId);
-  assert.equal(await ui("document.querySelector('[role=separator]').getAttribute('aria-valuenow')"), '62');
+  assert.equal(await ui("document.querySelector('.split-divider').getAttribute('aria-valuenow')"), '62');
   const scrollBefore = await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .pane-content')}).scrollTop`);
   const rightScrollBefore = await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')}).scrollTop`);
   await selectTab(splitIds[2]);
@@ -1013,7 +1107,7 @@ try {
   assert.equal(await ui("document.querySelector('#filename').textContent"), 'third.md');
   await selectTab(splitIds[0]);
   assert.equal(await ui("document.querySelectorAll('#canvas > .document-pane').length"), 2);
-  assert.equal(await ui("document.querySelector('[role=separator]').getAttribute('aria-valuenow')"), '62');
+  assert.equal(await ui("document.querySelector('.split-divider').getAttribute('aria-valuenow')"), '62');
   assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .pane-content')}).scrollTop`), scrollBefore);
   assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')}).scrollTop`), rightScrollBefore);
   assert.deepEqual(await ui(`(() => {const source=document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')});return [source.selectionStart,source.selectionEnd];})()`), [7,12]);
@@ -1049,7 +1143,7 @@ try {
   assert.equal(await tabCount(), 5);
   assert.deepEqual(await ui("Array.from(document.querySelectorAll('.document-tab'), tab => tab.dataset.documentId)"), originalSplitOrder);
   assert.equal(await ui("document.querySelectorAll('#canvas > .document-pane').length"), 1);
-  console.log('PASS: five files become one split pair plus three normal tabs; both editable views, scoped images, independent modes/undo/selection/scroll, keyboard/pointer resizing, normal-tab switching, group navigation, Save All, active-pane exports, and lossless unsplit');
+  console.log('PASS: thumbnail cards show live edits and scoped images, exclude current/paired files, preserve undo on Cancel/Escape, and create split pairs; both editable views, independent modes/undo/selection/scroll, keyboard/pointer resizing, normal-tab switching, group navigation, Save All, active-pane exports, and lossless unsplit');
 
   await selectTab(splitIds[0]);
   const tabPoint = await ui("(() => {const tab=document.querySelector('.document-tab.selected .tab-select').getBoundingClientRect();return {x:tab.x+15,y:tab.y+15};})()");
@@ -1057,7 +1151,7 @@ try {
   await browser.call('Input.dispatchMouseEvent', {type:'mouseReleased',...tabPoint,button:'right',buttons:0,clickCount:1}, sessionId);
   await waitFor(async () => ui("document.querySelector('#tab-context-menu').matches(':popover-open')"), 'actual tab right-click menu');
   await ui("document.querySelector('#tab-context-menu button').click()");
-  await confirmSplit(splitIds[1]);
+  await confirmSplit(splitIds[1], true);
   await paneMode(splitIds[0], 'source');
   await sourceEdit((await paneSource(splitIds[0])) + '\nPending left.');
   await paneMode(splitIds[1], 'source');

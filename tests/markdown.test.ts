@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { headingAnchor, headings, imageDisplayURL, isSafeLink, replaceAllLiteral, wordCount } from '../lib/markdown.js';
+import { documentPreviewHTML, headingAnchor, headings, imageDisplayURL, isSafeLink, replaceAllLiteral, wordCount } from '../lib/markdown.js';
 
 test('outline handles ATX and Setext headings and excludes code blocks', () => {
   assert.deepEqual(headings('# Title\n\n```\n# not a heading\n```\n\nSubtitle\n---\n\n### Details'), [
@@ -49,4 +49,30 @@ test('heading anchors handle inline formatting, links, Unicode, and duplicates',
   assert.equal(headingAnchor('Hello world', used), 'hello-world-1');
   assert.equal(headingAnchor('Hello world', used), 'hello-world-2');
   assert.equal(headingAnchor('\u4f60\u597d \u4e16\u754c', used), '\u4f60\u597d-\u4e16\u754c');
+});
+
+test('document previews render Markdown without allowing raw HTML or script links', () => {
+  const preview = documentPreviewHTML('# Current edits\n\n**Bold**\n\n<script>alert(1)</script>\n\n[x](javascript:alert(1))', 'tab');
+  assert.match(preview, /<h1>Current edits<\/h1>/);
+  assert.match(preview, /<strong>Bold<\/strong>/);
+  assert.match(preview, /&lt;script&gt;/);
+  assert.doesNotMatch(preview, /<script|href="javascript:/);
+  assert.equal(documentPreviewHTML('', 'tab'), '');
+});
+
+test('preview images use document-scoped local URLs, including nested and remote images', () => {
+  const markdown = '> ![Local](asset.png)\n\n[![Nested](assets/photo.png)](https://example.com)\n\n![Remote](https://example.com/photo.png)';
+  const first = documentPreviewHTML(markdown, 'first');
+  const second = documentPreviewHTML(markdown, 'second');
+  assert.notEqual(first, second);
+  assert.equal((first.match(/src="studio-image:\/\/local\/image\?/g) ?? []).length, 3);
+  assert.equal((first.match(/document=first/g) ?? []).length, 3);
+  assert.match(first, /source=https%3A%2F%2Fexample.com%2Fphoto.png/);
+  assert.doesNotMatch(first, /src="https:/);
+  assert.equal(documentPreviewHTML(markdown, 'first'), first, 'Preview rendering never mutates the shared parser');
+});
+
+test('preview rendering preserves embedded images even when their data exceeds a thumbnail text budget', () => {
+  const image = `data:image/png;base64,${'a'.repeat(16000)}`;
+  assert.ok(documentPreviewHTML(`![Embedded](${image})`, 'tab').includes(`src="${image}"`));
 });

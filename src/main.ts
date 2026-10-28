@@ -5,10 +5,10 @@ import { TableKit } from '@tiptap/extension-table';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { Markdown } from '@tiptap/markdown';
-import { headingAnchor, headings, imageDisplayURL, isSafeLink, replaceAllLiteral, wordCount } from '../lib/markdown.js';
+import { documentPreviewHTML, headingAnchor, headings, imageDisplayURL, isSafeLink, replaceAllLiteral, wordCount } from '../lib/markdown.js';
 import type { Result } from './bridge.js';
 import { isTheme, restoreTheme, themes, type Theme } from '../lib/themes.js';
-import { createPair, groupTabs, pairFor, splitRatio, type SplitPair } from '../lib/workspace.js';
+import { createPair, DEFAULT_SIDEBAR_WIDTH, groupTabs, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, pairFor, sidebarWidth, splitRatio, type SplitPair } from '../lib/workspace.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, tableMarkdown, validateTableSize } from '../lib/tables.js';
 import { syntaxCSS } from '../lib/highlight.js';
@@ -111,6 +111,7 @@ app.innerHTML = `
       <div class="theme-switch" role="group" aria-label="Color theme">${themes.map(item => `<button type="button" data-theme-option="${item.id}" aria-pressed="false" title="${item.label} theme">${icon(item.id === 'light' ? 'sun' : 'moon')}<span>${item.label}</span></button>`).join('')}</div>
       <div class="privacy"><span class="status-dot"></span> Local files. Your space.</div>
     </div>
+    <div id="sidebar-resizer" role="separator" tabindex="0" aria-label="Resize sidebar" aria-controls="sidebar" aria-orientation="vertical" title="Drag to resize; Left/Right keys resize, Home/End set limits; double-click to reset"></div>
   </aside>
   <main>
     <div class="tabs-bar"><div id="tabs" role="tablist" aria-label="Open documents"></div>${button('new', 'New tab', 'plus', 'icon-only')}</div>
@@ -159,10 +160,10 @@ app.innerHTML = `
   <dialog id="split-dialog" aria-labelledby="split-title"><form method="dialog" id="split-form">
     <h2 id="split-title">Split with another file</h2>
     <p id="split-description"></p>
-    <label>Other open file<select id="split-document" required></select></label>
+    <div id="split-documents" role="group" aria-label="Other open documents"></div>
     <p>These two files become one paired tab. Your other tabs stay independent.</p>
     <p id="split-error" role="alert" hidden></p>
-    <div class="dialog-actions"><button id="split-cancel" type="button">Cancel</button><button class="primary" value="split">Create split</button></div>
+    <div class="dialog-actions"><button id="split-cancel" type="button">Cancel</button></div>
   </form></dialog>
   <div id="tab-context-menu" popover="auto" role="menu" aria-label="Tab actions"></div>
   <dialog id="shortcuts-dialog" aria-labelledby="shortcuts-title">
@@ -192,12 +193,13 @@ app.innerHTML = `
   <dialog id="help-dialog">
     <h2>Your writing desk, explained</h2>
     <p><b>Tabs:</b> Open and New keep other files open. Each tab keeps its edits and undo history. Click its x to close; a dot means unsaved changes. Save and Export use the active tab; Save all saves every modified tab.</p>
-    <p><b>Split tabs:</b> choose <b>Split with...</b> or right-click a tab to pair it with another open file. One paired tab displays exactly those two files side by side. Other tabs still open alone; clicking the pair restores both files. Each side keeps its own Visual/Source mode and undo. Click a side to target formatting, Find, Save, and Export. Drag the divider or focus it and use Left/Right to resize. <b>Unsplit</b> restores individual tabs without closing files. The pair's x closes both files with unsaved-change prompts; Ctrl+W closes only the active file.</p>
+    <p><b>Split tabs:</b> choose <b>Split with...</b> or right-click a tab, then choose another open file from its thumbnail preview card. Previews include current unsaved edits. One paired tab displays exactly those two files side by side. Other tabs still open alone; clicking the pair restores both files. Each side keeps its own Visual/Source mode and undo. Click a side to target formatting, Find, Save, and Export. Drag the divider or focus it and use Left/Right to resize. <b>Unsplit</b> restores individual tabs without closing files. The pair's x closes both files with unsaved-change prompts; Ctrl+W closes only the active file.</p>
     <p><b>Themes:</b> choose Light or Dark at the bottom of the sidebar, or use View &gt; Color theme when the sidebar is hidden. Recent Files starts collapsed; expand its heading to browse history. This preference is remembered, and the outline gets the remaining space.</p>
     <p><b>Save:</b> the Save button saves the active file. Its arrow opens Save All and Save As. Hover over tools for their keyboard shortcuts, or open ${button('shortcuts', 'Keyboard shortcuts')} (F1). At narrower widths, More formatting keeps less-used tools available.</p>
     <p><b>Visual</b> works like a word processor. Type <code># </code> for a heading, <code>- </code> for a list, or use the toolbar.</p>
     <p><b>Code blocks</b> have a searchable language selector and Copy button at the bottom-right. Select PowerShell, Python, JSON, or another supported language for syntax colors. Code contents are never reformatted or executed. PDF and Word include the colors, not the controls.</p>
-    <p><b>Sidebar</b>: use the button to the left of Visual/Source or Ctrl+Shift+B to toggle outline/recent files. <b>View &gt; Focus mode</b> or F9 also hides the document header; Escape restores your previous sidebar preference.</p>
+    <p><b>Sidebar</b>: drag its right edge to resize, or focus the edge and use Left/Right (Home/End set limits). Double-click the edge to reset. Width is remembered between launches and limited to leave room for editing. Use the button to the left of Visual/Source or Ctrl+Shift+B to toggle outline/recent files. <b>View &gt; Focus mode</b> or F9 also hides the document header; Escape restores your previous sidebar preference.</p>
+    <p><b>Find</b>: click Find or press Ctrl+F to open or close the find bar. Close and Escape also dismiss it; the search and replacement text are retained.</p>
     <p><b>Right-click</b> for Formatting, Paragraph (Heading 1-6 or normal text), Insert, Copy / Paste As, and spelling suggestions. Choose <b>Table &gt; Insert table</b> or <b>Insert &gt; Table</b> to choose rows and columns. Row/column editing controls become available inside a table.</p>
     <p><b>Insert</b> includes images, links, tables, code fences, horizontal lines, a static table of contents, and paragraphs before/after. Footnotes, link references, math, and YAML insert editable syntax in <b>Source mode</b>. From Visual mode these go at the end, except YAML at the top. Math, footnotes, and YAML do not yet have formatted rendering or structured export support. Reinsert the contents list after changing headings.</p>
     <p><b>Source</b> lets you edit the exact Markdown text. Use it for advanced syntax or HTML the visual editor doesn't support. Visual editing may normalize Markdown syntax; switching Visual/Source modes resets that tab's undo history.</p>
@@ -280,8 +282,10 @@ let contextImageSource: string | null = null;
 const draftKey = 'markdown-studio-draft-v1';
 const themeKey = 'markdown-studio-theme';
 const sidebarKey = 'markdown-studio-sidebar-hidden';
+const sidebarWidthKey = 'markdown-studio-sidebar-width';
 const recentExpandedKey = 'markdown-studio-recent-expanded';
 let sidebarHidden = false;
+let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
 let recentExpanded = false;
 let theme: Theme = 'light';
 let tableDocumentId: string | null = null;
@@ -303,8 +307,17 @@ try {
     element('recovery-banner').hidden = !recovery.length;
   }
 } catch (error) { notify(`Draft/settings storage could not be read: ${String(error)}`, true); }
+try {
+  const storedWidth = localStorage.getItem(sidebarWidthKey);
+  if (storedWidth !== null) {
+    if (!storedWidth.trim() || !Number.isFinite(Number(storedWidth))) throw new Error('The saved sidebar width is not valid.');
+    preferredSidebarWidth = sidebarWidth(Number(storedWidth), MAX_SIDEBAR_WIDTH + 480);
+  }
+} catch (error) { notify(`Sidebar width could not be read: ${String(error)}`, true); }
 updateThemeUI();
 updateSidebar();
+updateSidebarWidth();
+setFindOpen(false);
 updateRecentDisclosure();
 
 function updateThemeUI(): void {
@@ -338,6 +351,35 @@ function updateSidebar(): void {
 function setFocusMode(enabled: boolean): void {
   document.body.classList.toggle('focus-mode', enabled);
   updateSidebar();
+}
+
+function updateSidebarWidth(): void {
+  const width = sidebarWidth(preferredSidebarWidth, window.innerWidth);
+  element('sidebar').style.width = `${width}px`;
+  const divider = element('sidebar-resizer');
+  divider.setAttribute('aria-valuemin', String(MIN_SIDEBAR_WIDTH));
+  divider.setAttribute('aria-valuemax', String(sidebarWidth(MAX_SIDEBAR_WIDTH, window.innerWidth)));
+  divider.setAttribute('aria-valuenow', String(width));
+  divider.setAttribute('aria-valuetext', `${width} pixels`);
+}
+
+function rememberSidebarWidth(): void {
+  try { localStorage.setItem(sidebarWidthKey, String(preferredSidebarWidth)); }
+  catch (error) { notify(`Sidebar width changed, but could not be remembered: ${String(error)}`, true); }
+}
+
+function setFindOpen(open: boolean): void {
+  const panel = element('find-panel');
+  const returnToEditor = !open && panel.contains(document.activeElement);
+  panel.hidden = !open;
+  const control = document.querySelector<HTMLButtonElement>('[data-action="find"]')!;
+  control.setAttribute('aria-controls', 'find-panel');
+  control.setAttribute('aria-expanded', String(open));
+  if (open) element<HTMLInputElement>('find-text').focus();
+  else if (returnToEditor) {
+    if (mode === 'source') source.focus();
+    else editor.commands.focus();
+  }
 }
 
 async function applyTheme(value: Theme, persist = true): Promise<void> {
@@ -655,18 +697,39 @@ function openSplit(): void {
   const candidates = tabs.filter(tab => tab.id !== documentId && !pairFor(pairs, tab.id));
   if (!candidates.length) throw new Error('Open another unpaired file before creating a split.');
   splitDocumentId = documentId;
-  const select = element<HTMLSelectElement>('split-document');
-  select.replaceChildren();
+  captureTab();
+  const list = element('split-documents');
+  list.replaceChildren();
   for (const tab of candidates) {
-    const option = document.createElement('option');
-    option.value = tab.id;
-    option.textContent = tab.path ?? tab.name;
-    select.append(option);
+    const card = document.createElement('button');
+    card.type = 'submit';
+    card.className = 'split-card';
+    card.dataset.documentId = tab.id;
+    const dirty = tab.markdown !== tab.savedMarkdown;
+    card.setAttribute('aria-label', `Split with ${tab.name}${dirty ? ', unsaved changes' : ''}`);
+    card.title = tab.path ?? tab.name;
+    const thumbnail = document.createElement('span');
+    thumbnail.className = 'split-preview';
+    thumbnail.setAttribute('aria-hidden', 'true');
+    thumbnail.inert = true;
+    const page = document.createElement('div');
+    page.className = 'split-preview-page';
+    page.innerHTML = documentPreviewHTML(tab.markdown, tab.id);
+    if (!page.textContent?.trim() && !page.querySelector('img, hr')) page.textContent = 'Empty document';
+    thumbnail.append(page);
+    const label = document.createElement('span');
+    label.className = 'split-card-name';
+    label.textContent = `${tab.name}${dirty ? ' \u2022' : ''}`;
+    const location = document.createElement('span');
+    location.className = 'split-card-path';
+    location.textContent = tab.path ?? 'Unsaved document';
+    card.append(thumbnail, label, location);
+    list.append(card);
   }
   element('split-description').textContent = `Pair ${documentName} with another open file.`;
   element('split-error').hidden = true;
   element<HTMLDialogElement>('split-dialog').showModal();
-  select.focus();
+  list.querySelector<HTMLButtonElement>('button')!.focus();
 }
 
 function showTabMenu(event: MouseEvent, id: string): void {
@@ -1190,10 +1253,9 @@ async function dispatch(action: string): Promise<void> {
       await applyTheme(themes[(themes.findIndex(option => option.id === theme) + 1) % themes.length].id);
       break;
     case 'find':
-      element('find-panel').hidden = false;
-      element<HTMLInputElement>('find-text').focus();
+      setFindOpen(element('find-panel').hidden);
       break;
-    case 'find-close': element('find-panel').hidden = true; break;
+    case 'find-close': setFindOpen(false); break;
     case 'find-next': {
       const query = element<HTMLInputElement>('find-text').value;
       if (!query) throw new Error('Enter some text to find.');
@@ -1369,6 +1431,46 @@ element('recent-toggle').addEventListener('click', () => {
   try { localStorage.setItem(recentExpandedKey, String(recentExpanded)); }
   catch (error) { notify(`Recent Files changed, but could not be remembered: ${String(error)}`, true); }
 });
+const sidebarResizer = element('sidebar-resizer');
+let sidebarDrag: { pointerId: number; startX: number; startWidth: number } | undefined;
+sidebarResizer.addEventListener('pointerdown', event => {
+  if (busy || event.button !== 0) return;
+  event.preventDefault();
+  sidebarDrag = { pointerId: event.pointerId, startX: event.clientX, startWidth: element('sidebar').getBoundingClientRect().width };
+  sidebarResizer.setPointerCapture(event.pointerId);
+  sidebarResizer.focus();
+  document.body.classList.add('resizing-sidebar');
+});
+sidebarResizer.addEventListener('pointermove', event => {
+  if (!sidebarDrag || event.pointerId !== sidebarDrag.pointerId) return;
+  preferredSidebarWidth = sidebarWidth(sidebarDrag.startWidth + event.clientX - sidebarDrag.startX, window.innerWidth);
+  updateSidebarWidth();
+});
+sidebarResizer.addEventListener('lostpointercapture', () => {
+  if (!sidebarDrag) return;
+  sidebarDrag = undefined;
+  document.body.classList.remove('resizing-sidebar');
+  rememberSidebarWidth();
+});
+sidebarResizer.addEventListener('pointerup', event => {
+  if (sidebarResizer.hasPointerCapture(event.pointerId)) sidebarResizer.releasePointerCapture(event.pointerId);
+});
+sidebarResizer.addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  if (busy) return;
+  const width = sidebarWidth(preferredSidebarWidth, window.innerWidth);
+  preferredSidebarWidth = sidebarWidth(event.key === 'Home' ? MIN_SIDEBAR_WIDTH : event.key === 'End' ? MAX_SIDEBAR_WIDTH : width + (event.key === 'ArrowLeft' ? -10 : 10), window.innerWidth);
+  updateSidebarWidth();
+  rememberSidebarWidth();
+});
+sidebarResizer.addEventListener('dblclick', () => {
+  if (busy) return;
+  preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
+  updateSidebarWidth();
+  rememberSidebarWidth();
+});
+window.addEventListener('resize', updateSidebarWidth);
 element<HTMLFormElement>('table-form').addEventListener('submit', event => {
   event.preventDefault();
   void run(async () => {
@@ -1402,7 +1504,9 @@ element<HTMLFormElement>('split-form').addEventListener('submit', event => {
   void run(async () => {
     try {
       if (documentId !== splitDocumentId) throw new Error('The active file changed. Cancel and reopen Split with... in the intended tab.');
-      const pair = createPair(tabs.map(tab => tab.id), pairs, documentId, element<HTMLSelectElement>('split-document').value);
+      const target = event.submitter;
+      if (!(target instanceof HTMLButtonElement) || !target.dataset.documentId) throw new Error('Choose an open document preview to create a split.');
+      const pair = createPair(tabs.map(tab => tab.id), pairs, documentId, target.dataset.documentId);
       captureTab();
       pairs.push(pair);
       showWorkspace();
@@ -1416,6 +1520,9 @@ element<HTMLFormElement>('split-form').addEventListener('submit', event => {
   });
 });
 element('split-cancel').addEventListener('click', () => element<HTMLDialogElement>('split-dialog').close('cancel'));
+element('split-dialog').addEventListener('close', () => {
+  if (!element<HTMLDialogElement>('split-dialog').open) element('split-documents').replaceChildren();
+});
 element('tab-context-menu').addEventListener('keydown', event => {
   const menu = element('tab-context-menu');
   if (event.key === 'Escape') { event.stopPropagation(); menu.hidePopover(); return; }
@@ -1484,7 +1591,7 @@ element('canvas').addEventListener('cut', event => copySelectedImage(event, true
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     closeDropdowns();
-    element('find-panel').hidden = true;
+    setFindOpen(false);
     setFocusMode(false);
   }
 });

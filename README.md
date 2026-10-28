@@ -21,11 +21,11 @@ These are screenshots of the actual desktop application, using sample documents.
 ## Features
 
 - **Visual and Source editing:** format naturally or edit the exact Markdown.
-- **Multiple files and paired split tabs:** two files share one tab; other tabs remain independent. Each pane has its own mode, selection, scroll position, and undo.
+- **Multiple files and paired split tabs:** thumbnail cards help you choose another open document to pair. Two files share one tab; other tabs remain independent. Each pane has its own mode, selection, scroll position, and undo.
 - **Markdown tools:** headings, bold, italics, lists, tasks, tables, links, images, quotes, and code blocks.
 - **Offline syntax highlighting:** searchable code-language selection and per-block Copy.
 - **Word and PDF export:** no Microsoft Word or Pandoc installation required.
-- **Light/Dark themes:** teal accents, a collapsible sidebar, and collapsible recent history that leaves room for the outline.
+- **Light/Dark themes:** teal accents, a resizable/collapsible sidebar with remembered width, and collapsible recent history that leaves room for the outline.
 - **Keyboard shortcuts:** hover over controls, inspect menu hints, or press **F1**.
 - **Local safeguards:** unsaved-change prompts, external-edit detection, atomic saves, and recovery drafts.
 - **No account, cloud sync, document uploads, or analytics.**

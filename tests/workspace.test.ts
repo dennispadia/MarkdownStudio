@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPair, groupTabs, pairFor, splitRatio } from '../lib/workspace.js';
+import { createPair, DEFAULT_SIDEBAR_WIDTH, groupTabs, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, pairFor, sidebarWidth, splitRatio } from '../lib/workspace.js';
 
 test('five files become one paired tab plus three individual tabs without changing document order', () => {
   const documents = ['a', 'b', 'c', 'd', 'e'];
@@ -41,4 +41,18 @@ test('split divider positions remain finite and within keyboard/pointer resize l
     assert.equal(splitRatio(value), expected);
   }
   for (const value of [NaN, Infinity, -Infinity]) assert.throws(() => splitRatio(value), /finite/);
+});
+
+test('sidebar resizing respects limits, rounds pixels, and leaves room for the editor', () => {
+  assert.equal(sidebarWidth(DEFAULT_SIDEBAR_WIDTH, 1320), 220);
+  assert.equal(sidebarWidth(0, 1320), MIN_SIDEBAR_WIDTH);
+  assert.equal(sidebarWidth(900, 1320), MAX_SIDEBAR_WIDTH);
+  assert.equal(sidebarWidth(312.6, 1320), 313);
+  assert.equal(sidebarWidth(480, 850), 370);
+  assert.equal(sidebarWidth(480, 600), MIN_SIDEBAR_WIDTH);
+  assert.equal(sidebarWidth(220, 0), MIN_SIDEBAR_WIDTH);
+  for (const value of [NaN, Infinity, -Infinity]) {
+    assert.throws(() => sidebarWidth(value, 1320), /finite/);
+    assert.throws(() => sidebarWidth(220, value), /finite/);
+  }
 });
