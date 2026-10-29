@@ -30,7 +30,7 @@ npm.cmd run release:checksums
 
 For later releases, increment `version` using `npm version <version> --no-git-tag-version`, keep the lockfile synchronized, and update the changelog.
 
-**Current release status:** version **0.6.1** fixes Windows Explorer file opening and reuses the existing window for subsequent files, while retaining the 0.6.0 writing features. It remains unsigned while trusted signing approval is pending. Successful Windows CI verifies the installer and extracted application, including real startup and second-process file launches, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
+**Current release status:** version **0.6.2** adds Visual link editing and Ctrl+click opening, while retaining the Explorer-opening/single-window fixes and 0.6.0 writing features. It remains unsigned; no trusted signing provider is configured. Successful Windows CI verifies the installer and extracted application, including link editing, split-pane targeting, real startup and second-process file launches, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
 
 On GitHub:
 

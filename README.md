@@ -4,13 +4,20 @@
 
 A calm, local-first **Windows Markdown editor** with visual editing, **Source + Preview**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download the Windows x64 installer (0.6.1)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.1/Markdown-Studio-0.6.1-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.1) · [User guide](docs/USER_GUIDE.md)
+**[Download the Windows x64 installer (0.6.2)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.2/Markdown-Studio-0.6.2-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.2) · [User guide](docs/USER_GUIDE.md)
 
 The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
 **Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## What's new in 0.6.1
+## What's new in 0.6.2
+
+- Click a link in Visual mode to edit its text and address without switching to Source. The toolbar link button, **Ctrl+K**, and right-click **Edit link...** work too.
+- **Ctrl+click** opens web/email links through the existing confirmation dialog. Generated table-of-contents links still navigate with an ordinary click.
+- **Remove link** keeps its text. Address-only edits preserve label formatting; link changes support single-step undo/redo and target the correct split pane.
+- Source link insertion replaces selected text exactly once and escapes parentheses and whitespace in addresses.
+
+### Included from 0.6.1
 
 - Double-clicking an associated Markdown file in Windows Explorer opens that file, rather than only the Welcome screen.
 - Further Explorer launches reuse the existing window and open files in tabs. An already-open file is focused without replacing unsaved edits; minimized windows are restored.
@@ -20,7 +27,7 @@ Close Markdown Studio before upgrading with the new MSI. If Windows no longer re
 
 ### Included from 0.6.0
 
-All five additions below remain included in the **0.6.1 installer**, not just the source checkout.
+All five additions below remain included in the **0.6.2 installer**, not just the source checkout.
 
 | Feature | What you can do |
 | --- | --- |
@@ -65,7 +72,7 @@ This example searches for `Word` or `PDF` with a regex, shows both matches in So
 | Area | Included tools |
 | --- | --- |
 | **Markdown editing** | Headings, bold, italics, strikethrough, lists, tasks, quotes, links, images, horizontal rules, and code blocks. Use Visual for formatted writing or Source for exact Markdown and unsupported syntax. |
-| **Visual link editing (source checkout)** | Click an existing link to edit its text and address; Ctrl+K, the toolbar, and right-click **Edit link...** work too. Remove a link without deleting its text. Ctrl+click opens links after confirmation. Not yet included in the 0.6.1 installer. |
+| **Visual link editing** | Click an existing link to edit its text and address; Ctrl+K, the toolbar, and right-click **Edit link...** work too. Remove a link without deleting its text. Ctrl+click opens links after confirmation. |
 | **Tables** | Choose rows and columns in the Insert table dialog from the toolbar, right-click menu, or **Ctrl+T**. Add/remove rows and columns in Visual mode. |
 | **Code blocks** | Search the offline language catalog by name or alias, apply syntax highlighting, and copy a block's raw code. Code is displayed, never executed. |
 | **Tabs and paired views** | Open multiple documents; use thumbnail cards to pick a split partner. Resize the divider, work independently in each pane, or unsplit without closing files. Each tab keeps its own selection, scroll position, and undo history. |
@@ -81,15 +88,15 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.6.1** includes the Explorer-opening fix and the features shown above. This release is unsigned while trusted code-signing approval is pending; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **0.6.2** includes Visual link editing, the Explorer-opening fix, and the features shown above. This release is unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the Windows x64 MSI installer (0.6.1)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.1/Markdown-Studio-0.6.1-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
+1. **[Download the Windows x64 MSI installer (0.6.2)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.2/Markdown-Studio-0.6.2-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
 3. Open **Markdown Studio** from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.1/SHA256SUMS.txt) and a clean source ZIP are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.2/SHA256SUMS.txt) and a clean source ZIP are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
