@@ -1811,15 +1811,15 @@ element('link-dialog').querySelector('form')!.addEventListener('submit', event =
   const dialog = element<HTMLDialogElement>('link-dialog');
   const action = event.submitter instanceof HTMLButtonElement ? event.submitter.value : 'insert';
   if (action === 'cancel') { dialog.close('cancel'); return; }
+  const selection = linkSelection;
   void run(async () => {
     try {
-      const selection = linkSelection;
       if (!selection || documentId !== selection.documentId || mode !== selection.mode
         || (mode === 'visual' ? !editor.state.doc.eq(selection.doc) : markdown !== selection.content)) {
         throw new Error('The active document changed. Cancel and reopen the link editor in the intended document.');
       }
       const range = { from: selection.from, to: selection.to };
-      const change = () => editor.chain().focus().command(({ tr }) => { closeHistory(tr); return true; });
+      const change = () => editor.chain().command(({ tr }) => { closeHistory(tr); return true; });
       if (action === 'remove') {
         if (!selection.existing || mode !== 'visual') throw new Error('Choose an existing Visual link to remove.');
         if (!change().setTextSelection(range).unsetLink().run()) throw new Error('The link could not be removed.');
@@ -1850,6 +1850,11 @@ element('link-dialog').querySelector('form')!.addEventListener('submit', event =
       element('link-error').hidden = false;
       throw error;
     }
+  }).then(() => {
+    if (dialog.open || busy || !selection || documentId !== selection.documentId || mode !== selection.mode) return;
+    // Deferred Tiptap focus can otherwise reactivate a previously edited split pane.
+    if (mode === 'visual') editor.view.focus();
+    else source.focus();
   });
 });
 element('link-dialog').addEventListener('close', () => {
