@@ -11,7 +11,8 @@ import { toDocx, toPrintHTML, type DiagramImageLoader } from '../lib/export.js';
 import { diagramLimits, isMermaidLanguage, prepareMermaid } from '../lib/diagrams.js';
 import { themes } from '../lib/themes.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
-import type { EditorContext, Result } from '../src/bridge.js';
+import { fileArguments } from '../lib/launch.js';
+import type { EditorContext, OpenedFile, Result } from '../src/bridge.js';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'studio-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.setName('Markdown Studio');
@@ -20,7 +21,11 @@ if (profilePath) {
   mkdirSync(profilePath, { recursive: true });
   app.setPath('userData', profilePath);
 }
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
 let window: BrowserWindow;
+const pendingFiles: string[] = [];
+let rendererReady = false;
 interface NativeDocument { path: string | null; diskContent: string | null }
 const documents = new Map<string, NativeDocument>();
 let dirty = false;
@@ -69,6 +74,36 @@ async function remember(file: string): Promise<void> {
 }
 
 function action(command: string): void { window.webContents.send('app:action', command); }
+
+function queueFiles(files: string[]): void {
+  pendingFiles.push(...files);
+  if (pendingFiles.length && rendererReady && !window.isDestroyed()) action('open-pending');
+}
+
+if (primaryInstance) {
+  queueFiles(fileArguments(process.argv, process.cwd(), app.isPackaged));
+  app.on('second-instance', (_event, argv, cwd) => {
+    queueFiles(fileArguments(argv, cwd, app.isPackaged));
+    if (window && !window.isDestroyed()) {
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+    }
+  });
+}
+
+async function openDocument(file: string): Promise<OpenedFile> {
+  const existing = [...documents].find(([, document]) => document.path && samePath(document.path, file));
+  if (existing) {
+    await remember(file);
+    return { id: existing[0], path: file, content: existing[1].diskContent ?? '' };
+  }
+  const content = await readMarkdown(file);
+  const id = randomUUID();
+  documents.set(id, { path: file, diskContent: content });
+  await remember(file);
+  return { id, path: file, content };
+}
 
 function paste(): void {
   if (!clipboard.readImage().isEmpty()) action('paste-image');
@@ -262,6 +297,18 @@ function installIPC(): void {
     await atomicWrite(recentPath(), '[]');
     recentFiles = [];
   });
+  handle('document:open-pending', async (): Promise<Result<OpenedFile>[]> => {
+    rendererReady = true;
+    const results: Result<OpenedFile>[] = [];
+    for (const file of pendingFiles.splice(0)) {
+      try { results.push({ ok: true, value: await openDocument(file) }); }
+      catch (error) {
+        console.error('Could not open requested file:', file, error);
+        results.push({ ok: false, error: `Could not open "${file}": ${error instanceof Error ? error.message : String(error)}` });
+      }
+    }
+    return results;
+  });
   handle('document:open', async (recent?: string) => {
     let file: string;
     if (recent !== undefined) {
@@ -275,16 +322,7 @@ function installIPC(): void {
       if (selected.canceled) return null;
       file = selected.filePaths[0];
     }
-    const existing = [...documents].find(([, document]) => document.path && samePath(document.path, file));
-    if (existing) {
-      await remember(file);
-      return { id: existing[0], path: file, content: existing[1].diskContent ?? '' };
-    }
-    const content = await readMarkdown(file);
-    const id = randomUUID();
-    documents.set(id, { path: file, diskContent: content });
-    await remember(file);
-    return { id, path: file, content };
+    return openDocument(file);
   });
   handle('document:new', async () => {
     const id = randomUUID();
@@ -406,6 +444,7 @@ function createWindow(): void {
       sandbox: true, contextIsolation: true, nodeIntegration: false, spellcheck: true,
     },
   });
+  window.webContents.on('did-start-loading', () => { rendererReady = false; });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('context-menu', (_event, parameters) => {
     const items: MenuItemConstructorOptions[] = [];
@@ -523,7 +562,7 @@ function createWindow(): void {
   void window.loadURL(entryURL);
 }
 
-void app.whenReady().then(async () => {
+if (primaryInstance) void app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.markdownstudio.desktop');
   try {
     const saved: unknown = JSON.parse(await readFile(recentPath(), 'utf8'));

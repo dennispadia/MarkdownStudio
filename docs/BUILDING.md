@@ -37,6 +37,12 @@ Close running copies before rebuilding. Do not run two packaging/build commands 
 
 `verify:msi` performs **administrative extraction**, not a product installation. It does not register/unregister the app or create user shortcuts. Test real installation, upgrade, repair, and uninstall in a disposable Windows VM before a wider release.
 
+The desktop suite launches the application with a Markdown path, then starts real
+secondary processes against an isolated profile. It checks startup loading,
+one-window tab activation, relative paths with spaces/Unicode, preservation of
+unsaved edits, minimized-window restoration, and file requests queued during a
+busy Save As operation. It runs against both development and extracted MSI apps.
+
 ### Installer validation status and policy restrictions
 
 Local MSI validation can be blocked by Windows system policy (`LGHT1105`), including when run with administrator approval. The hosted workflow runs validation without suppressing ICE checks. Per-user file components use stable HKCU registry key paths, non-advertised shortcuts, and uninstall folder cleanup to satisfy ICE38 and ICE64.

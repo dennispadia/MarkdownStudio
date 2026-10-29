@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Open Markdown files passed by Windows Explorer on startup. Reuse the existing application window for subsequent launches, opening new tabs or focusing an already-open file without replacing unsaved edits.
+- Queue Explorer file requests until the editor is ready and while another operation is busy; report unreadable files without preventing other requested files from opening.
+
 ## 0.6.0
 
 - Add same-document Source + Preview with read-only rendering and optional proportional scroll synchronization, including in either side of an existing two-file split.

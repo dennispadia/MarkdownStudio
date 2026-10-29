@@ -1257,6 +1257,20 @@ async function open(file?: string): Promise<void> {
   await refreshRecent();
 }
 
+let pendingExternalOpen = false;
+
+async function openPending(): Promise<void> {
+  const results = unwrap(await window.studio.openPending());
+  const errors: string[] = [];
+  for (const result of results) {
+    if (!result.ok) { errors.push(result.error); continue; }
+    const opened = result.value;
+    addTab(opened.id, opened.content, opened.path.split(/[\\/]/).at(-1)!, opened.path);
+  }
+  if (results.length) await refreshRecent();
+  if (errors.length) throw new Error(errors.join('\n'));
+}
+
 async function run(operation: () => Promise<unknown>): Promise<void> {
   if (busy) { notify('Please wait for the current operation to finish.'); return; }
   busy = true;
@@ -1278,6 +1292,10 @@ async function run(operation: () => Promise<unknown>): Promise<void> {
       tab.source.readOnly = false;
     }
     if (!tabs.length) { editor.setEditable(true, false); source.readOnly = false; }
+    if (pendingExternalOpen) {
+      pendingExternalOpen = false;
+      void run(openPending);
+    }
   }
 }
 
@@ -1881,7 +1899,12 @@ document.addEventListener('keydown', event => {
   void run(async () => format(shortcut.command));
 }, true);
 window.addEventListener('beforeunload', storeDraft);
-window.studio.onAction(action => { void run(async () => dispatch(action)); });
+window.studio.onAction(action => {
+  if (action === 'open-pending') {
+    pendingExternalOpen = true;
+    if (!busy) { pendingExternalOpen = false; void run(openPending); }
+  } else void run(async () => dispatch(action));
+});
 element('tabs').addEventListener('keydown', event => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
   event.preventDefault();
@@ -1908,4 +1931,5 @@ void run(async () => {
   update();
   await applyTheme(theme);
   await refreshRecent();
+  await openPending();
 });

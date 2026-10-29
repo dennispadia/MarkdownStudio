@@ -30,12 +30,12 @@ npm.cmd run release:checksums
 
 For later releases, increment `version` using `npm version <version> --no-git-tag-version`, keep the lockfile synchronized, and update the changelog.
 
-**Current release status:** version **0.6.0** is published unsigned with Source + Preview, enhanced Find/Replace, refreshable contents, image storage choice, and offline Mermaid with Word/PDF export while trusted signing approval is pending. Successful Windows CI verifies the installer and extracted application, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
+**Current release status:** version **0.6.1** fixes Windows Explorer file opening and reuses the existing window for subsequent files, while retaining the 0.6.0 writing features. It remains unsigned while trusted signing approval is pending. Successful Windows CI verifies the installer and extracted application, including real startup and second-process file launches, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
 
 On GitHub:
 
 1. Open the repository's **Releases > Draft a new release**.
-2. Create a tag matching the version, such as `v0.6.0`, targeting the reviewed commit.
+2. Create a tag matching the version, such as `v0.6.1`, targeting the reviewed commit.
 3. Add a description of the release, known limitations, the unsigned-installer warning, and the no-support policy.
 4. Attach these files from `release`:
    - `Markdown-Studio-<version>-x64.msi`

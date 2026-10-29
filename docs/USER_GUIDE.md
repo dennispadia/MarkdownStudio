@@ -34,6 +34,7 @@ Export uses the **active tab's** current text, including unsaved edits. Exportin
 
 ### Working with multiple files
 
+- If Markdown Studio is your Windows default for `.md` files, double-clicking a file in Explorer opens that document. Further files open as tabs in the existing window, which is restored if minimized. Reopening the same file focuses its tab without replacing unsaved edits.
 - **Open file** and **New document** each open a new tab without replacing your other documents.
 - Click a tab to switch documents. Each tab keeps its text, undo/redo history, Visual/Source mode, scroll position, and selection.
 - A dot beside a tab's name means it has unsaved changes. Hover over the tab to see its full path.

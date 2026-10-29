@@ -31,10 +31,13 @@ const root = process.cwd();
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'markdown-studio-desktop-'));
 const executable = process.argv[2] ?? createRequire(import.meta.url)('electron');
 const packaged = Boolean(process.argv[2]);
+const startupFile = path.join(temporary, 'Startup résumé 日本語.md');
+await writeFile(startupFile, '# Opened from Explorer\n\nStartup document with spaces and Unicode.\n');
 const child = spawn(executable, [
   ...(packaged ? [] : ['.']),
   '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
   '--inspect=127.0.0.1:0', '--remote-debugging-port=0', `--user-data-dir=${path.join(temporary, 'profile')}`,
+  startupFile,
 ], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let log = '';
 let spawnError;
@@ -108,6 +111,13 @@ try {
   const { sessionId } = await browser.call('Target.attachToTarget', { targetId: target.targetId, flatten: true });
   const ui = expression => browser.evaluate(expression, sessionId);
   await waitFor(async () => ui("Boolean(document.querySelector('.tiptap h1')) && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'rendered editor');
+  const electron = "process.getBuiltinModule('module').createRequire(process.cwd() + '\\\\package.json')('electron')";
+  await main.evaluate(`globalThis.smokeElectron = ${electron}`);
+  await waitFor(async () => ui(`document.querySelector('#filename').textContent === ${JSON.stringify(path.basename(startupFile))}`), 'cold-launch file opens after renderer initialization');
+  assert.match(await ui("document.querySelector('#visual-editor').textContent"), /Opened from Explorer/);
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].webContents.send('app:action', 'close-tab')");
+  await waitFor(async () => ui("document.querySelector('#filename').textContent === 'Welcome' && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'welcome remains after closing startup file');
+  console.log('PASS: cold launch opens the requested file, including spaces and Unicode, after editor initialization');
   const imageChoices = `(() => {
     window.smokeImageStorage = 'embedded';
     setInterval(() => {
@@ -133,7 +143,6 @@ try {
   assert.ok(taskAlignment.length >= 3 && taskAlignment.every(offset => offset <= 1), `Checkbox alignment must be within 1px of first text line: ${taskAlignment}`);
   console.log('PASS: task checkboxes align with the first line of their text within 1px');
   assert.equal(await ui("document.querySelector('#dirty-indicator').textContent"), '');
-  const electron = "process.getBuiltinModule('module').createRequire(process.cwd() + '\\\\package.json')('electron')";
   await main.evaluate(`globalThis.smokeElectron = ${electron}; globalThis.smokeSavePath = null; globalThis.smokeOpenPath = null; globalThis.smokeChoice = 2; globalThis.smokeChoices = []; smokeElectron.dialog.showSaveDialog = async () => smokeSavePath ? ({canceled:false,filePath:smokeSavePath}) : ({canceled:true}); smokeElectron.dialog.showOpenDialog = async () => smokeOpenPath ? ({canceled:false,filePaths:[smokeOpenPath]}) : ({canceled:true,filePaths:[]}); smokeElectron.dialog.showMessageBox = async () => ({response:smokeChoices.length ? smokeChoices.shift() : smokeChoice});`);
   assert.equal(await main.evaluate("smokeElectron.app.getPath('userData')"), path.join(temporary, 'profile'), 'Test profile is isolated from real user data');
   assert.equal(await main.evaluate("smokeElectron.app.getVersion()"), JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version, 'The executable matches the current release version');
@@ -209,6 +218,54 @@ try {
 
   await action('source');
   const sourceEdit = async text => ui(`(() => { const source = document.querySelector('#source-editor'); source.value = ${JSON.stringify(text)}; source.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  const launch = async files => {
+    const process = spawn(executable, [
+      ...(packaged ? [] : [root]), `--user-data-dir=${path.join(temporary, 'profile')}`, ...files,
+    ], { cwd: temporary, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    let error;
+    process.on('error', value => { error = value; });
+    process.stdout.on('data', data => { output += data; });
+    process.stderr.on('data', data => { output += data; });
+    try {
+      await waitFor(() => {
+        if (error) throw error;
+        return process.exitCode !== null;
+      }, 'second process forwards files and exits');
+      assert.equal(process.exitCode, 0, output);
+    } finally { if (process.exitCode === null) process.kill(); }
+  };
+  await sourceEdit(raw.replace(/\r\n/g, '\n') + '\nUnsaved Explorer edits');
+  const explorerEdits = await ui("document.querySelector('#source-editor').value");
+  const originalTabs = await tabCount();
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].minimize()");
+  await launch([file]);
+  await waitFor(async () => main.evaluate("!smokeElectron.BrowserWindow.getAllWindows()[0].isMinimized()"), 'existing window restored');
+  assert.equal(await main.evaluate("smokeElectron.BrowserWindow.getAllWindows().length"), 1);
+  assert.equal(await tabCount(), originalTabs);
+  assert.equal(await ui("document.querySelector('#source-editor').value"), explorerEdits);
+  const warmFile = path.join(temporary, 'Warm résumé 日本語.md');
+  await writeFile(warmFile, '# Another Explorer document\n');
+  await launch([path.basename(warmFile)]);
+  await waitFor(async () => ui(`document.querySelector('#filename').textContent === ${JSON.stringify(path.basename(warmFile))} && document.querySelector('#app').getAttribute('aria-busy') === 'false'`), 'relative second-launch file opens in a tab');
+  assert.equal(await tabCount(), originalTabs + 1);
+  assert.equal(await main.evaluate("smokeElectron.BrowserWindow.getAllWindows().length"), 1);
+  await menuAction('close-tab');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), explorerEdits);
+  await main.evaluate("globalThis.smokeSaveDialog = smokeElectron.dialog.showSaveDialog; smokeElectron.dialog.showSaveDialog = () => new Promise(resolve => { globalThis.smokeResumeSave = resolve; })");
+  await ui("document.querySelector('[data-action=save-as]').click()");
+  await waitFor(async () => main.evaluate("typeof smokeResumeSave === 'function'"), 'Save As holds the renderer busy');
+  const queuedFile = path.join(temporary, 'Queued file.md');
+  await writeFile(queuedFile, '# Queued while busy\n');
+  await launch(['missing.md', path.basename(queuedFile)]);
+  assert.equal(await tabCount(), originalTabs, 'Busy editor has not switched tabs');
+  await main.evaluate("smokeElectron.dialog.showSaveDialog = smokeSaveDialog; smokeResumeSave({canceled:true})");
+  await waitFor(async () => ui("document.querySelector('#filename').textContent === 'Queued file.md' && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'queued file opens after Save As completes');
+  assert.match(await ui("document.querySelector('#notification').textContent"), /Could not open.*missing\.md/);
+  assert.equal(await tabCount(), originalTabs + 1, 'A failed file does not prevent the next file from opening');
+  await menuAction('close-tab');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), explorerEdits);
+  console.log('PASS: real second-process launches reuse one window, restore minimized windows, open relative Unicode paths in tabs, preserve duplicate-file edits, and queue busy-time requests with visible per-file errors');
   const content = '# Desktop export test\n\n**Bold** and *italic*.\n\n| Item | Value |\n| --- | --- |\n| A | B |\n\n- [x] Tested\n\n> A quote\n\n```js\nconst answer = 42;\n```\n';
   await sourceEdit(content);
   assert.match(await ui("document.querySelector('#save-status').textContent"), /Unsaved/);

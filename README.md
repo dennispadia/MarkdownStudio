@@ -4,15 +4,23 @@
 
 A calm, local-first **Windows Markdown editor** with visual editing, **Source + Preview**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download the Windows x64 installer (0.6.0)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.0/Markdown-Studio-0.6.0-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.0) · [User guide](docs/USER_GUIDE.md)
+**[Download the Windows x64 installer (0.6.1)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.1/Markdown-Studio-0.6.1-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.1) · [User guide](docs/USER_GUIDE.md)
 
 The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
 **Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## What's new in 0.6.0
+## What's new in 0.6.1
 
-All five additions below are included in the published **0.6.0 installer**, not just the source checkout.
+- Double-clicking an associated Markdown file in Windows Explorer opens that file, rather than only the Welcome screen.
+- Further Explorer launches reuse the existing window and open files in tabs. An already-open file is focused without replacing unsaved edits; minimized windows are restored.
+- File requests wait until the editor is ready or its current operation finishes. Unreadable files report an error without blocking other requested files.
+
+Close Markdown Studio before upgrading with the new MSI. If Windows no longer remembers your `.md` default, choose **Open with > Choose another app > Markdown Studio** again.
+
+### Included from 0.6.0
+
+All five additions below remain included in the **0.6.1 installer**, not just the source checkout.
 
 | Feature | What you can do |
 | --- | --- |
@@ -72,15 +80,15 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.6.0** is published with the features shown above. This release is unsigned while trusted code-signing approval is pending; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **0.6.1** includes the Explorer-opening fix and the features shown above. This release is unsigned while trusted code-signing approval is pending; see the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the Windows x64 MSI installer (0.6.0)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.0/Markdown-Studio-0.6.0-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
+1. **[Download the Windows x64 MSI installer (0.6.1)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.1/Markdown-Studio-0.6.1-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
 3. Open **Markdown Studio** from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.0/SHA256SUMS.txt) and a clean source ZIP are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.1/SHA256SUMS.txt) and a clean source ZIP are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 

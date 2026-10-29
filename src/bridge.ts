@@ -8,6 +8,7 @@ export interface EditorContext {
 }
 export interface StudioAPI {
   open: (recentPath?: string) => Promise<Result<OpenedFile | null>>;
+  openPending: () => Promise<Result<Result<OpenedFile>[]>>;
   save: (id: string, content: string, saveAs: boolean) => Promise<Result<{ path: string } | null>>;
   newDocument: () => Promise<Result<string>>;
   closeDocument: (id: string) => Promise<Result<void>>;

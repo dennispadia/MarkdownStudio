@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('studio', {
   open: (recentPath) => ipcRenderer.invoke('document:open', recentPath),
+  openPending: () => ipcRenderer.invoke('document:open-pending'),
   save: (id, content, saveAs) => ipcRenderer.invoke('document:save', id, content, saveAs),
   newDocument: () => ipcRenderer.invoke('document:new'),
   closeDocument: (id) => ipcRenderer.invoke('document:release', id),
