@@ -964,16 +964,21 @@ try {
     })()`);
     await browser.call('Input.dispatchMouseEvent', { type:'mousePressed', ...point, button:'left', buttons:1, clickCount:1, modifiers }, sessionId);
     await browser.call('Input.dispatchMouseEvent', { type:'mouseReleased', ...point, button:'left', buttons:0, clickCount:1, modifiers }, sessionId);
+    if (!modifiers && !selector.includes('.document-preview')) {
+      await waitFor(async () => ui("document.querySelector('#link-dialog').open"), 'clicked link editor');
+    }
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'link click');
   };
   const linkField = id => ui(`document.querySelector('#link-${id}').value`);
-  const submitLink = async (label, url, button = 'insert') => {
+  const submitLink = async (label, url, button = 'insert', expectError = false) => {
     await ui(`(() => {
       if (${label !== null}) document.querySelector('#link-label').value = ${JSON.stringify(label)};
       if (${url !== null}) document.querySelector('#link-url').value = ${JSON.stringify(url)};
       document.querySelector('#link-dialog form').requestSubmit(document.querySelector('#link-dialog button[value=${JSON.stringify(button)}]'));
     })()`);
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'link submission');
+    assert.equal(await ui("document.querySelector('#link-dialog').open"), expectError, await ui("document.querySelector('#link-error').textContent") || 'Successful link submission closes its dialog');
+    if (expectError) assert.equal(await ui("document.querySelector('#link-error').hidden"), false);
   };
   await action('new');
   await action('source');
@@ -990,6 +995,13 @@ try {
   assert.equal(await ui("document.querySelector('.tiptap').innerHTML"), originalLinkHTML, 'Cancel does not change content');
   await action('link');
   assert.equal(await linkField('url'), 'https://example.com/old', 'Toolbar edits the selected existing link');
+  await ui(`(() => {
+    const dialog = document.querySelector('#link-dialog');
+    dialog.querySelector('button[value=cancel]').click();
+    document.querySelector('[data-action=link]').click();
+    dialog.dispatchEvent(new Event('close'));
+  })()`);
+  assert.equal(await ui("document.querySelector('#link-dialog').open"), true, 'An old close event cannot clear a newly reopened link editor');
   await submitLink(null, 'https://example.com/new');
   assert.equal(await ui("document.querySelector('.tiptap a').getAttribute('href')"), 'https://example.com/new');
   assert.equal(await ui("document.querySelector('.tiptap a strong').textContent"), 'Original', 'Address-only edits retain mixed label formatting');
@@ -1009,7 +1021,7 @@ try {
   await showContext('.tiptap a');
   await contextAction(['Edit link...']);
   assert.equal(await linkField('label'), 'Updated label', 'Native right-click edits its target');
-  await submitLink(null, 'javascript:alert(1)');
+  await submitLink(null, 'javascript:alert(1)', 'insert', true);
   assert.equal(await ui("document.querySelector('#link-dialog').open"), true, 'Invalid address keeps the editor open');
   assert.match(await ui("document.querySelector('#link-error').textContent"), /http, https, mailto/);
   assert.equal(await ui("document.querySelector('.tiptap a').getAttribute('href')"), 'https://example.com/edited');
@@ -1648,7 +1660,7 @@ try {
   await waitFor(async () => ui("!document.querySelector('#link-dialog').open"), 'Escape cancels link editing');
   await clickLink(rightLinkSelector);
   await menuAction('new');
-  await submitLink('Must not replace another document', 'https://example.com/wrong');
+  await submitLink('Must not replace another document', 'https://example.com/wrong', 'insert', true);
   assert.equal(await ui("document.querySelector('#link-dialog').open"), true);
   assert.match(await ui("document.querySelector('#link-error').textContent"), /active document changed/);
   assert.equal(await ui("document.querySelector('.tiptap').textContent"), '', 'Stale dialog cannot change a newly activated document');

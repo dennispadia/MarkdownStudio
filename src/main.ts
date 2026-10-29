@@ -1852,7 +1852,10 @@ element('link-dialog').querySelector('form')!.addEventListener('submit', event =
     }
   });
 });
-element('link-dialog').addEventListener('close', () => { linkSelection = null; });
+element('link-dialog').addEventListener('close', () => {
+  // An earlier close event may arrive after the dialog has reopened.
+  if (!element<HTMLDialogElement>('link-dialog').open) linkSelection = null;
+});
 element('canvas').addEventListener('error', event => {
   if (event.target instanceof HTMLImageElement) notify('An image could not be displayed. Relative images must be inside the saved document\'s folder. Use Insert image to embed it instead.', true);
 }, true);
