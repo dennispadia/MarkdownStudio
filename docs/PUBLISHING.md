@@ -35,7 +35,7 @@ For later releases, increment `version` using `npm version <version> --no-git-ta
 On GitHub:
 
 1. Open the repository's **Releases > Draft a new release**.
-2. Create a tag matching the version, such as `v0.6.1`, targeting the reviewed commit.
+2. Create a tag matching the version, such as `v0.6.2`, targeting the reviewed commit.
 3. Add a description of the release, known limitations, the unsigned-installer warning, and the no-support policy.
 4. Attach these files from `release`:
    - `Markdown-Studio-<version>-x64.msi`

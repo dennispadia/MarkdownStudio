@@ -65,6 +65,7 @@ This example searches for `Word` or `PDF` with a regex, shows both matches in So
 | Area | Included tools |
 | --- | --- |
 | **Markdown editing** | Headings, bold, italics, strikethrough, lists, tasks, quotes, links, images, horizontal rules, and code blocks. Use Visual for formatted writing or Source for exact Markdown and unsupported syntax. |
+| **Visual link editing (source checkout)** | Click an existing link to edit its text and address; Ctrl+K, the toolbar, and right-click **Edit link...** work too. Remove a link without deleting its text. Ctrl+click opens links after confirmation. Not yet included in the 0.6.1 installer. |
 | **Tables** | Choose rows and columns in the Insert table dialog from the toolbar, right-click menu, or **Ctrl+T**. Add/remove rows and columns in Visual mode. |
 | **Code blocks** | Search the offline language catalog by name or alias, apply syntax highlighting, and copy a block's raw code. Code is displayed, never executed. |
 | **Tabs and paired views** | Open multiple documents; use thumbnail cards to pick a split partner. Resize the divider, work independently in each pane, or unsplit without closing files. Each tab keeps its own selection, scroll position, and undo history. |

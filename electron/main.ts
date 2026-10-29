@@ -456,6 +456,7 @@ function createWindow(): void {
       items.push({ type: 'separator' });
     }
     if (parameters.isEditable) {
+      if (parameters.linkURL) items.push({ label: 'Edit link...', click: () => action('link') }, { type: 'separator' });
       items.push(
         { label: 'Undo', click: () => action('undo') }, { label: 'Redo', click: () => action('redo') },
         { type: 'separator' }, { role: 'cut' }, { role: 'copy' },

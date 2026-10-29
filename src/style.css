@@ -235,6 +235,7 @@ dialog h2 { margin-top: 0; font-size: 23px; letter-spacing: -.5px; }
 dialog p { font-size: 13px; color: var(--muted); }
 dialog label { display: block; margin: 15px 0; font-size: 12px; }
 dialog input { display: block; width: 100%; margin-top: 6px; min-width: 300px; }
+#link-error { color: var(--text); font-weight: 600; }
 .dialog-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 25px; }
 #table-dialog { width: min(440px, 90vw); }
 .table-dimensions { display: flex; gap: 20px; }

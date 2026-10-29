@@ -62,6 +62,7 @@ Export uses the **active tab's** current text, including unsaved edits. Exportin
 - **Visual / Source:** switch between formatted editing and direct Markdown text. A single file has one switch above the toolbar; split view has one switch in each pane, with no duplicate global switch.
 - **Adaptive toolbar:** rounded outline icons expose names and shortcuts on hover. In narrower windows, **More formatting (...)** contains block quote, image, table, code block, and horizontal rule. All commands remain available from the native menus. Save and Export keep their labels.
 - **Document outline:** click a heading on the left to navigate.
+- **Links (0.6.2):** in Visual, click a link to edit its **Link text** and **Link address**, then choose **Save changes**. The link toolbar button, **Ctrl+K**, and right-click **Edit link...** also edit an existing link. **Remove link** keeps its text and formatting; Cancel leaves the document unchanged. Changing only the address preserves formatting within the label. Each change can be undone in one step. Use **Ctrl+click** to open a web/email link through the existing confirmation dialog, including in read-only Preview. Generated table-of-contents links still navigate with an ordinary click. Supported addresses are HTTP, HTTPS, `mailto:`, and `#heading` anchors. In Source, Ctrl+K continues to insert Markdown link syntax around the selection.
 - **Tables:** right-click and choose **Table > Insert table...** or **Insert > Table**, click the table toolbar button, or press **Ctrl+T**. Choose columns and rows, then **Insert table**. Rows include the header; the limits are 100 rows and 50 columns. Cancel leaves your text unchanged. The same dialog works in Visual and Source modes. Click inside an existing table for controls to add or remove rows and columns.
 - **Find and replace:** click **Find** or press **Ctrl+F** to toggle the bar; Close/Escape dismiss it without clearing your text. Search Markdown using **Match case** (on by default), **Whole word** (Unicode letters/numbers/underscore), or **Regex**. Previous/Next wrap around; Enter/Shift+Enter in Find navigate. Matches are counted and highlighted in Source. **Replace** changes the current result (or first result); **Replace all** changes every result in one undo step. Regex replacement supports `$1`, named groups, `$&`, and `$$`; literal replacement treats dollar signs literally. Navigation/replacement switches Visual to Source. Regex runs off the UI thread, stops after two seconds, and reports invalid expressions. Above 10,000 results, narrow the search before replacing; replacements cannot exceed the document size limit.
 - **Source + Preview:** choose the third mode button to edit one document's Source alongside a read-only live rendering. **Sync scrolling** proportionally links scroll positions in either direction and can be unchecked. This is separate from pairing two files; each paired pane can use Source + Preview. Returning to Source keeps its undo history; entering Visual retains the existing mode-switch history-reset behavior.
@@ -90,7 +91,8 @@ These work in both Visual and Source modes, including the active side of a split
 | Task list | Ctrl+Shift+9 |
 | Block quote | Ctrl+Shift+Q |
 | Paragraph / Headings 1-6 | Ctrl+0 / Ctrl+1-6 |
-| Insert link | Ctrl+K |
+| Insert / edit link | Ctrl+K |
+| Open link (confirmation for web/email) | Ctrl+click |
 | Insert image | Ctrl+Shift+I |
 | Insert table | Ctrl+T |
 | Code block | Ctrl+Shift+K |
@@ -112,6 +114,7 @@ Formatting shortcuts are scoped to document editors, not Find fields, dialogs, o
 Right-click inside the visual editor or Markdown source to access:
 
 - **Cut, Copy, Paste, Select All, Delete selection, Undo, and Redo**, with spelling suggestions when available.
+- **Edit link...:** shown when right-clicking a link in Visual, with its current text and address prefilled.
 - **Copy / Paste As:** copy a selection or the full document as Markdown, paste as plain text, paste Markdown as formatted content in Visual mode, or explicitly **Paste image**.
 - **Formatting:** bold, italic, strikethrough, inline code, quotes, bullet/numbered/task lists, and Clear formatting in Visual mode.
 - **Paragraph:** Heading 1 through Heading 6, or normal Paragraph. The current style is checked.

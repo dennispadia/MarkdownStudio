@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.2
+
+- Edit an existing Visual link's text and address by clicking it, using the link toolbar button or Ctrl+K, or choosing **Edit link...** from its right-click menu. Remove a link without removing its text.
+- Use Ctrl+click to open web/email links through the existing confirmation dialog. Preserve normal navigation for generated table-of-contents links.
+- Preserve the complete link range, mixed label formatting on address-only edits, single-step undo/redo, and split-pane targeting. Keep invalid-address errors in the dialog and prevent stale dialogs from editing another document.
+- Insert Source-mode links around the captured selection without duplicating selected text, and escape parentheses and whitespace in addresses.
+
 ## 0.6.1
 
 - Open Markdown files passed by Windows Explorer on startup. Reuse the existing application window for subsequent launches, opening new tabs or focusing an already-open file without replacing unsaved edits.

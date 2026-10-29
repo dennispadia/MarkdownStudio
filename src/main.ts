@@ -1,4 +1,5 @@
-import { Editor, mergeAttributes } from '@tiptap/core';
+import { Editor, getMarkRange, mergeAttributes } from '@tiptap/core';
+import { closeHistory } from '@tiptap/pm/history';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
@@ -136,7 +137,7 @@ app.innerHTML = `
       <span class="divider"></span>
       ${formatButton('bullet', 'Bullet list')}${formatButton('ordered', 'Numbered list')}${formatButton('task', 'Task list')}${formatButton('quote', 'Block quote', true)}
       <span class="divider"></span>
-      ${button('link', 'Insert link', 'link', 'icon-only')}${button('image', 'Insert image', 'image', 'icon-only toolbar-optional')}${button('table', 'Insert table', 'table', 'icon-only toolbar-optional')}
+      ${button('link', 'Insert / edit link', 'link', 'icon-only')}${button('image', 'Insert image', 'image', 'icon-only toolbar-optional')}${button('table', 'Insert table', 'table', 'icon-only toolbar-optional')}
       ${formatButton('codeblock', 'Code block', true)}${formatButton('rule', 'Horizontal rule', true)}
       <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More formatting" title="More formatting" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button><div id="format-menu" class="dropdown" role="menu" hidden><button type="button" data-command="quote" role="menuitem">${icon('quote')}<span>Block quote</span><kbd>Ctrl+Shift+Q</kbd></button>${button('image', 'Insert image', 'image')}${button('table', 'Insert table', 'table')}<button type="button" data-command="codeblock" role="menuitem">${icon('codeblock')}<span>Code block</span><kbd>Ctrl+Shift+K</kbd></button><button type="button" data-command="rule" role="menuitem">${icon('rule')}<span>Horizontal rule</span></button></div></div>
       <span class="toolbar-spacer"></span>
@@ -161,7 +162,14 @@ app.innerHTML = `
     <p id="image-storage-note">Save the document first to use an assets folder. Keep the folder with the document when sharing or moving it.</p>
     <div class="dialog-actions"><button value="cancel">Cancel</button><button value="insert" class="primary">Insert image</button></div>
   </form></dialog>
-  <dialog id="link-dialog"><form method="dialog"><h2>Add a link</h2><label>Link text<input id="link-label" required /></label><label>Web address<input id="link-url" type="url" placeholder="https://example.com" required /></label><div class="dialog-actions"><button value="cancel" formnovalidate>Cancel</button><button value="insert" class="primary">Insert link</button></div></form></dialog>
+  <dialog id="link-dialog" aria-labelledby="link-title"><form method="dialog">
+    <h2 id="link-title">Add a link</h2>
+    <label>Link text<input id="link-label" required /></label>
+    <label>Link address<input id="link-url" inputmode="url" placeholder="https://example.com" required /></label>
+    <p>Click a link to edit it. Ctrl+click opens it. Generated table-of-contents links navigate to their headings.</p>
+    <p id="link-error" role="alert" hidden></p>
+    <div class="dialog-actions"><button id="link-submit" value="insert" class="primary">Insert link</button><button value="cancel" formnovalidate>Cancel</button><button id="link-remove" value="remove" formnovalidate hidden>Remove link</button></div>
+  </form></dialog>
   <dialog id="table-dialog" aria-labelledby="table-title"><form method="dialog" id="table-form">
     <h2 id="table-title">Insert table</h2>
     <div class="table-dimensions"><label>Columns<input id="table-columns" type="number" min="1" max="${MAX_TABLE_COLUMNS}" step="1" value="3" required autofocus /></label><label>Rows<input id="table-rows" type="number" min="1" max="${MAX_TABLE_ROWS}" step="1" value="4" required /></label></div>
@@ -184,7 +192,8 @@ app.innerHTML = `
     <table class="shortcut-table"><tbody>
       ${formattingShortcuts.map(item => `<tr><th scope="row">${item.label}</th><td><kbd>${item.accelerator.replace('CmdOrCtrl', 'Ctrl')}</kbd></td></tr>`).join('')}
       <tr><th scope="row">Paragraph / Headings 1-6</th><td><kbd>Ctrl+0 / Ctrl+1-6</kbd></td></tr>
-      <tr><th scope="row">Insert link</th><td><kbd>Ctrl+K</kbd></td></tr>
+      <tr><th scope="row">Insert / edit link</th><td><kbd>Ctrl+K</kbd></td></tr>
+      <tr><th scope="row">Open link</th><td><kbd>Ctrl+click</kbd></td></tr>
       <tr><th scope="row">Insert image</th><td><kbd>Ctrl+Shift+I</kbd></td></tr>
       <tr><th scope="row">Insert table</th><td><kbd>Ctrl+T</kbd></td></tr>
       <tr><th scope="row">Code block</th><td><kbd>Ctrl+Shift+K</kbd></td></tr>
@@ -214,6 +223,7 @@ app.innerHTML = `
     <p><b>Find</b>: click Find or press Ctrl+F to open or close the find bar. Close and Escape also dismiss it; the search and replacement text are retained.</p>
     <p><b>Right-click</b> for Formatting, Paragraph (Heading 1-6 or normal text), Insert, Copy / Paste As, and spelling suggestions. Choose <b>Table &gt; Insert table</b> or <b>Insert &gt; Table</b> to choose rows and columns. Row/column editing controls become available inside a table.</p>
     <p><b>Insert</b> includes images, links, tables, code fences, Mermaid, horizontal lines, a marked table of contents, and paragraphs before/after. Use <b>Update table of contents</b> after changing headings. Footnotes, link references, math, and YAML insert editable syntax in <b>Source mode</b>. From Visual mode these go at the end, except YAML at the top. Math, footnotes, and YAML do not yet have formatted rendering or structured export support.</p>
+    <p><b>Links:</b> in Visual, click a link to edit its text and address, or right-click and choose <b>Edit link...</b>. The link toolbar button and <b>Ctrl+K</b> also edit the selected link. <b>Remove link</b> keeps its text. <b>Ctrl+click</b> opens a link after confirmation; generated contents links still navigate normally.</p>
     <p><b>Source</b> lets you edit the exact Markdown text. Use it for advanced syntax or HTML the visual editor doesn't support. Visual editing may normalize Markdown syntax; switching Visual/Source modes resets that tab's undo history.</p>
     <p><b>Save</b> keeps a regular UTF-8 Markdown file. <b>Export</b> creates a separate Word or PDF document, including the active tab's unsaved edits.</p>
     <p>Insert, paste or drop an image, then choose embedding or a saved document's <b>assets</b> folder. Clipboard bitmaps become PNG. Right-click an image for <b>Copy image</b>. Embedded images travel with the Markdown; relative assets must be kept with its folder. Remote images are not fetched. Word supports PNG, JPEG, and GIF; PDF also supports WebP.</p>
@@ -309,7 +319,10 @@ let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
 let recentExpanded = false;
 let theme: Theme = 'light';
 let tableDocumentId: string | null = null;
-let linkDocumentId: string | null = null;
+let linkSelection: {
+  documentId: string; mode: 'visual' | 'source'; from: number; to: number;
+  doc: Editor['state']['doc']; content: string; existing: boolean; label: string;
+} | null = null;
 let splitDocumentId: string | null = null;
 try {
   const savedTheme = restoreTheme(localStorage.getItem(themeKey));
@@ -1362,6 +1375,33 @@ function format(command: string): void {
   updateToolbar();
 }
 
+function showLinkDialog(link?: HTMLAnchorElement): void {
+  const dialog = element<HTMLDialogElement>('link-dialog');
+  if (dialog.open) return;
+  let from = mode === 'source' ? source.selectionStart : editor.state.selection.from;
+  let to = mode === 'source' ? source.selectionEnd : editor.state.selection.to;
+  let existing = false;
+  if (mode === 'visual') {
+    const position = link ? editor.view.posAtDOM(link, 0) : from;
+    const range = getMarkRange(editor.state.doc.resolve(position), editor.schema.marks.link);
+    if (range && (link || to <= range.to)) {
+      ({ from, to } = range);
+      existing = true;
+      editor.commands.setTextSelection(range);
+    }
+  }
+  const label = mode === 'source' ? source.value.slice(from, to) : editor.state.doc.textBetween(from, to);
+  linkSelection = { documentId, mode, from, to, doc: editor.state.doc, content: markdown, existing, label };
+  element('link-title').textContent = existing ? 'Edit link' : 'Add a link';
+  element('link-submit').textContent = existing ? 'Save changes' : 'Insert link';
+  element('link-remove').hidden = !existing;
+  element<HTMLInputElement>('link-label').value = label;
+  element<HTMLInputElement>('link-url').value = existing ? String(editor.getAttributes('link').href ?? '') : 'https://';
+  element('link-error').hidden = true;
+  dialog.showModal();
+  element<HTMLInputElement>('link-label').focus();
+}
+
 async function dispatch(action: string): Promise<void> {
   closeDropdowns();
   if (action.startsWith('theme:')) {
@@ -1506,12 +1546,7 @@ async function dispatch(action: string): Promise<void> {
     case 'find-previous': await navigateSearch(true); break;
     case 'replace-one': await replaceFound(false); break;
     case 'replace-all': await replaceFound(true); break;
-    case 'link':
-      linkDocumentId = documentId;
-      element<HTMLInputElement>('link-label').value = mode === 'source' ? source.value.slice(source.selectionStart, source.selectionEnd) : editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
-      element<HTMLInputElement>('link-url').value = 'https://';
-      element<HTMLDialogElement>('link-dialog').showModal();
-      break;
+    case 'link': showLinkDialog(); break;
     case 'image': {
       const image = unwrap(await window.studio.insertImage());
       if (image) await chooseImageStorage(image);
@@ -1638,19 +1673,24 @@ document.addEventListener('click', event => {
   }
   if (action) void run(async () => dispatch(action));
   else if (!target.closest('.dropdown')) closeDropdowns();
-  const link = target.closest<HTMLAnchorElement>('.tiptap a');
+  const link = target.closest<HTMLAnchorElement>('.tiptap a, .document-preview a');
   if (link) {
     event.preventDefault();
+    activateEventPane(event);
     void run(async () => {
       const href = link.getAttribute('href') ?? '';
-      if (href.startsWith('#')) {
+      const navigate = event.ctrlKey || event.metaKey || Boolean(link.closest('[data-studio-contents], .contents-node'));
+      if (href.startsWith('#') && (navigate || link.closest('.document-preview'))) {
         const anchor = decodeURIComponent(href.slice(1));
         const used = new Map<string, number>();
         const index = headings(markdown).findIndex(item => headingAnchor(item.text, used) === anchor);
-        const heading = index < 0 ? undefined : visual.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[index];
+        const container = link.closest('.document-preview') ?? visual;
+        const heading = index < 0 ? undefined : container.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[index];
         if (!heading) throw new Error('That heading was not found. Reinsert the table of contents after changing headings.');
         heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else unwrap(await window.studio.openExternal(link.href));
+      } else if (navigate) unwrap(await window.studio.openExternal(href));
+      else if (link.closest('.document-preview')) notify('Switch to Visual to edit this link. Ctrl+click opens it.');
+      else showLinkDialog(link);
     });
   }
 });
@@ -1766,20 +1806,63 @@ element('tab-context-menu').addEventListener('keydown', event => {
   const index = controls.findIndex(control => control === document.activeElement);
   controls[event.key === 'Home' ? 0 : event.key === 'End' ? controls.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : controls.length - 1)) % controls.length].focus();
 });
-element<HTMLDialogElement>('link-dialog').addEventListener('close', event => {
-  if ((event.target as HTMLDialogElement).returnValue !== 'insert') return;
-  if (documentId !== linkDocumentId) { notify('The active file changed. Reopen Insert link in the intended file.', true); return; }
-  const label = element<HTMLInputElement>('link-label').value;
-  const url = element<HTMLInputElement>('link-url').value;
-  if (!isSafeLink(url)) { notify('Use an http, https, or mailto address.', true); return; }
-  if (mode === 'source') insertSource(`[${label.replace(/[[\]\\]/g, '\\$&')}](${url.replace(/[()]/g, encodeURIComponent)})`);
-  else editor.chain().focus().insertContent({ type: 'text', text: label, marks: [{ type: 'link', attrs: { href: url } }] }).run();
+element('link-dialog').querySelector('form')!.addEventListener('submit', event => {
+  event.preventDefault();
+  const dialog = element<HTMLDialogElement>('link-dialog');
+  const action = event.submitter instanceof HTMLButtonElement ? event.submitter.value : 'insert';
+  if (action === 'cancel') { dialog.close('cancel'); return; }
+  void run(async () => {
+    try {
+      const selection = linkSelection;
+      if (!selection || documentId !== selection.documentId || mode !== selection.mode
+        || (mode === 'visual' ? !editor.state.doc.eq(selection.doc) : markdown !== selection.content)) {
+        throw new Error('The active document changed. Cancel and reopen the link editor in the intended document.');
+      }
+      const range = { from: selection.from, to: selection.to };
+      const change = () => editor.chain().focus().command(({ tr }) => { closeHistory(tr); return true; });
+      if (action === 'remove') {
+        if (!selection.existing || mode !== 'visual') throw new Error('Choose an existing Visual link to remove.');
+        if (!change().setTextSelection(range).unsetLink().run()) throw new Error('The link could not be removed.');
+      } else {
+        const label = element<HTMLInputElement>('link-label').value;
+        const url = element<HTMLInputElement>('link-url').value.trim();
+        if (!label.trim()) throw new Error('Enter the text to display for this link.');
+        if (!isSafeLink(url) && !/^#[^\s]*$/.test(url)) throw new Error('Use an http, https, mailto, or #heading address.');
+        if (mode === 'source') {
+          const address = url.replace(/[()\s]/g, character => character === '(' ? '%28' : character === ')' ? '%29' : encodeURIComponent(character));
+          source.setRangeText(`[${label.replace(/[[\]\\]/g, '\\$&')}](${address})`, range.from, range.to, 'end');
+          source.focus();
+          changed(source.value);
+        } else if (selection.existing && label === selection.label) {
+          if (!change().setTextSelection(range).updateAttributes('link', { href: url }).run()) throw new Error('The link could not be updated.');
+        } else {
+          const marks = selection.existing
+            ? selection.doc.resolve(selection.from).nodeAfter?.marks.map(mark => mark.type.name === 'link'
+              ? { ...mark.toJSON(), attrs: { ...mark.attrs, href: url } } : mark.toJSON())
+            : [{ type: 'link', attrs: { href: url } }];
+          if (!change().insertContentAt(range, { type: 'text', text: label, marks }).run()) throw new Error('The link could not be inserted.');
+        }
+      }
+      if (mode === 'visual') editor.view.dispatch(closeHistory(editor.state.tr));
+      dialog.close(action);
+    } catch (error) {
+      element('link-error').textContent = error instanceof Error ? error.message : String(error);
+      element('link-error').hidden = false;
+      throw error;
+    }
+  });
 });
+element('link-dialog').addEventListener('close', () => { linkSelection = null; });
 element('canvas').addEventListener('error', event => {
   if (event.target instanceof HTMLImageElement) notify('An image could not be displayed. Relative images must be inside the saved document\'s folder. Use Insert image to embed it instead.', true);
 }, true);
 element('canvas').addEventListener('contextmenu', event => {
   contextImageSource = event.target instanceof HTMLImageElement ? event.target.getAttribute('data-studio-source') : null;
+  const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('.tiptap a') : null;
+  if (!busy && link && !link.closest('[data-studio-contents], .contents-node')) {
+    const range = getMarkRange(editor.state.doc.resolve(editor.view.posAtDOM(link, 0)), editor.schema.marks.link);
+    if (range) editor.commands.setTextSelection(range);
+  }
 });
 element('canvas').addEventListener('paste', event => {
   const file = [...(event.clipboardData?.files ?? [])].find(item => item.type.startsWith('image/'));
