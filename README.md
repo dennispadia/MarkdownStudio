@@ -4,20 +4,29 @@
 
 A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download the Windows x64 installer (0.6.4)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.4/Markdown-Studio-0.6.4-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.4) · [User guide](docs/USER_GUIDE.md)
+**[Download the Windows x64 installer (0.6.5)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.5/Markdown-Studio-0.6.5-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.5) · [User guide](docs/USER_GUIDE.md)
 
 The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
 **Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## What's new in 0.6.4
+## What's new in 0.6.5
+
+- The single-row toolbar now ships in the actual desktop app, with direct formatting, lists, quotes, links, images, tables, code, rule, table-of-contents, and Mermaid controls. Narrow windows scroll the row horizontally instead of hiding editing commands.
+- **Split** is directly beside **Visual + Source**: Split pairs two different documents; the switch shows two editable views of one document.
+- The compact right-click menu now ships with twelve direct buttons: Cut, Copy, Paste, Delete, Bold, Italic, Code, Link, Quote, Numbered list, Bullet list, and Task list. Copy / Paste As, Paragraph, Insert, and Table keep their existing choices.
+- Menu actions work in Visual and Source, preserve selection, and target the clicked split pane. Shift+F10, keyboard navigation, Escape focus restoration, spelling suggestions, and viewport-safe submenus are included.
+
+These are working features in the **verified 0.6.5 installer**, not design previews. The official build runs the desktop tests against the extracted installer application. Installer-speed and early running-app prompt improvements remain separate pending work.
+
+### Included from 0.6.4
 
 - Readable outline labels show a linked heading's description instead of Markdown link syntax, without changing its links or navigation.
 - Recent Files shows only the five most recently used files, newest first, including existing saved history.
 - Status-bar zoom-out, percentage/reset, and zoom-in controls stay synchronized with View-menu and keyboard zoom.
 - Save confirmations name the actual file, including its new name after Save As: for example, `Notes.md saved`.
 
-These improvements are included in the **verified 0.6.4 installer**. The proposed single-row toolbar and compact right-click menu remain design previews; installer-speed improvements are not included.
+These improvements remain included in the **verified 0.6.5 installer**.
 
 ### Included from 0.6.3
 
@@ -27,7 +36,7 @@ Start with one blank **Untitled** document, without a Welcome document. Opening 
 
 Turn on the **Visual + Source** switch for editable Visual on the left and Markdown Source on the right. Changes appear in both panes, with the formatting toolbar available; turning the switch off returns to Visual. Source-only and the existing read-only Source + Preview remain available through **More (...)** and the View menu.
 
-These interface changes remain included in the **verified 0.6.4 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
+These interface changes remain included in the **verified 0.6.5 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
 
 ### Included from 0.6.2
 
@@ -46,7 +55,7 @@ Close Markdown Studio before upgrading with the new MSI. If Windows no longer re
 
 ### Included from 0.6.0
 
-All five additions below remain included in the **0.6.4 installer**, not just the source checkout.
+All five additions below remain included in the **0.6.5 installer**, not just the source checkout.
 
 | Feature | What you can do |
 | --- | --- |
@@ -107,15 +116,15 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.6.4** adds readable outline labels, five recent files, synchronized zoom controls, and filename-specific save confirmations. It retains the minimalist workspace, editable Visual + Source, collapsed action rail, blank startup, Visual link editing, Explorer opening, and the features shown above. This release is unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **0.6.5** ships the single-row editing toolbar, visible Split control, and working compact right-click menu. It retains readable outline labels, five recent files, synchronized zoom controls, filename-specific save confirmations, the minimalist workspace, editable Visual + Source, collapsed action rail, blank startup, Visual link editing, Explorer opening, and the features shown above. This release is unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the Windows x64 MSI installer (0.6.4)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.4/Markdown-Studio-0.6.4-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
+1. **[Download the Windows x64 MSI installer (0.6.5)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.5/Markdown-Studio-0.6.5-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
 3. Open **Markdown Studio** from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.4/SHA256SUMS.txt) and a clean source ZIP are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.5/SHA256SUMS.txt) and a clean source ZIP are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
