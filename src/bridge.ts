@@ -6,6 +6,21 @@ export interface EditorContext {
   heading: number;
   inTable: boolean;
 }
+export interface ContextMenuItem {
+  id: string;
+  label: string;
+  enabled: boolean;
+  separator: boolean;
+  checked?: boolean;
+  shortcut?: string;
+  submenu?: ContextMenuItem[];
+}
+export interface EditorContextMenu {
+  id: string;
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+}
 export interface StudioAPI {
   open: (recentPath?: string) => Promise<Result<OpenedFile | null>>;
   openPending: () => Promise<Result<Result<OpenedFile>[]>>;
@@ -21,6 +36,8 @@ export interface StudioAPI {
   setTheme: (theme: Theme) => Promise<Result<void>>;
   confirmUnsaved: (name: string) => Promise<Result<'save' | 'discard' | 'cancel'>>;
   setEditorContext: (context: EditorContext) => void;
+  onContextMenu: (listener: (menu: EditorContextMenu) => void) => void;
+  contextMenuCommand: (id: string, command: string) => Promise<Result<void>>;
   readClipboard: () => Promise<Result<string>>;
   paste: () => void;
   readClipboardImage: () => Promise<Result<string | null>>;

@@ -106,12 +106,14 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; container-t
 #sidebar-toggle { position: absolute; top: 10px; left: 6px; width: 28px; height: 28px; padding: 5px; color: var(--muted); background: var(--soft); }
 .icon-only { padding: 7px; width: 32px; }
 .icon-only > span { display: none; }
-.toolbar { min-height: 47px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); padding: 7px 23px; flex-shrink: 0; }
-.toolbar button { min-width: 32px; height: 32px; padding: 6px; }
+.toolbar { min-height: 47px; display: flex; flex-wrap: nowrap; align-items: center; gap: 2px; border-bottom: 1px solid var(--line); padding: 7px 12px; flex-shrink: 0; overflow-x: auto; scrollbar-width: thin; }
+.toolbar > *, .global-modes { flex-shrink: 0; }
+.toolbar button { min-width: 28px; height: 30px; padding: 5px; }
+.toolbar button svg { width: 16px; height: 16px; }
+.toolbar .split-control { font-size: 11px; }
 .toolbar .dropdown button { height: auto; padding: 10px; }
 .toolbar .dropdown svg { flex-shrink: 0; }
 .toolbar-more { display: block; }
-.toolbar-optional { display: none; }
 .view-switch { display: flex; align-items: center; gap: 8px; padding: 6px 0 !important; color: var(--muted); font-size: 11px; }
 .switch-track { position: relative; width: 28px; height: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); flex-shrink: 0; }
 .switch-thumb { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
@@ -122,10 +124,22 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; container-t
 .toolbar button[data-command] > span { display: none; }
 .toolbar .dropdown button[data-command] > span { display: inline; }
 .toolbar button.active { background: var(--hover); color: var(--accent); }
-.toolbar select { width: 113px; border: 0; background: transparent; color: var(--text); font-size: 12px; cursor: pointer; padding: 5px; border-radius: 4px; }
+.toolbar select { width: 100px; border: 0; background: transparent; color: var(--text); font-size: 11px; cursor: pointer; padding: 5px; border-radius: 4px; }
 .toolbar select option { background: var(--paper); }
-.divider { height: 19px; width: 1px; background: var(--line); margin: 0 7px; }
+.divider { height: 19px; width: 1px; background: var(--line); margin: 0 3px; flex-shrink: 0; }
 .toolbar-spacer { flex: 1; }
+.view-menu { position: fixed; top: auto; right: auto; max-height: calc(100vh - 100px); overflow-y: auto; }
+.editor-context-menu { position: fixed; inset: auto; margin: 0; width: 236px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); padding: 5px; overflow-y: auto; color: var(--text); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 28px #0004; font-size: 12px; }
+.editor-context-menu button { width: 100%; justify-content: space-between; min-height: 29px; padding: 6px 9px; font-size: 11px; text-align: left; }
+.editor-context-menu button:disabled { opacity: .4; cursor: default; }
+.editor-context-menu button:disabled:hover { background: transparent; }
+.editor-context-menu button[aria-checked="true"] { color: var(--accent); background: var(--selection); }
+.editor-context-menu kbd { color: var(--muted); font: 10px "Segoe UI", sans-serif; margin-left: 8px; }
+.context-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding-bottom: 5px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.context-tools button { flex-direction: column; justify-content: center; gap: 4px; height: 45px; padding: 4px 1px; font-size: 10px; text-align: center; }
+.context-tools svg { width: 16px; height: 16px; }
+.editor-context-submenu { width: 270px; }
+.context-separator { height: 1px; background: var(--line); margin: 4px 0; }
 #table-tools { padding: 5px 34px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
 #table-tools > span { color: var(--muted); font-size: 9px; letter-spacing: 1px; }
 #table-tools button { font-size: 11px; }
@@ -294,11 +308,10 @@ dialog input { display: block; width: 100%; margin-top: 6px; min-width: 300px; }
   .pane-content { padding: 28px 24px 50px; }
 }
 @container (max-width: 1000px) {
-  .toolbar-optional { display: none; }
   .toolbar-more { display: block; }
   .toolbar { gap: 1px; padding: 7px 8px; }
-  .toolbar > button, .toolbar-more > button { min-width: 28px; width: 28px; padding: 5px; }
-  .toolbar select { width: 104px; }
+  .toolbar > button:not(.split-control), .toolbar-more > button { min-width: 28px; width: 28px; padding: 5px; }
+  .toolbar select { width: 100px; }
   .divider { margin: 0 4px; }
   .workspace-actions, .workspace-navigation { gap: 7px; }
   .workspace-bar { gap: 10px; }

@@ -18,6 +18,7 @@ import { syntaxCSS } from '../lib/highlight.js';
 import { LanguageCodeBlock } from './code-block.js';
 import { ContentsNode } from './contents-node.js';
 import { renderMermaidBlocks } from './diagrams.js';
+import { ContextMenu } from './context-menu.js';
 import './style.css';
 
 const syntaxStyle = document.createElement('style');
@@ -57,11 +58,18 @@ const icons = {
   quote: '<path d="M4 13h5V6H3v8c0 3 2 4 4 4m9-5h5V6h-6v8c0 3 2 4 4 4"/>',
   codeblock: '<rect x="2" y="3" width="20" height="18" rx="4"/><path d="m9 9-3 3 3 3m6-6 3 3-3 3"/>',
   rule: '<path d="M3 12h18"/>',
+  cut: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8 8 12 12M8 16 20 4"/>',
+  copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+  paste: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M8 4H4v18h16V4h-4"/>',
+  delete: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
+  contents: '<path d="M9 5h12M9 12h12M9 19h12M3 5h1M3 12h1M3 19h1"/>',
+  refresh: '<path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/>',
+  diagram: '<rect x="8" y="2" width="8" height="5" rx="1"/><rect x="2" y="17" width="7" height="5" rx="1"/><rect x="15" y="17" width="7" height="5" rx="1"/><path d="M12 7v5H5v5m7-5h7v5"/>',
 };
 type Icon = keyof typeof icons;
 const icon = (name: Icon) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
 const button = (action: string, label: string, name?: Icon, className = '') => `<button type="button" data-action="${action}" class="${className}" title="${label}">${name ? icon(name) : ''}<span>${label}</span></button>`;
-const formatButton = (command: Icon, label: string, optional = false) => `<button type="button" data-command="${command}" title="${label}" aria-label="${label}" class="${optional ? 'toolbar-optional' : ''}">${icon(command)}<span>${label}</span></button>`;
+const formatButton = (command: Icon, label: string) => `<button type="button" data-command="${command}" title="${label}" aria-label="${label}">${icon(command)}<span>${label}</span></button>`;
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const brandIcon = new URL('../assets/icon.svg', import.meta.url).href;
 const brandDarkIcon = new URL('../assets/icon-dark.svg', import.meta.url).href;
@@ -90,16 +98,19 @@ app.innerHTML = `
     </header>
     <div class="toolbar" role="toolbar" aria-label="Text formatting">
       <div class="global-modes"><button type="button" id="view-switch" data-action="side-by-side" class="view-switch" role="switch" aria-checked="false" aria-controls="canvas" title="Show Source beside Visual"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span>Visual + Source</span></button></div>
+      ${button('split', 'Split', 'split', 'split-control')}
       <span class="divider"></span>
       <select id="heading" aria-label="Paragraph style"><option value="0">Paragraph</option><option value="1">Heading 1</option><option value="2">Heading 2</option><option value="3">Heading 3</option><option value="4">Heading 4</option><option value="5">Heading 5</option><option value="6">Heading 6</option></select>
       <span class="divider"></span>
-      ${formatButton('bold', 'Bold')}${formatButton('italic', 'Italic')}${formatButton('strike', 'Strikethrough', true)}${formatButton('code', 'Inline code', true)}
+      ${formatButton('bold', 'Bold')}${formatButton('italic', 'Italic')}${formatButton('strike', 'Strikethrough')}${formatButton('code', 'Inline code')}
       <span class="divider"></span>
-      ${formatButton('bullet', 'Bullet list')}${formatButton('ordered', 'Numbered list', true)}${formatButton('task', 'Task list', true)}${formatButton('quote', 'Block quote', true)}
+      ${formatButton('bullet', 'Bullet list')}${formatButton('ordered', 'Numbered list')}${formatButton('task', 'Task list')}${formatButton('quote', 'Block quote')}
       <span class="divider"></span>
-      ${button('link', 'Insert / edit link', 'link', 'icon-only')}${button('image', 'Insert image', 'image', 'icon-only toolbar-optional')}${button('table', 'Insert table', 'table', 'icon-only toolbar-optional')}
-      ${formatButton('codeblock', 'Code block', true)}${formatButton('rule', 'Horizontal rule', true)}
-      <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More formatting and views" title="More formatting and views" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button><div id="format-menu" class="dropdown" role="menu" hidden>${formatButton('strike', 'Strikethrough')}${formatButton('code', 'Inline code')}${formatButton('ordered', 'Numbered list')}${formatButton('task', 'Task list')}<button type="button" data-command="quote" role="menuitem">${icon('quote')}<span>Block quote</span><kbd>Ctrl+Shift+Q</kbd></button>${button('image', 'Insert image', 'image')}${button('table', 'Insert table', 'table')}<button type="button" data-command="codeblock" role="menuitem">${icon('codeblock')}<span>Code block</span><kbd>Ctrl+Shift+K</kbd></button><button type="button" data-command="rule" role="menuitem">${icon('rule')}<span>Horizontal rule</span></button>${button('split', 'Split with...', 'split', 'split-control')}${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('help', 'Getting started', 'help')}</div></div>
+      ${button('link', 'Insert / edit link', 'link', 'icon-only')}${button('image', 'Insert image', 'image', 'icon-only')}${button('table', 'Insert table', 'table', 'icon-only')}
+      ${formatButton('codeblock', 'Code block')}${formatButton('rule', 'Horizontal rule')}
+      <span class="divider"></span>
+      ${button('insert:toc', 'Insert table of contents', 'contents', 'icon-only')}${button('insert:toc-update', 'Update table of contents', 'refresh', 'icon-only')}${button('insert:mermaid', 'Mermaid diagram', 'diagram', 'icon-only')}
+      <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More views and help" title="More views and help" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button></div>
       <span class="toolbar-spacer"></span>
       ${button('undo', 'Undo', 'undo', 'icon-only')}${button('redo', 'Redo', 'redo', 'icon-only')}
     </div>
@@ -114,6 +125,7 @@ app.innerHTML = `
     <div class="canvas" id="canvas"><article class="paper" id="visual-editor" aria-label="Visual Markdown editor"></article><textarea id="source-editor" aria-label="Markdown source" spellcheck="false" hidden></textarea></div>
     <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><span id="save-status" aria-live="polite">Ready to write</span><div class="zoom-controls" role="group" aria-label="Zoom controls"><button type="button" id="zoom-out" data-action="zoom-out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" id="zoom-reset" data-action="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%">100%</button><button type="button" id="zoom-in" data-action="zoom-in" aria-label="Zoom in" title="Zoom in">+</button></div></footer>
   </main>
+  <div id="format-menu" class="dropdown view-menu" role="menu" hidden>${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('help', 'Getting started', 'help')}</div>
   <div id="notification" role="status" hidden></div>
   <dialog id="image-storage-dialog" aria-labelledby="image-storage-title"><form method="dialog">
     <h2 id="image-storage-title">Store this image</h2>
@@ -188,14 +200,13 @@ app.innerHTML = `
     <p><b>Save</b> keeps a regular UTF-8 Markdown file. <b>Export</b> creates a separate Word or PDF document, including the active tab's unsaved edits.</p>
     <p>Insert, paste or drop an image, then choose embedding or a saved document's <b>assets</b> folder. Clipboard bitmaps become PNG. Right-click an image for <b>Copy image</b>. Embedded images travel with the Markdown; relative assets must be kept with its folder. Remote images are not fetched. Word supports PNG, JPEG, and GIF; PDF also supports WebP.</p>
     <p><b>Ctrl+N</b> New tab &nbsp; <b>Ctrl+O</b> Open &nbsp; <b>Ctrl+S</b> Save<br><b>Ctrl+W</b> Close tab &nbsp; <b>Ctrl+Tab</b> Next tab<br><b>Ctrl+Alt+S</b> Save all &nbsp; <b>Ctrl+P</b> PDF<br><b>Ctrl+0-6</b> Paragraph / Headings &nbsp; <b>Ctrl+T</b> Table<br><b>Ctrl+F</b> Find &nbsp; <b>Ctrl+/</b> Switch mode &nbsp; <b>F9</b> Focus</p>
-    <p><b>Source + Preview</b> shows a read-only rendering beside your editable Markdown, with optional synchronized scrolling. Mermaid diagrams render locally. Use More formatting or Insert for a Mermaid template and to update a marked table of contents.</p>
+    <p><b>Source + Preview</b> shows a read-only rendering beside your editable Markdown, with optional synchronized scrolling. Mermaid diagrams render locally. Use the single-row toolbar or Insert menu for a Mermaid template and to update a marked table of contents.</p>
     <p>Local draft recovery covers every unsaved tab. Save regularly; recovery is not a substitute for backups. Rendered math is not supported.</p>
     <form method="dialog"><button class="primary">Let's write</button></form>
   </dialog>
 `;
 
 function element<T extends HTMLElement>(id: string): T { return document.getElementById(id) as T; }
-element('format-menu').insertAdjacentHTML('beforeend', '<button type="button" role="menuitem" data-action="insert:toc">Insert table of contents</button><button type="button" role="menuitem" data-action="insert:toc-update">Update table of contents</button><button type="button" role="menuitem" data-action="insert:mermaid">Mermaid diagram</button>');
 for (const shortcut of formattingShortcuts) {
   for (const control of document.querySelectorAll<HTMLElement>(`[data-command="${shortcut.command}"]`)) {
     control.title = `${shortcut.label} (${shortcut.accelerator.replace('CmdOrCtrl', 'Ctrl')})`;
@@ -233,6 +244,9 @@ let documentPath: string | null = null;
 let documentName = 'Untitled.md';
 let mode: 'visual' | 'source' = 'visual';
 let busy = false;
+const editorMenu = new ContextMenu(icon);
+let contextTarget: HTMLElement | null = null;
+let contextPoint = { x: 0, y: 0 };
 let sourceUndo: string[] = [];
 let sourceRedo: string[] = [];
 let searchMatches: SearchMatch[] = [];
@@ -739,9 +753,9 @@ function updatePaneHeaders(): void {
     }
   }
   const control = document.querySelector<HTMLButtonElement>('[data-action="split"]')!;
-  const label = pair ? 'Unsplit' : 'Split with...';
+  const label = pair ? 'Unsplit' : 'Split';
   control.querySelector('span')!.textContent = label;
-  control.title = label;
+  control.title = pair ? 'Unsplit the two documents' : 'Split with another document';
   control.setAttribute('aria-pressed', String(Boolean(pair)));
   control.disabled = !pair && !tabs.some(tab => tab.id !== documentId && !pairFor(pairs, tab.id));
 }
@@ -845,6 +859,7 @@ function showMode(): void {
 }
 
 function activateTab(id: string): void {
+  editorMenu.hide();
   const next = tabs.find(tab => tab.id === id);
   if (!next) throw new Error('This tab is no longer open.');
   if (next === activeTab) return;
@@ -1136,6 +1151,7 @@ function storeDraft(): void {
 }
 
 function switchMode(next: 'visual' | 'source'): void {
+  editorMenu.hide();
   if (activeTab) { activeTab.preview = false; activeTab.sideBySide = false; }
   if (next === mode) { showMode(); return; }
   if (next === 'source') {
@@ -1459,6 +1475,7 @@ function showLinkDialog(link?: HTMLAnchorElement): void {
 }
 
 async function dispatch(action: string): Promise<void> {
+  editorMenu.hide();
   closeDropdowns();
   if (action.startsWith('theme:')) {
     const value = action.slice(6);
@@ -1731,6 +1748,7 @@ document.addEventListener('click', event => {
     closeDropdowns();
     if (!expanded) {
       element(action).hidden = false;
+      positionViewMenu();
       target.closest('button')!.setAttribute('aria-expanded', 'true');
     }
     return;
@@ -1936,6 +1954,33 @@ element('canvas').addEventListener('contextmenu', event => {
     if (range) editor.commands.setTextSelection(range);
   }
 });
+document.addEventListener('contextmenu', event => {
+  const target = event.target instanceof HTMLElement ? event.target : null;
+  contextTarget = target?.closest<HTMLElement>('#canvas .tiptap, #canvas .document-source') ?? null;
+  if (target?.closest('.code-block-controls')) contextTarget = null;
+  const bounds = contextTarget?.getBoundingClientRect();
+  contextPoint = event.clientX || event.clientY ? { x: event.clientX, y: event.clientY }
+    : { x: (bounds?.left ?? 0) + 12, y: (bounds?.top ?? 0) + 12 };
+}, true);
+window.studio.onContextMenu(menu => {
+  const origin = contextTarget;
+  contextTarget = null;
+  const report = (error: unknown) => notify(error instanceof Error ? error.message : String(error), true);
+  if (!origin || busy) {
+    void window.studio.contextMenuCommand(menu.id, 'native').then(unwrap).catch(report);
+    return;
+  }
+  closeDropdowns();
+  const id = documentId;
+  const currentMode = mode;
+  editorMenu.show({ ...menu, ...contextPoint }, origin, command => {
+    if (busy || documentId !== id || mode !== currentMode) {
+      notify('The active editor changed. Open the context menu again in the intended document.', true);
+      return;
+    }
+    void window.studio.contextMenuCommand(menu.id, command).then(unwrap).catch(report);
+  });
+});
 element('canvas').addEventListener('paste', event => {
   const file = [...(event.clipboardData?.files ?? [])].find(item => item.type.startsWith('image/'));
   const hasImage = file || [...(event.clipboardData?.types ?? [])].some(type => type.startsWith('image/'));
@@ -2002,6 +2047,7 @@ element('canvas').addEventListener('copy', event => copySelectedImage(event, fal
 element('canvas').addEventListener('cut', event => copySelectedImage(event, true), true);
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
+    editorMenu.hide();
     closeDropdowns();
     setFindOpen(false);
     setFocusMode(false);
@@ -2014,6 +2060,14 @@ function closeDropdowns(): void {
     document.querySelector(`[aria-controls="${id}"]`)!.setAttribute('aria-expanded', 'false');
   }
 }
+function positionViewMenu(): void {
+  const menu = element('format-menu');
+  if (menu.hidden) return;
+  const trigger = document.querySelector<HTMLElement>('[aria-controls="format-menu"]')!.getBoundingClientRect();
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(trigger.right - bounds.width, innerWidth - bounds.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(trigger.bottom + 5, innerHeight - bounds.height - 8))}px`;
+}
 for (const id of dropdownIds) {
   const trigger = document.querySelector<HTMLButtonElement>(`[aria-controls="${id}"]`)!;
   const menu = element(id);
@@ -2023,6 +2077,7 @@ for (const id of dropdownIds) {
     event.preventDefault();
     closeDropdowns();
     menu.hidden = false;
+    positionViewMenu();
     trigger.setAttribute('aria-expanded', 'true');
     const items = menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
     items[event.key === 'ArrowUp' ? items.length - 1 : 0].focus();

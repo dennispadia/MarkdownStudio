@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('studio', {
   setTheme: (theme) => ipcRenderer.invoke('app:theme', theme),
   confirmUnsaved: (name) => ipcRenderer.invoke('document:confirm', name),
   setEditorContext: (context) => ipcRenderer.send('editor:context', context),
+  onContextMenu: (listener) => ipcRenderer.on('editor:context-menu', (_event, menu) => listener(menu)),
+  contextMenuCommand: (id, command) => ipcRenderer.invoke('editor:context-menu-command', id, command),
   readClipboard: () => ipcRenderer.invoke('editor:clipboard-read'),
   paste: () => ipcRenderer.send('editor:paste'),
   readClipboardImage: () => ipcRenderer.invoke('editor:clipboard-image'),

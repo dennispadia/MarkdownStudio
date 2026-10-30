@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.5
+
+- Ship the approved single-row editing toolbar in the actual desktop application, with direct formatting, lists, quotes, links, images, tables, code, rule, table-of-contents, and Mermaid controls. Narrow windows scroll horizontally instead of hiding editing commands.
+- Put Split directly beside Visual + Source, distinguishing two-document pairing from two editable views of one document.
+- Ship the compact right-click menu with twelve direct editing buttons, Copy / Paste As, Paragraph, Insert, and Table choices. Preserve spelling suggestions, undo/redo, formatting state, link editing, image operations, and native menus for other inputs.
+- Preserve selection and active-pane targeting, support keyboard invocation/navigation and focus restoration, and keep menus within the viewport.
+- Retain the readable outline labels, five recent files, zoom controls, and filename-specific save confirmations from 0.6.4.
+
+Known limitations: installer-speed and early running-app prompt improvements remain separate pending work, as do DOCX/PDF formatting fidelity and comprehensive cross-mode reading-position alignment. The application and installer remain unsigned.
+
 ## 0.6.4
 
 - Show readable heading descriptions in the document outline and its tooltips instead of Markdown link syntax or destination URLs. Preserve document links, heading navigation, and existing anchors.

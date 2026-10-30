@@ -12,7 +12,7 @@ import { diagramLimits, isMermaidLanguage, prepareMermaid } from '../lib/diagram
 import { themes } from '../lib/themes.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
 import { fileArguments } from '../lib/launch.js';
-import type { EditorContext, OpenedFile, Result } from '../src/bridge.js';
+import type { ContextMenuItem, EditorContext, OpenedFile, Result } from '../src/bridge.js';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'studio-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.setName('Markdown Studio');
@@ -33,6 +33,7 @@ let allowClose = false;
 let recentFiles: string[] = [];
 const RECENT_FILE_LIMIT = 5;
 let editorContext: EditorContext = { mode: 'visual', active: [], heading: 0, inTable: false };
+let contextMenu: { id: string; native: Menu; x: number; y: number; commands: Map<string, () => void> } | null = null;
 const entryURL = pathToFileURL(path.join(app.getAppPath(), 'dist', 'index.html')).href;
 const recentPath = () => path.join(app.getPath('userData'), 'recent-files.json');
 const samePath = (left: string, right: string) => path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase();
@@ -109,6 +110,36 @@ async function openDocument(file: string): Promise<OpenedFile> {
 function paste(): void {
   if (!clipboard.readImage().isEmpty()) action('paste-image');
   else window.webContents.paste();
+}
+
+function showContextMenu(items: MenuItemConstructorOptions[], x: number, y: number): void {
+  const native = Menu.buildFromTemplate(items);
+  const commands = new Map<string, () => void>();
+  const serialize = (menu: Menu, parentEnabled = true): ContextMenuItem[] => menu.items.map(item => {
+    const id = String(commands.size);
+    const enabled = parentEnabled && item.enabled;
+    if (!item.submenu && item.type !== 'separator' && enabled) {
+      commands.set(id, () => {
+        switch (item.role?.toLowerCase()) {
+          case 'cut': window.webContents.cut(); break;
+          case 'copy': window.webContents.copy(); break;
+          case 'pasteandmatchstyle': window.webContents.pasteAndMatchStyle(); break;
+          case 'selectall': window.webContents.selectAll(); break;
+          default: item.click(item, window, {});
+        }
+      });
+    } else commands.set(id, () => { throw new Error('This menu command is not available.'); });
+    return {
+      id, label: item.label, enabled, separator: item.type === 'separator',
+      checked: item.type === 'checkbox' ? item.checked : undefined,
+      shortcut: item.accelerator?.replace(/CommandOrControl|CmdOrCtrl/g, 'Ctrl'),
+      submenu: item.submenu ? serialize(item.submenu, enabled) : undefined,
+    };
+  });
+  const model = serialize(native);
+  const id = randomUUID();
+  contextMenu = { id, native, commands, x, y };
+  window.webContents.send('editor:context-menu', { id, x, y, items: model });
 }
 
 function paragraphItems(): MenuItemConstructorOptions[] {
@@ -256,6 +287,19 @@ function installIPC(): void {
     const text = clipboard.readText();
     contentArgument(text);
     return text;
+  });
+  handle('editor:context-menu-command', async (id: unknown, command: unknown) => {
+    if (!contextMenu || contextMenu.id !== id || typeof command !== 'string') throw new Error('This context menu is no longer open.');
+    const current = contextMenu;
+    if (command === 'native') {
+      contextMenu = null;
+      current.native.popup({ window, x: current.x, y: current.y });
+      return;
+    }
+    const execute = current.commands.get(command);
+    if (!execute) throw new Error('Unknown context menu command.');
+    contextMenu = null;
+    execute();
   });
   handle('editor:clipboard-write', async (text: unknown) => {
     contentArgument(text);
@@ -469,7 +513,8 @@ function createWindow(): void {
       if (parameters.linkURL) items.push({ label: 'Edit link...', click: () => action('link') }, { type: 'separator' });
       items.push(
         { label: 'Undo', click: () => action('undo') }, { label: 'Redo', click: () => action('redo') },
-        { type: 'separator' }, { role: 'cut' }, { role: 'copy' },
+        { type: 'separator' }, { role: 'cut', enabled: parameters.editFlags.canCut },
+        { role: 'copy', enabled: parameters.editFlags.canCopy || parameters.mediaType === 'image' },
         { label: 'Paste', accelerator: 'CmdOrCtrl+V', click: paste }, { role: 'selectAll' },
       );
       items.push(
@@ -512,7 +557,7 @@ function createWindow(): void {
     if (parameters.mediaType === 'image') {
       items.push({ label: 'Copy image', click: () => action('copy-image') });
     }
-    if (items.length) Menu.buildFromTemplate(items).popup({ window });
+    if (items.length) showContextMenu(items, parameters.x, parameters.y);
   });
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));

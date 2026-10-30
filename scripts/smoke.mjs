@@ -332,9 +332,17 @@ try {
   await action('side-by-side');
   assert.ok(await ui("document.querySelector('.visual-surface').scrollTop") > 1000, 'Enabling Source retains the Visual scroll position');
   assert.equal(await ui("document.querySelector('#source-editor').scrollTop"), 700);
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1280,900)");
+  await delay(150);
+  assert.ok(await ui("document.querySelector('.toolbar').scrollWidth <= document.querySelector('.toolbar').clientWidth"), 'Every editing command fits on one row at 1280px');
+  assert.equal(await ui("document.querySelector('.toolbar > [data-action=split]').textContent"), 'Split', 'Split is directly visible beside the editable dual-view switch');
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
   await delay(200);
-  assert.ok(await ui("document.querySelector('.toolbar').scrollWidth <= document.querySelector('.toolbar').clientWidth"), 'Editable dual-view toolbar fits minimum window width');
+  assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar')).flexWrap"), 'nowrap', 'Editable dual-view toolbar stays on one row at minimum width');
+  await ui("document.querySelector('.toolbar > [data-action=redo]').scrollIntoView({block:'nearest',inline:'nearest'})");
+  await delay(100);
+  const scrolledToolbar = await ui("(() => {const button=document.querySelector('.toolbar > [data-action=redo]').getBoundingClientRect();const toolbar=document.querySelector('.toolbar');const bounds=toolbar.getBoundingClientRect();return {left:button.left,right:button.right,toolbarLeft:bounds.left,toolbarRight:bounds.right,scroll:toolbar.scrollLeft,width:toolbar.scrollWidth,client:toolbar.clientWidth}})()");
+  assert.ok(scrolledToolbar.left >= scrolledToolbar.toolbarLeft - 1 && scrolledToolbar.right <= scrolledToolbar.toolbarRight + 1, `The last command remains reachable by horizontal scrolling: ${JSON.stringify(scrolledToolbar)}`);
   assert.ok(await ui("document.querySelector('.source-surface').getBoundingClientRect().right <= innerWidth"), 'Source remains beside Visual at minimum window width');
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
   await menuAction('side-by-side');
@@ -892,6 +900,12 @@ try {
     globalThis.smokeContextMenu = null;
     globalThis.smokeClipboard = '';
     globalThis.smokeClipboardImage = smokeElectron.nativeImage.createEmpty();
+    const buildMenu = smokeElectron.Menu.buildFromTemplate;
+    smokeElectron.Menu.buildFromTemplate = function (...args) {
+      const menu = buildMenu.apply(this, args);
+      smokeContextMenu = menu;
+      return menu;
+    };
     smokeElectron.Menu.prototype.popup = function () { smokeContextMenu = this; };
     smokeElectron.clipboard.readText = () => smokeClipboard;
     smokeElectron.clipboard.writeText = text => { smokeClipboard = text; };
@@ -909,20 +923,32 @@ try {
       return item;
     };
   `);
-  const showContext = async (selector = '.tiptap p') => {
+  let contextSelector = '.tiptap p';
+  const showContext = async (selector = contextSelector, corner = false) => {
+    contextSelector = selector;
     await main.evaluate('smokeContextMenu = null');
     const point = await ui(`(() => {
-      const element = document.querySelector(${JSON.stringify(selector)});
+      const requested = document.querySelector(${JSON.stringify(selector)});
+      const element = requested?.getClientRects().length ? requested : document.querySelector('.active-pane .tiptap > :first-child');
       element.scrollIntoView({block:'center'});
       const box = element.getBoundingClientRect();
-      return {x:box.x + 12,y:box.y + 12};
+      return ${corner} ? {x:Math.min(box.right-12,innerWidth-24),y:Math.min(box.bottom-12,innerHeight-65)} : {x:box.x + 12,y:box.y + 12};
     })()`);
     await browser.call('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'right', buttons: 2, clickCount: 1 }, sessionId);
     await browser.call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'right', buttons: 0, clickCount: 1 }, sessionId);
-    await waitFor(async () => main.evaluate('Boolean(smokeContextMenu)'), 'native right-click menu');
+    await waitFor(async () => ui("document.querySelector('#editor-context-menu').matches(':popover-open')"), 'compact right-click menu in the actual application');
   };
   const contextAction = async labels => {
-    await main.evaluate(`smokeMenuItem(${JSON.stringify(labels)}).click()`);
+    if (!await ui("document.querySelector('#editor-context-menu').matches(':popover-open')")) await showContext();
+    await ui(`(() => {
+      let menu = document.querySelector('#editor-context-menu');
+      for (const label of ${JSON.stringify(labels.filter(label => label !== 'Formatting'))}) {
+        const control = [...menu.querySelectorAll('button')].find(button => button.dataset.contextLabel === label && button.closest('[role=menu]') === menu);
+        if (!control || control.disabled) throw new Error('Unavailable compact context action: ' + label);
+        control.click();
+        if (control.hasAttribute('aria-controls')) menu = document.getElementById(control.getAttribute('aria-controls'));
+      }
+    })()`);
     await delay(100);
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), labels.join(' / '));
   };
@@ -946,6 +972,13 @@ try {
   await browser.call('Input.insertText', { text: 'Menu words' }, sessionId);
   await selectParagraph();
   await showContext();
+  assert.equal(await ui("document.querySelectorAll('#editor-context-menu .context-tools button').length"), 12, 'All twelve editing commands are directly accessible');
+  assert.deepEqual(await ui("[...document.querySelectorAll('#editor-context-menu .context-tools button')].map(button => button.textContent)"), ['Cut', 'Copy', 'Paste', 'Delete', 'Bold', 'Italic', 'Code', 'Link', 'Quote', 'Numbered', 'Bullets', 'Tasks']);
+  assert.equal((await ui("window.studio.contextMenuCommand('invalid-menu', 'invalid-command')")).ok, false, 'Invalid native context commands are rejected');
+  if (process.env.STUDIO_SCREENSHOT) {
+    const screenshot = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'compact-context-menu-desktop.png'), Buffer.from(screenshot.data, 'base64'));
+  }
   assert.equal(await main.evaluate("smokeMenuItem(['Table']).enabled"), true, 'Table menu is available before a table exists');
   assert.equal(await main.evaluate("smokeMenuItem(['Table', 'Insert table...']).enabled"), true);
   assert.equal(await main.evaluate("smokeMenuItem(['Table', 'Add row after']).enabled"), false);
@@ -1029,6 +1062,84 @@ try {
   await main.evaluate('smokeChoice = 1');
   await menuAction('close-tab');
   console.log('PASS: row/column dialog from context menus, toolbar and shortcut action; cancellation, invalid dimensions, exact Visual/Source table shapes, and 1x1 minimum');
+
+  await action('new');
+  await action('source');
+  for (const [label, expected] of [
+    ['Bold', '**menu** words'], ['Italic', '*menu* words'], ['Inline code', '`menu` words'],
+    ['Block quote', '\n> menu words'], ['Numbered list', '\n1. menu words'],
+    ['Bullet list', '\n- menu words'], ['Task list', '\n- [ ] menu words'],
+  ]) {
+    await sourceEdit('menu words');
+    await ui("document.querySelector('#source-editor').setSelectionRange(0,4)");
+    await showContext('#source-editor');
+    await contextAction([label]);
+    assert.equal(await ui("document.querySelector('#source-editor').value"), expected, `Direct ${label} preserves and formats the Source selection`);
+    await menuAction('undo');
+    assert.equal(await ui("document.querySelector('#source-editor').value"), 'menu words', `Direct ${label} supports undo`);
+  }
+  await sourceEdit('remove keep');
+  await ui("document.querySelector('#source-editor').setSelectionRange(0,7)");
+  await showContext('#source-editor');
+  await contextAction(['Delete selection']);
+  assert.equal(await ui("document.querySelector('#source-editor').value"), 'keep', 'Direct Delete really edits the focused Source selection');
+  await menuAction('undo');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), 'remove keep');
+  await ui("document.querySelector('#source-editor').setSelectionRange(0,0)");
+  await showContext('#source-editor');
+  assert.equal(await ui("document.querySelector('#editor-context-menu [data-context-label=Cut]').disabled"), true, 'Cut is disabled without a selection');
+  assert.equal(await ui("document.querySelector('#editor-context-menu [data-context-label=Copy]').disabled"), true, 'Copy is disabled without a selection');
+  await nativeShortcut('Escape', [], false);
+  await ui("document.querySelector('#source-editor').setSelectionRange(0,6)");
+  await showContext('#source-editor');
+  await contextAction(['Link...']);
+  assert.equal(await ui("document.querySelector('#link-dialog').open"), true);
+  assert.equal(await ui("document.querySelector('#link-label').value"), 'remove');
+  await ui("document.querySelector('#link-dialog button[value=cancel]').click()");
+  await delay(100);
+  await main.evaluate(`
+    globalThis.smokeNativeEdits = [];
+    globalThis.smokeEditMethods = {};
+    for (const name of ['cut','copy','paste','pasteAndMatchStyle']) {
+      const contents = smokeElectron.BrowserWindow.getAllWindows()[0].webContents;
+      smokeEditMethods[name] = contents[name];
+      contents[name] = () => smokeNativeEdits.push(name);
+    }
+    smokeClipboardImage = smokeElectron.nativeImage.createEmpty();
+  `);
+  for (const labels of [['Cut'], ['Copy'], ['Paste'], ['Copy / Paste As', 'Paste as plain text']]) {
+    await showContext('#source-editor');
+    await contextAction(labels);
+    assert.equal(await ui("document.querySelector('#source-editor').readOnly"), false, 'Native editing is not blocked by the async-operation lock');
+  }
+  assert.deepEqual(await main.evaluate('smokeNativeEdits'), ['cut', 'copy', 'paste', 'pasteAndMatchStyle'], 'Compact clipboard buttons route to the native methods without touching the real user clipboard in this test');
+  await main.evaluate("Object.assign(smokeElectron.BrowserWindow.getAllWindows()[0].webContents, smokeEditMethods)");
+  await nativeShortcut('F10', ['shift']);
+  await waitFor(async () => ui("document.querySelector('#editor-context-menu').matches(':popover-open')"), 'Shift+F10 opens the actual editor context menu');
+  await ui("document.querySelector('#editor-context-menu > [data-context-label=Paragraph]').focus()");
+  await nativeShortcut('Right', [], false);
+  assert.match(await ui("document.activeElement.textContent"), /Heading/);
+  await nativeShortcut('Escape', [], false);
+  assert.equal(await ui("document.activeElement.dataset.contextLabel"), 'Paragraph');
+  await nativeShortcut('Escape', [], false);
+  assert.equal(await ui("document.activeElement === document.querySelector('#source-editor')"), true, 'Escape restores editing focus');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
+  await delay(150);
+  for (const label of ['Copy / Paste As', 'Paragraph', 'Insert', 'Table']) {
+    await showContext('#source-editor', true);
+    await ui(`(() => {const button=[...document.querySelectorAll('#editor-context-menu > button')].find(button=>button.dataset.contextLabel===${JSON.stringify(label)});button.scrollIntoView({block:'nearest'});button.click()})()`);
+    assert.ok(await ui("[...document.querySelectorAll('.editor-context-menu:popover-open')].every(menu=>{const box=menu.getBoundingClientRect();return box.left>=7 && box.top>=7 && box.right<=innerWidth-7 && box.bottom<=innerHeight-7})"), `Root and ${label} submenu fit near the bottom-right viewport edge`);
+    await nativeShortcut('Escape', [], false);
+    await nativeShortcut('Escape', [], false);
+  }
+  await showContext('#source-editor');
+  await browser.call('Input.dispatchMouseEvent', {type:'mousePressed',x:10,y:100,button:'left',buttons:1,clickCount:1}, sessionId);
+  await browser.call('Input.dispatchMouseEvent', {type:'mouseReleased',x:10,y:100,button:'left',buttons:0,clickCount:1}, sessionId);
+  assert.equal(await ui("document.querySelector('#editor-context-menu').matches(':popover-open')"), false, 'Outside click dismisses the menu');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+  await main.evaluate('smokeChoice=1');
+  await menuAction('close-tab');
+  console.log('PASS: compact direct Source formatting and undo, real deletion, link dialog, native clipboard routing, Shift+F10, keyboard submenus, Escape focus, edge clamping, and outside dismissal');
 
   await action('new');
   await action('visual');
@@ -1559,6 +1670,13 @@ try {
   await paneMode(splitIds[1], 'visual');
   await paneMode(splitIds[0], 'visual');
   console.log('PASS: both files can independently use editable dual view, Source/Visual updates and undo stay scoped, and legacy Preview disables only its own dual view');
+  const leftBeforeContext = await paneSource(splitIds[0]);
+  await showContext(pane(splitIds[1]) + ' .tiptap p');
+  assert.equal(await ui("document.querySelector('#filename').textContent"), 'right.md', 'Right-click activates the clicked split pane');
+  await contextAction(['Paragraph', 'Heading 2']);
+  assert.ok(await ui(`Boolean(document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .tiptap h2')}))`));
+  assert.equal(await paneSource(splitIds[0]), leftBeforeContext, 'Compact Visual menu leaves the other document unchanged');
+  await menuAction('undo');
   await visualAppend(splitIds[1], ' RIGHT EDIT');
   assert.equal(await ui("document.querySelector('#filename').textContent"), 'right.md');
   await menuAction('undo');
@@ -1575,6 +1693,16 @@ try {
   await menuAction('undo');
   assert.equal(await paneSource(splitIds[1]), rightBeforeSource);
   await menuAction('redo');
+  const rightBeforeContext = await paneSource(splitIds[1]);
+  const leftBeforeSourceContext = await paneSource(splitIds[0]);
+  await ui(`(() => {const source=document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')});source.focus();source.setSelectionRange(2,7)})()`);
+  await nativeShortcut('F10', ['shift'], false);
+  await waitFor(async () => ui("document.querySelector('#editor-context-menu').matches(':popover-open')"), 'Source split context menu preserves its keyboard selection');
+  await contextAction(['Bold']);
+  assert.equal(await paneSource(splitIds[1]), rightBeforeContext.slice(0,2) + '**' + rightBeforeContext.slice(2,7) + '**' + rightBeforeContext.slice(7));
+  assert.equal(await paneSource(splitIds[0]), leftBeforeSourceContext, 'Compact Source menu leaves the other document unchanged');
+  await menuAction('undo');
+  assert.equal(await paneSource(splitIds[1]), rightBeforeContext);
   await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .tiptap')}).focus()`);
   await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .pane-content')}).scrollTop=220; const otherSource=document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')}); otherSource.setSelectionRange(7,12); otherSource.scrollTop=140`);
   await ui("document.querySelector('.split-divider').focus()");
@@ -1781,14 +1909,16 @@ try {
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
   await delay(250);
   assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar-more')).display"), 'block');
-  assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar > [data-command=quote]')).display"), 'none');
-  assert.ok(await ui("document.querySelector('.toolbar').scrollWidth <= document.querySelector('.toolbar').clientWidth"), 'Toolbar fits the minimum supported window');
+  assert.notEqual(await ui("getComputedStyle(document.querySelector('.toolbar > [data-command=quote]')).display"), 'none');
+  assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar')).flexWrap"), 'nowrap');
+  assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar')).overflowX"), 'auto', 'Narrow windows scroll instead of hiding editing commands');
+  assert.ok(await ui("(() => {const toolbar=document.querySelector('.toolbar');const controls=[...toolbar.querySelectorAll('button,select')].filter(control=>control.getClientRects().length);return controls.every(control=>Math.abs(control.getBoundingClientRect().top-controls[0].getBoundingClientRect().top)<8)})()"), 'All controls remain on one row');
   assert.ok(await ui("document.querySelector('.workspace-actions').getBoundingClientRect().right <= innerWidth"), 'File actions fit the minimum supported window');
   assert.ok(await ui("document.querySelector('#outline').clientHeight > 30 && document.querySelector('#outline').scrollHeight > document.querySelector('#outline').clientHeight"), 'Long outline has independently scrollable room');
   assert.ok(await ui("document.querySelector('#theme-toggle').getBoundingClientRect().bottom < innerHeight"), 'Theme toggle remains anchored and visible');
   await action('format-menu');
   assert.equal(await ui("document.querySelector('#format-menu').hidden"), false);
-  await ui("document.querySelector('#format-menu [data-command=quote]').click()");
+  await ui("document.querySelector('.toolbar > [data-command=quote]').click()");
   assert.equal(await ui("document.querySelector('#format-menu').hidden"), true);
   assert.equal(await ui("Boolean(document.querySelector('#visual-editor blockquote'))"), true);
   await action('save-menu');
