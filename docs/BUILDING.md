@@ -1,4 +1,4 @@
-# Building and validating Markdown Studio
+# Building and validating Lekh
 
 ## Requirements
 
@@ -29,8 +29,8 @@ Close running copies before rebuilding. Do not run two packaging/build commands 
 | Command | Result |
 | --- | --- |
 | `npm run build` | TypeScript checking, generated icons, and Vite application output |
-| `npm run package` | Developer app in `release\win-unpacked` |
-| `npm run package:msi` | Self-contained `release\Markdown-Studio-<version>-x64.msi` and unpacked app |
+| `npm run package` | Developer app in `release\win-unpacked\Lekh - Markdown editor.exe` |
+| `npm run package:msi` | Self-contained `release\Lekh-Markdown-editor-<version>-x64.msi` and unpacked app |
 | `npm run verify:msi` | Checks MSI properties, per-user/limited scope, shortcuts, cabinet and upgrades; extracts its payload and runs the complete desktop suite against it |
 | `npm run package:source` | Clean, allowlisted source ZIP, excluding tools, dependencies, output, and private configuration |
 | `npm run release:checksums` | SHA-256 checksum list for the MSI and source ZIP |
@@ -51,7 +51,9 @@ If you encounter this error, use a Windows build environment where your organiza
 
 The workflow uses Windows PowerShell, matching the npm distribution scripts. Verification and checksum scripts explicitly load their host's Utility module so `Get-FileHash` remains available even when launched from PowerShell 7 with an inherited module search path.
 
-The installer is intentionally per-user only, uses LocalAppData rather than Program Files, creates desktop/Start menu shortcuts, and does not launch the app automatically. Its upgrade identity is derived from `build.appId`; keep that stable for original-product updates and change it for independent forks. The narrowly checked `configure-msi.cjs` hook adjusts the builder's dual-scope template to enforce the non-elevated scope and fails if an upstream template changes.
+The installer is intentionally per-user only, uses LocalAppData rather than Program Files, creates desktop/Start menu shortcuts, and does not launch the app automatically. `build.msi.upgradeCode` explicitly retains the original upgrade identity, formerly derived from `build.appId`; keep both stable for original-product updates and change both for independent forks. The narrowly checked `configure-msi.cjs` hook adjusts the builder's dual-scope template to enforce the non-elevated scope and fails if an upstream template changes.
+
+The npm package name and AppUserModelId remain compatibility identifiers. `lib/branding.ts` explicitly retains the original `Markdown Studio` user-data directory for both Electron and Chromium storage; `--user-data-dir` still overrides both for isolated testing. Existing renderer storage keys, diagram partition, and table-of-contents document markers are unchanged. Branding uses Windows-installed Segoe UI Light and Nirmala UI, not redistributed font files.
 
 ## Screenshots
 
@@ -63,7 +65,7 @@ npm.cmd run test:desktop
 Remove-Item Env:\STUDIO_PUBLIC_SCREENSHOTS
 ```
 
-They are written to `docs\images`. Review them before committing. Normal test runs do not overwrite these images.
+They are written to `docs\images\lekh-light.png` and `docs\images\lekh-dark-split.png`. Review them before committing. Historical screenshots are retained; normal test runs do not overwrite these images.
 
 ## Project map
 

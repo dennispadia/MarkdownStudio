@@ -1,4 +1,4 @@
-# Markdown Studio user guide
+# Lekh user guide
 
 A local-first Windows desktop application for writing Markdown with a friendly visual editor and exporting to Word and PDF.
 
@@ -6,9 +6,11 @@ A local-first Windows desktop application for writing Markdown with a friendly v
 
 ## Open the application
 
-Install the shared x64 MSI, then open **Markdown Studio** from your desktop or Start menu. It installs for your current Windows user without administrator access.
+Install the shared x64 MSI, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without administrator access. The historical published 0.6.6 release still opens as Markdown Studio; the 0.7.0 Lekh installer is not published yet.
 
-For a source checkout, double-click **Launch.cmd** in the project root. The developer build is **release\win-unpacked\Markdown Studio.exe**; keep that entire folder together.
+For a source checkout, double-click **Launch.cmd** in the project root. The developer build is **release\win-unpacked\Lekh - Markdown editor.exe**; keep that entire folder together.
+
+Lekh retains the original `%APPDATA%\Markdown Studio` profile, including preferences, recent files, and recovery drafts. Its MSI upgrade identity is unchanged. Close the app before upgrading; because the executable filename changes, you may need to choose Lekh again for `.md` files and repin Windows shortcuts.
 
 No Microsoft Word, Pandoc, account, or internet connection is required to edit or export documents after setup. Images hosted on websites are deliberately not downloaded.
 
@@ -36,7 +38,7 @@ Export uses the **active tab's** current text, including unsaved edits. Exportin
 
 ### Working with multiple files
 
-- If Markdown Studio is your Windows default for `.md` files, double-clicking a file in Explorer opens that document. Further files open as tabs in the existing window, which is restored if minimized. Reopening the same file focuses its tab without replacing unsaved edits.
+- If Lekh is your Windows default for `.md` files, double-clicking a file in Explorer opens that document. Further files open as tabs in the existing window, which is restored if minimized. Reopening the same file focuses its tab without replacing unsaved edits.
 - **Open file** and **New document** each open a new tab without replacing your other documents.
 - Click a tab to switch documents. Each tab keeps its text, undo/redo history, Visual/Source mode, scroll position, and selection.
 - A dot beside a tab's name means it has unsaved changes. Hover over the tab to see its full path.
@@ -221,6 +223,6 @@ npm.cmd run package
 - `npm run test:desktop`: builds and launches the real desktop app with an isolated temporary profile. Exercises visual typing, formatting, actual native right-click menus, source-only insertions, table-of-contents links, checkbox alignment (within 1 px of the first text line, including wrapped/nested tasks), per-tab state and undo, duplicate-file handling, Save All, closing tabs/app with unsaved work, native file handlers, exact source preservation, find/replace, external-change protection, DOCX/PDF generation, themes, and multi-tab draft recovery. Native dialog selections and clipboard contents are supplied through a test-only debugger connection; production code has no dialog bypass, and tests do not alter your real clipboard.
 - `npm run package`: creates `release\win-unpacked`.
 - `npm run generate:icon`: regenerates the multi-resolution Windows icon and window PNG from the original Enchanted Quill artwork in `assets/icon.svg`: an ivory feather and gold writing stroke on emerald, without a crescent. Builds run this automatically. The application remains unsigned; icon and version resources are embedded without code signing.
-- To test the packaged executable: `node scripts\smoke.mjs "release\win-unpacked\Markdown Studio.exe"`.
+- To test the packaged executable: `node scripts\smoke.mjs "release\win-unpacked\Lekh - Markdown editor.exe"`.
 
 Desktop tests enable loopback debugging only for the test process and close it afterward. The normal launcher does not enable debugging.

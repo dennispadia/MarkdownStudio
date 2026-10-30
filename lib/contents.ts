@@ -24,7 +24,7 @@ export function updateTableOfContents(markdown: string): string {
   const starts = [...markdown.matchAll(/^<!-- markdown-studio:toc -->\r?$/gm)].filter(outsideCode);
   const ends = [...markdown.matchAll(/^<!-- \/markdown-studio:toc -->\r?$/gm)].filter(outsideCode);
   if (starts.length !== 1 || ends.length !== 1 || starts[0].index >= ends[0].index) {
-    throw new Error('Update requires exactly one marked Markdown Studio table of contents. Insert a new one if your contents list has no markers.');
+    throw new Error('Update requires exactly one marked Lekh table of contents. Insert a new one if your contents list has no markers.');
   }
   const start = starts[0].index;
   const end = ends[0].index + TOC_END.length;

@@ -3,7 +3,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $manifest = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json
 $release = Join-Path $root 'release'
 New-Item -ItemType Directory -Path $release -Force | Out-Null
-$output = Join-Path $release "MarkdownStudio-$($manifest.version)-source.zip"
+$output = Join-Path $release "Lekh-$($manifest.version)-source.zip"
 $files = @('.gitignore', '.gitattributes', '.editorconfig', 'package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'index.html', 'diagram-export.html', 'Launch.cmd', 'Setup.ps1', 'README.md', 'LICENSE', 'SUPPORT.md', 'CONTRIBUTING.md', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md')
 $folders = @('.github', 'assets', 'docs', 'electron', 'lib', 'scripts', 'src', 'tests')
 foreach ($folder in $folders) {
@@ -22,7 +22,7 @@ try {
     foreach ($relative in ($files | Sort-Object -Unique)) {
         $absolute = Join-Path $root $relative
         if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) { throw "Required source file is missing: $relative" }
-        $entry = 'MarkdownStudio/' + $relative.Replace('\', '/')
+        $entry = 'lekh/' + $relative.Replace('\', '/')
         [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $absolute, $entry, [IO.Compression.CompressionLevel]::Optimal)
     }
 } finally { $archive.Dispose(); $stream.Dispose() }

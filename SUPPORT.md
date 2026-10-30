@@ -1,6 +1,6 @@
 # Support policy
 
-Markdown Studio is shared **as-is, without support**.
+Lekh is shared **as-is, without support**.
 
 - There is no help desk, troubleshooting service, response-time commitment, or promised maintenance.
 - Bug reports, feature requests, pull requests, and security reports are not guaranteed to be read, answered, or acted on.

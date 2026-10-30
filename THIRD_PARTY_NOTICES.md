@@ -1,6 +1,8 @@
 # Third-party software
 
-Markdown Studio's original application code and artwork are provided under the MIT license. Its text is named `LICENSE.md` in installed distributions and `LICENSE` in the source repository.
+Lekh's original application code and artwork are provided under the MIT license, including the existing Markdown Studio contributors' copyright notice. Its text is named `LICENSE.md` in installed distributions and `LICENSE` in the source repository.
+
+Segoe UI Light and Nirmala UI are used from Windows when available; their font files are not bundled or redistributed with this application.
 
 The application depends on separately licensed open-source software, including:
 

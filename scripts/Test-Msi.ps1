@@ -4,7 +4,7 @@ Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 $manifest = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json
-if (-not $MsiPath) { $MsiPath = Join-Path $root "release\Markdown-Studio-$($manifest.version)-x64.msi" }
+if (-not $MsiPath) { $MsiPath = Join-Path $root "release\Lekh-Markdown-editor-$($manifest.version)-x64.msi" }
 $MsiPath = (Resolve-Path -LiteralPath $MsiPath).Path
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ("markdown-studio-msi-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporary | Out-Null
@@ -29,6 +29,7 @@ try {
     $properties = @{}
     foreach ($row in (Read-MsiRows 'SELECT `Property`, `Value` FROM `Property`' 2)) { $properties[$row[0]] = $row[1] }
     if ($properties.ProductName -ne $manifest.build.productName) { throw 'MSI product name mismatch.' }
+    if (-not $properties.UpgradeCode -or $properties.UpgradeCode.Trim('{}') -ne 'E2FD477D-ED35-561D-8A35-B75851090FE9') { throw 'MSI no longer retains the original application upgrade identity.' }
     if ($properties.ProductVersion -notin @($manifest.version, "$($manifest.version).0")) { throw 'MSI version mismatch.' }
     if ($properties.ContainsKey('ALLUSERS') -or $properties.MSIINSTALLPERUSER -ne '1') { throw 'MSI is not restricted to the current user.' }
     $summary = $database.SummaryInformation(0)
@@ -55,7 +56,7 @@ try {
         if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 30 | Write-Host }
         throw "MSI administrative extraction failed (exit $($process.ExitCode))."
     }
-    $executables = @(Get-ChildItem -LiteralPath $payload -Filter 'Markdown Studio.exe' -Recurse -File)
+    $executables = @(Get-ChildItem -LiteralPath $payload -Filter "$($manifest.build.productName).exe" -Recurse -File)
     if ($executables.Count -ne 1) { throw 'Expected exactly one application executable in the MSI payload.' }
     $application = $executables[0]
     foreach ($file in @('resources\app.asar', 'LICENSE.md', 'SUPPORT.md', 'THIRD_PARTY_NOTICES.md', 'LICENSE.electron.txt', 'LICENSES.chromium.html')) {

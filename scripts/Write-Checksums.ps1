@@ -3,7 +3,7 @@ Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft
 $root = Split-Path $PSScriptRoot -Parent
 $manifest = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json
 $release = Join-Path $root 'release'
-$names = @("Markdown-Studio-$($manifest.version)-x64.msi", "MarkdownStudio-$($manifest.version)-source.zip")
+$names = @("Lekh-Markdown-editor-$($manifest.version)-x64.msi", "Lekh-$($manifest.version)-source.zip")
 $lines = foreach ($name in $names) {
     $file = Join-Path $release $name
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Build the release artifact first: $name" }

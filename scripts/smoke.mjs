@@ -164,6 +164,38 @@ try {
   assert.equal(await ui("document.querySelector('#dirty-indicator').textContent"), '');
   await main.evaluate(`globalThis.smokeElectron = ${electron}; globalThis.smokeSavePath = null; globalThis.smokeOpenPath = null; globalThis.smokeChoice = 2; globalThis.smokeChoices = []; smokeElectron.dialog.showSaveDialog = async () => smokeSavePath ? ({canceled:false,filePath:smokeSavePath}) : ({canceled:true}); smokeElectron.dialog.showOpenDialog = async () => smokeOpenPath ? ({canceled:false,filePaths:[smokeOpenPath]}) : ({canceled:true,filePaths:[]}); smokeElectron.dialog.showMessageBox = async () => ({response:smokeChoices.length ? smokeChoices.shift() : smokeChoice});`);
   assert.equal(await main.evaluate("smokeElectron.app.getPath('userData')"), path.join(temporary, 'profile'), 'Test profile is isolated from real user data');
+  assert.equal(await main.evaluate("smokeElectron.app.getPath('sessionData')"), path.join(temporary, 'profile'), 'Chromium storage is isolated in the same preserved profile');
+  assert.equal(await main.evaluate("smokeElectron.app.getName()"), 'Lekh');
+  assert.equal(await ui("document.querySelector('.latin-name').textContent"), 'Lekh');
+  assert.equal(await ui("document.querySelector('.devanagari').textContent"), 'लेख');
+  assert.equal(await ui("document.querySelector('.brand-descriptor').textContent"), 'Markdown editor');
+  assert.equal(await ui("getComputedStyle(document.querySelector('.latin-name')).fontWeight"), '300');
+  assert.ok((await ui('document.title')).endsWith(' - Lekh'));
+  const brandingLayouts = await ui(`(() => {
+    const sidebar = document.querySelector('#sidebar');
+    const previous = sidebar.style.width;
+    try {
+      return [200, 220, 320].map(width => {
+        sidebar.style.width = width + 'px';
+        const edge = sidebar.getBoundingClientRect().right;
+        const name = document.querySelector('.brand-name').getBoundingClientRect();
+        const descriptor = document.querySelector('.brand-descriptor').getBoundingClientRect();
+        return {width, fits: Math.max(name.right, descriptor.right) <= edge - 15,
+          iconWidth: document.querySelector('.brand-mark').getBoundingClientRect().width};
+      });
+    } finally { sidebar.style.width = previous; }
+  })()`);
+  for (const layout of brandingLayouts) {
+    assert.ok(layout.fits, `The complete bilingual wordmark fits at sidebar width ${layout.width}`);
+    assert.equal(layout.iconWidth, 52);
+  }
+  await browser.call('DOM.enable', {}, sessionId);
+  await browser.call('CSS.enable', {}, sessionId);
+  const brandDocument = await browser.call('DOM.getDocument', {}, sessionId);
+  const brandNode = await browser.call('DOM.querySelector', {nodeId:brandDocument.root.nodeId,selector:'.latin-name'}, sessionId);
+  const brandFonts = await browser.call('CSS.getPlatformFontsForNode', {nodeId:brandNode.nodeId}, sessionId);
+  assert.ok(brandFonts.fonts.some(font => font.postScriptName === 'SegoeUI-Light' && font.glyphCount > 0), 'The wordmark uses the actual Windows Segoe UI Light font');
+  console.log('PASS: Lekh branding, genuine Segoe UI Light, minimum-width wordmark, and isolated preserved Chromium storage');
   assert.equal(await main.evaluate("smokeElectron.app.getVersion()"), JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version, 'The executable matches the current release version');
   await waitFor(async () => ui("document.querySelector('.brand-mark img')?.naturalWidth === 512"), 'original wizard sidebar artwork');
   const brandSource = async () => {
@@ -799,7 +831,7 @@ try {
     const comma = darkBrandIcon.indexOf(',');
     const payload = darkBrandIcon.slice(comma + 1);
     const svg = darkBrandIcon.slice(0, comma).endsWith(';base64') ? Buffer.from(payload, 'base64').toString('utf8') : decodeURIComponent(payload);
-    for (const color of ['#387c65', '#275f50', '#9cd9b5', '#f4d492']) assert.ok(svg.includes(color), `The embedded dark artwork includes ${color}`);
+    for (const color of ['#356f68', '#275950', '#80bfb8', '#e6eee4']) assert.ok(svg.includes(color), `The embedded dark artwork includes ${color}`);
   } else {
     assert.match(darkBrandIcon, /\/icon-dark(?:-[\w-]+)?\.svg$/);
   }
@@ -2137,7 +2169,7 @@ try {
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'README Light theme');
     await ui("document.querySelector('#notification').click(); document.activeElement.blur()");
     let capture = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(images, 'light.png'), Buffer.from(capture.data, 'base64'));
+    await writeFile(path.join(images, 'lekh-light.png'), Buffer.from(capture.data, 'base64'));
     const examples = [
       ['Project Plan.md', '# Project plan\n\nAn uncluttered place to think, write, and share.\n\n## A little structure. A lot of possibility.\n\nTurn a rough idea into a clear, shareable document.\n\n- [x] Shape the first draft\n- [ ] Add details and examples\n- [ ] Export a polished document\n\n> Good writing starts with a little breathing room.\n\n## Next steps\n\nKeep notes nearby without losing your writing flow.'],
       ['Notes.md', '# Keep the good ideas.\n\nA second document, right where you need it.\n\n## Keep the essentials close.\n\n- Edit both files without switching windows.\n- Return to this pair from its combined tab.\n\n```python\ndef write_something_good():\n    idea = "Start with a little curiosity"\n    return idea\n```\n\nPaired, not merged. Each file stays independent.'],
@@ -2157,7 +2189,7 @@ try {
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'README Dark theme');
     await ui("document.querySelector('#notification').click(); document.activeElement.blur()");
     capture = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(images, 'dark-split.png'), Buffer.from(capture.data, 'base64'));
+    await writeFile(path.join(images, 'lekh-dark-split.png'), Buffer.from(capture.data, 'base64'));
     await ui("document.querySelector('.paired-tab .tab-close').click()");
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'close README example pair');
     console.log('PASS: README screenshots captured from the actual Light and Dark split application with sample content');

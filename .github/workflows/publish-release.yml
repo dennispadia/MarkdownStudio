@@ -43,7 +43,7 @@ jobs:
             const version = JSON.parse(Buffer.from(manifest.content, 'base64').toString('utf8')).version;
             if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Unsupported release version.');
             const { data } = await github.rest.actions.listWorkflowRunArtifacts({ ...repo, run_id });
-            const artifacts = data.artifacts.filter(a => a.name === 'markdown-studio-windows-x64' && !a.expired);
+            const artifacts = data.artifacts.filter(a => a.name === 'lekh-windows-x64' && !a.expired);
             if (artifacts.length !== 1) throw new Error('Expected exactly one verified Windows artifact.');
             const artifact = artifacts[0];
             const download = await github.rest.actions.downloadArtifact({
@@ -72,7 +72,7 @@ jobs:
             const repo = context.repo;
             const version = process.env.RELEASE_VERSION;
             const tag = `v${version}`;
-            const names = [`Markdown-Studio-${version}-x64.msi`, `MarkdownStudio-${version}-source.zip`, 'SHA256SUMS.txt'];
+            const names = [`Lekh-Markdown-editor-${version}-x64.msi`, `Lekh-${version}-source.zip`, 'SHA256SUMS.txt'];
             const entries = fs.readdirSync('release-assets').sort();
             if (JSON.stringify(entries) !== JSON.stringify([...names].sort())) throw new Error('Unexpected artifact files.');
             const hashes = new Map();
@@ -99,7 +99,7 @@ jobs:
                 `Shared as-is under MIT, with no support or promised maintenance. Independent forks and AI-assisted customization are welcome.`;
               ({ data: release } = await github.rest.repos.createRelease({
                 ...repo, tag_name: tag, target_commitish: process.env.RELEASE_SHA,
-                name: `Markdown Studio ${version}`, body, draft: true, prerelease: false,
+                name: `Lekh ${version}`, body, draft: true, prerelease: false,
               }));
             }
             const existing = await github.paginate(github.rest.repos.listReleaseAssets, { ...repo, release_id: release.id });
@@ -116,7 +116,7 @@ jobs:
                 ...repo, release_id: release.id, name, data,
                 headers: { 'content-type': 'application/octet-stream', 'content-length': data.length },
               });
-              if (asset.state !== 'uploaded' || asset.digest !== `sha256:${hashes.get(name)}`) {
+              if (asset.name !== name || asset.state !== 'uploaded' || asset.digest !== `sha256:${hashes.get(name)}`) {
                 throw new Error(`Uploaded asset verification failed: ${name}`);
               }
             }

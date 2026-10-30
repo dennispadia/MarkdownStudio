@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+
+- Rebrand Markdown Studio as Lekh: Markdown editor, using the mixed-case Lekh wordmark with smaller Sanskrit लेख, Windows Segoe UI Light, and the refined quill in Graphite + Teal.
+- Rename application titles, About information, export metadata, shortcuts, executable, MSI/source archives, and build artifacts. The executable is `Lekh - Markdown editor.exe`; MSI builds use the GitHub-safe download name `Lekh-Markdown-editor-0.7.0-x64.msi`.
+- Retain every existing editing feature, original user-data and Chromium-storage profile, draft/preferences keys, recent-file history, diagram partition, and refreshable table-of-contents markers.
+- Explicitly retain the original MSI upgrade code and AppUserModelId. Windows default-file associations and pinned shortcuts may need to be reselected because the executable filename changes.
+- Keep historical release assets, screenshots, and copyright notices unchanged.
+
+The Lekh installer has not yet been published. Animated premium Setup.exe, installer-speed improvements, and early running-app prompts remain separate pending work. The application and MSI remain unsigned; real install/upgrade/repair/uninstall testing in a disposable VM is still pending.
+
 ## 0.6.6
 
 - Use one shared Visual + Source switch for single and paired documents. In a split pair it reflects and changes only the active document; remove duplicate pane switches and mode bars.

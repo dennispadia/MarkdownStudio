@@ -19,5 +19,5 @@ $env:PATH = "$runtime;$env:PATH"
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. See the error above.' }
 & "$runtime\npm.cmd" run package
 if ($LASTEXITCODE -ne 0) { throw 'Application build failed. See the error above.' }
-Write-Host 'Ready! Open release\win-unpacked\Markdown Studio.exe.'
+Write-Host 'Ready! Open release\win-unpacked\Lekh - Markdown editor.exe.'
 Read-Host 'Press Enter to finish'

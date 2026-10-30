@@ -37,7 +37,7 @@ jobs:
       - name: Upload reviewed-download candidates
         uses: actions/upload-artifact@v4
         with:
-          name: markdown-studio-windows-x64
+          name: lekh-windows-x64
           if-no-files-found: error
           path: |
             release/*.msi

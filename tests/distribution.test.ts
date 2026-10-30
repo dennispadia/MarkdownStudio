@@ -61,6 +61,12 @@ test('distribution uses the public npm registry and ships notices without develo
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
   assert.equal(lock.version, manifest.version);
   assert.equal(lock.packages[''].version, manifest.version);
+  assert.equal(manifest.name, 'markdown-studio');
+  assert.equal(manifest.build.appId, 'com.markdownstudio.desktop');
+  assert.equal(manifest.build.productName, 'Lekh - Markdown editor');
+  assert.equal(manifest.build.msi.shortcutName, 'Lekh');
+  assert.equal(manifest.build.msi.upgradeCode, 'E2FD477D-ED35-561D-8A35-B75851090FE9');
+  assert.equal(manifest.build.msi.artifactName, 'Lekh-Markdown-editor-${version}-${arch}.${ext}');
   assert.equal(manifest.build.msi.perMachine, false);
   assert.equal(manifest.build.msi.runAfterFinish, false);
   assert.equal(manifest.build.msi.createDesktopShortcut, true);
@@ -72,9 +78,18 @@ test('distribution uses the public npm registry and ships notices without develo
   assert.equal(lock.packages[''].engines.node, manifest.engines.node);
   const workflow = await readFile(new URL('../.github/workflows/windows.yml', import.meta.url), 'utf8');
   assert.match(workflow, /defaults:\s+run:\s+shell: powershell/);
+  assert.match(workflow, /name: lekh-windows-x64/);
+  const publisher = await readFile(new URL('../.github/workflows/publish-release.yml', import.meta.url), 'utf8');
+  assert.ok(publisher.includes("a.name === 'lekh-windows-x64'"));
+  assert.ok(publisher.includes('`Lekh-Markdown-editor-${version}-x64.msi`'));
+  assert.ok(publisher.includes('`Lekh-${version}-source.zip`'));
+  assert.ok(publisher.includes('asset.name !== name'));
+  assert.doesNotMatch(manifest.build.msi.artifactName, /\s/, 'GitHub preserves release filenames without whitespace normalization');
   const sourcePackager = await readFile(new URL('../scripts/Export-Source.ps1', import.meta.url), 'utf8');
   const vite = await readFile(new URL('../vite.config.ts', import.meta.url), 'utf8');
   assert.match(sourcePackager, /'diagram-export\.html'/);
+  assert.ok(sourcePackager.includes('"Lekh-$($manifest.version)-source.zip"'));
+  assert.ok(sourcePackager.includes("'lekh/'"));
   assert.match(vite, /diagramExport:\s*'diagram-export\.html'/);
   for (const name of ['LICENSE', 'SUPPORT.md', 'THIRD_PARTY_NOTICES.md']) {
     assert.ok(manifest.build.extraFiles.some((file: { from: string }) => file.from === name));

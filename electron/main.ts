@@ -12,15 +12,15 @@ import { diagramLimits, isMermaidLanguage, prepareMermaid } from '../lib/diagram
 import { themes } from '../lib/themes.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
 import { fileArguments } from '../lib/launch.js';
+import { productName, productTitle, userDataDirectory } from '../lib/branding.js';
 import type { ContextMenuItem, EditorContext, OpenedFile, Result } from '../src/bridge.js';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'studio-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
-app.setName('Markdown Studio');
-const profilePath = app.commandLine.getSwitchValue('user-data-dir');
-if (profilePath) {
-  mkdirSync(profilePath, { recursive: true });
-  app.setPath('userData', profilePath);
-}
+app.setName(productName);
+const profilePath = app.commandLine.getSwitchValue('user-data-dir') || path.join(app.getPath('appData'), userDataDirectory);
+mkdirSync(profilePath, { recursive: true });
+app.setPath('userData', profilePath);
+app.setPath('sessionData', profilePath);
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 let window: BrowserWindow;
@@ -423,7 +423,7 @@ function installIPC(): void {
       try { actual = await readMarkdown(file); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
       if (actual !== document.diskContent) {
-        throw new Error('This file changed or was removed outside Markdown Studio. Your edits have not been overwritten. Use Save As to save your version under a different name, then reopen the original to compare.');
+        throw new Error('This file changed or was removed outside Lekh. Your edits have not been overwritten. Use Save As to save your version under a different name, then reopen the original to compare.');
       }
     }
     await atomicWrite(file, content);
@@ -491,7 +491,7 @@ function installIPC(): void {
 function createWindow(): void {
   window = new BrowserWindow({
     width: 1320, height: 900, minWidth: 850, minHeight: 600, backgroundColor: '#f8faf8',
-    title: 'Markdown Studio',
+    title: productTitle,
     icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(app.getAppPath(), 'electron', 'preload.cjs'),
@@ -569,7 +569,7 @@ function createWindow(): void {
     if (!allowClose && dirty) { event.preventDefault(); action('close'); }
   });
   window.webContents.on('render-process-gone', (_event, details) => {
-    dialog.showErrorBox('The editor stopped unexpectedly', `Reason: ${details.reason}. Reopen Markdown Studio and use Recover draft if it is available. Your saved Markdown files have not been changed.`);
+    dialog.showErrorBox('The editor stopped unexpectedly', `Reason: ${details.reason}. Reopen ${productName} and use Recover draft if it is available. Your saved Markdown files have not been changed.`);
   });
   const send = (command: string) => () => action(command);
   Menu.setApplicationMenu(Menu.buildFromTemplate([
@@ -614,7 +614,7 @@ function createWindow(): void {
       { label: 'Previous tab', accelerator: 'Ctrl+Shift+Tab', click: send('previous-tab') },
       { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' },
     ] },
-    { label: '&Help', submenu: [{ label: 'Getting started', click: send('help') }, { label: 'Keyboard shortcuts', accelerator: 'F1', click: send('shortcuts') }, { label: 'About Markdown Studio', click: () => { void dialog.showMessageBox(window, { message: 'Markdown Studio', detail: `Version ${app.getVersion()}\nA local-first Markdown editor. Built with Electron and Tiptap.\nNo account or cloud connection required.` }); } }] },
+    { label: '&Help', submenu: [{ label: 'Getting started', click: send('help') }, { label: 'Keyboard shortcuts', accelerator: 'F1', click: send('shortcuts') }, { label: `About ${productName}`, click: () => { void dialog.showMessageBox(window, { message: productTitle, detail: `Version ${app.getVersion()}\nA local-first Markdown editor. Built with Electron and Tiptap.\nNo account or cloud connection required.` }); } }] },
   ]));
   void window.loadURL(entryURL);
 }
@@ -654,7 +654,7 @@ if (primaryInstance) void app.whenReady().then(async () => {
   createWindow();
 }).catch(error => {
   console.error('Application startup failed:', error);
-  dialog.showErrorBox('Markdown Studio could not start', String(error));
+  dialog.showErrorBox(`${productName} could not start`, String(error));
   app.quit();
 });
 app.on('window-all-closed', () => app.quit());

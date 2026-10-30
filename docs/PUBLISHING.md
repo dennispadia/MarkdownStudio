@@ -15,6 +15,8 @@ GitHub's browser uploader does not apply `.gitignore` for you. Do not drag the e
 
 ## Create release downloads
 
+The repository is now `dennispadia/lekh`. Source version 0.7.0 is a branding-only migration; its installer is not yet published. Historical releases and their original asset filenames remain unchanged. The new executable is `Lekh - Markdown editor.exe`; existing Windows associations and pinned shortcuts may need to be reselected. The MSI upgrade identity and existing settings/recovery profile are retained. The animated premium Setup.exe remains separate, unfinished work and is not included in this rebrand.
+
 Publish an installer only after packaging and verification both succeed. Local Windows policy may block validation even when the hosted workflow succeeds; see [installer validation and policy restrictions](BUILDING.md#installer-validation-status-and-policy-restrictions).
 
 Run the commands in order, not concurrently:
@@ -38,8 +40,8 @@ On GitHub:
 2. Create a tag matching the version, such as `v0.6.6`, targeting the reviewed commit.
 3. Add a description of the release, known limitations, the unsigned-installer warning, and the no-support policy.
 4. Attach these files from `release`:
-   - `Markdown-Studio-<version>-x64.msi`
-   - `MarkdownStudio-<version>-source.zip`
+   - `Lekh-Markdown-editor-<version>-x64.msi`
+   - `Lekh-<version>-source.zip`
    - `SHA256SUMS.txt`
 5. Publish the release when satisfied.
 
@@ -63,7 +65,7 @@ The planned no-cost route is [SignPath Foundation's open-source program](https:/
 
 ### Maintainer enrollment
 
-1. Review the current [SignPath conditions](https://signpath.org/terms) and [apply](https://signpath.org/apply) for the public repository `https://github.com/dennispadia/MarkdownStudio`. Provide the existing MIT license, public release, build workflow, and documentation as requested. Account creation, policy acceptance, MFA, and submission require the maintainer's participation.
+1. Review the current [SignPath conditions](https://signpath.org/terms) and [apply](https://signpath.org/apply) for the public repository `https://github.com/dennispadia/lekh`. Provide the existing MIT license, public release, build workflow, and documentation as requested. Account creation, policy acceptance, MFA, and submission require the maintainer's participation.
 2. Confirm eligibility with SignPath, including project reputation, maintenance expectations, and the Electron application packaging. The no-support policy does not promise future maintenance; do not change that promise or assume acceptance solely because the license is MIT.
 3. Identify the authors, reviewers, and signing approvers. Once accepted, update this policy with the confirmed roles and the attribution required by SignPath. Retain the application's [privacy description](USER_GUIDE.md#privacy); do not claim enrollment or sponsorship before approval.
 4. Configure the approved repository/build integration and artifact policies with SignPath. Keep API tokens and other secrets in GitHub Actions secrets, never source code, release assets, logs, or chat. Organization/project identifiers and artifact/signing policy names must come from the approved account, not guessed placeholders.

@@ -13,6 +13,7 @@ import type { Result } from './bridge.js';
 import { isTheme, restoreTheme, themes, type Theme } from '../lib/themes.js';
 import { createPair, DEFAULT_SIDEBAR_WIDTH, groupTabs, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, pairFor, sidebarWidth, splitRatio, type SplitPair } from '../lib/workspace.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
+import { productName } from '../lib/branding.js';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, tableMarkdown, validateTableSize } from '../lib/tables.js';
 import { syntaxCSS } from '../lib/highlight.js';
 import { LanguageCodeBlock } from './code-block.js';
@@ -76,7 +77,7 @@ const brandDarkIcon = new URL('../assets/icon-dark.svg', import.meta.url).href;
 app.innerHTML = `
   <aside class="sidebar" id="sidebar">
     <button type="button" id="sidebar-toggle" data-action="sidebar" aria-controls="sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+Shift+B)">${icon('menu')}</button>
-    <div class="brand"><div class="brand-mark"><img id="brand-icon" src="${brandIcon}" alt="" /></div><div>Markdown<span>STUDIO</span></div></div>
+    <div class="brand"><div class="brand-mark"><img id="brand-icon" src="${brandIcon}" alt="" /></div><div class="brand-text"><div class="brand-name"><span class="latin-name">${productName}</span><span class="devanagari" lang="sa">लेख</span></div><span class="brand-descriptor">Markdown editor</span></div></div>
     <div class="file-actions">${button('new', 'New', 'plus', 'new-button')}${button('open', 'Open', 'folder', 'sidebar-button')}</div>
     <section class="outline-section"><div class="section-label">IN THIS DOCUMENT</div><nav id="outline" aria-label="Document headings"></nav></section>
     <section class="recent-section"><div class="recent-header"><button id="recent-toggle" aria-expanded="false" aria-controls="recent" title="Expand recent files">${icon('chevron')}<span>RECENT FILES</span><span id="recent-count">(0)</span></button><button id="clear-recent" data-action="clear-recent" title="Clear recent file history" hidden disabled>Clear</button></div><div id="recent" hidden><p class="empty-note">Your opened files will appear here.</p></div></section>
@@ -1090,7 +1091,7 @@ function update(): void {
   element('filename').textContent = documentName;
   element('filename').title = documentPath ?? documentName;
   element('dirty-indicator').textContent = dirty ? ' \u2022' : '';
-  document.title = `${dirty ? '* ' : ''}${documentName} - Markdown Studio`;
+  document.title = `${dirty ? '* ' : ''}${documentName} - ${productName}`;
   window.studio.setDirty(tabs.some(tab => tab.markdown !== tab.savedMarkdown));
   const words = wordCount(markdown);
   element('word-count').textContent = `${words.toLocaleString()} words`;

@@ -8,6 +8,7 @@ import { escapeHTML, headingAnchor, isSafeLink, parser } from './markdown.js';
 import { readImage } from './images.js';
 import { highlightedHTML, highlightedSegments, syntaxCSS, type CodeSegment } from './highlight.js';
 import { diagramLimits, isMermaidLanguage, prepareMermaid } from './diagrams.js';
+import { productName } from './branding.js';
 
 export type ImageLoader = (source: string) => Promise<{ data: Buffer; mime: string }>;
 /** The renderer supplies locally rendered PNGs keyed by the original fence source. */
@@ -182,7 +183,7 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
     }
   }
   return Packer.toBuffer(new Document({
-    creator: 'Markdown Studio', title: 'Markdown document',
+    creator: productName, title: 'Markdown document',
     styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
     numbering: { config: numbering },
     sections: [{ properties: { page: { margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 } } }, children: blocks.length ? blocks : [new Paragraph('')] }],
@@ -252,5 +253,5 @@ export async function toPrintHTML(markdown: string, documentPath: string | null,
     }
   }
   const html = parser.renderer.render(tokens, { ...parser.options, highlight: highlightedHTML }, {});
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${escapeHTML('Markdown Studio export')}</title><style>${printCSS}</style></head><body>${html}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${escapeHTML(`${productName} export`)}</title><style>${printCSS}</style></head><body>${html}</body></html>`;
 }

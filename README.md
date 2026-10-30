@@ -1,10 +1,18 @@
-<img src="assets/icon.svg" width="72" height="72" alt="Markdown Studio quill icon">
+<img src="assets/icon.svg" width="72" height="72" alt="Lekh quill icon">
 
-# Markdown Studio
+# Lekh लेख
+
+**Lekh: Markdown editor** - formerly Markdown Studio.
 
 A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download the Windows x64 installer (0.6.6)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.6/Markdown-Studio-0.6.6-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.6) · [User guide](docs/USER_GUIDE.md)
+**[Download the verified Windows x64 installer (Markdown Studio 0.6.6)](https://github.com/dennispadia/lekh/releases/download/v0.6.6/Markdown-Studio-0.6.6-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.6.6) · [User guide](docs/USER_GUIDE.md)
+
+The **0.7.0 source rebrand** uses Segoe UI Light, a smaller Sanskrit लेख beside Lekh, and the refined quill in Graphite + Teal. It changes branding, not editing features. The Lekh installer has **not yet been published**; the verified download above retains its original name and branding.
+
+### Upgrading to Lekh
+
+Your existing preferences, recent files, recovery drafts, and marked tables of contents retain their original storage identities. The MSI retains the original upgrade identity. Close the existing app before upgrading. Because the executable becomes **Lekh - Markdown editor.exe**, Windows file associations and pinned shortcuts may need to be reselected or repinned. New MSI builds are named **Lekh-Markdown-editor-0.7.0-x64.msi**; download filenames use hyphens so GitHub preserves their names and checksum entries. Real install/upgrade/repair/uninstall testing in a disposable VM remains pending.
 
 The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
@@ -60,7 +68,7 @@ These interface changes remain included in the **verified 0.6.6 installer**, not
 - Further Explorer launches reuse the existing window and open files in tabs. An already-open file is focused without replacing unsaved edits; minimized windows are restored.
 - File requests wait until the editor is ready or its current operation finishes. Unreadable files report an error without blocking other requested files.
 
-Close Markdown Studio before upgrading with the new MSI. If Windows no longer remembers your `.md` default, choose **Open with > Choose another app > Markdown Studio** again.
+Close the app before upgrading with a new MSI. For Lekh builds, choose **Open with > Choose another app > Lekh** if Windows no longer remembers your `.md` default.
 
 ### Included from 0.6.0
 
@@ -76,7 +84,15 @@ All five additions below remain included in the **0.6.6 installer**, not just th
 
 See the [user guide](docs/USER_GUIDE.md#editing-features) for search options and limits, and [Mermaid diagrams](docs/USER_GUIDE.md#mermaid-diagrams) for supported diagram families and restrictions.
 
-## See 0.6.0 in action
+## See Lekh in action
+
+Actual 0.7.0 desktop captures using sample documents and an isolated profile, not design mockups.
+
+![Lekh in Light theme with the bilingual Segoe UI Light wordmark and refined quill](docs/images/lekh-light.png)
+
+![Lekh in Graphite + Teal Dark theme with paired, independent documents](docs/images/lekh-dark-split.png)
+
+## Historical 0.6.0 screenshots
 
 Fresh captures of the actual **0.6.0 desktop application**, using sample documents in an isolated profile. These are app screenshots, not mockups; no personal documents are shown.
 
@@ -125,15 +141,15 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.6.5** ships the single-row editing toolbar, visible Split control, and working compact right-click menu. It retains readable outline labels, five recent files, synchronized zoom controls, filename-specific save confirmations, the minimalist workspace, editable Visual + Source, collapsed action rail, blank startup, Visual link editing, Explorer opening, and the features shown above. This release is unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **0.6.6** is the latest published, verified installer and retains its historical Markdown Studio branding. The source checkout is now Lekh 0.7.0; that installer is not published yet. All existing editing features are retained. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the Windows x64 MSI installer (0.6.5)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.5/Markdown-Studio-0.6.5-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
+1. **[Download the verified Windows x64 MSI installer (Markdown Studio 0.6.6)](https://github.com/dennispadia/lekh/releases/download/v0.6.6/Markdown-Studio-0.6.6-x64.msi)**, or open [Releases](https://github.com/dennispadia/lekh/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
-3. Open **Markdown Studio** from the desktop or Start menu.
+3. Open **Markdown Studio** for the historical 0.6.6 release, or **Lekh** for a new Lekh build, from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.5/SHA256SUMS.txt) and a clean source ZIP are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/lekh/releases/download/v0.6.6/SHA256SUMS.txt) and a clean source ZIP are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
