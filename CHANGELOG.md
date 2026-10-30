@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.6.6
 
 - Use one shared Visual + Source switch for single and paired documents. In a split pair it reflects and changes only the active document; remove duplicate pane switches and mode bars.
 - Adapt the single-row toolbar to available width by moving commands into More tools and views, restoring them when space returns, without horizontal scrolling.
 - Shrink document tabs like browser tabs, keep the selected tab visible, and provide an Open documents dropdown for all tabs, including those that cannot fit.
 - Insert Mermaid diagrams at the current Visual selection rather than switching to Source and using its unrelated caret. Preserve Visual mode, active split-pane targeting, following content, and single-step undo.
+
+Known limitations: installer-speed and early running-app prompt improvements remain separate pending work, as do DOCX/PDF formatting fidelity and comprehensive cross-mode reading-position alignment. The application and installer remain unsigned.
 
 ## 0.6.5
 
