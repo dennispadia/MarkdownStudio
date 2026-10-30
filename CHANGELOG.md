@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.6.4
 
 - Show readable heading descriptions in the document outline and its tooltips instead of Markdown link syntax or destination URLs. Preserve document links, heading navigation, and existing anchors.
 - Limit Recent Files to the five most recently used files, newest first, including existing saved history.
 - Add status-bar zoom-out, percentage/reset, and zoom-in controls synchronized with native View-menu and keyboard zoom.
 - Name the saved file in save confirmations, including the new filename after Save As.
+
+Known limitations: the proposed single-row toolbar and compact right-click menu remain design previews, and installer-speed improvements remain pending. DOCX/PDF formatting-fidelity improvements and comprehensive cross-mode reading-position alignment are separate pending work. The application and installer remain unsigned.
 
 ## 0.6.3
 
