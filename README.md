@@ -4,20 +4,29 @@
 
 A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download the Windows x64 installer (0.6.5)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.5/Markdown-Studio-0.6.5-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.5) · [User guide](docs/USER_GUIDE.md)
+**[Download the Windows x64 installer (0.6.6)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.6/Markdown-Studio-0.6.6-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.6) · [User guide](docs/USER_GUIDE.md)
 
 The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
 **Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## What's new in 0.6.5
+## What's new in 0.6.6
 
-- The single-row toolbar now ships in the actual desktop app, with direct formatting, lists, quotes, links, images, tables, code, rule, table-of-contents, and Mermaid controls. Narrow windows scroll the row horizontally instead of hiding editing commands.
+- **One Visual + Source switch**, including paired split documents. It reflects and changes only the active document, without duplicate switches or mode bars in pane headers.
+- **Browser-style toolbar overflow:** commands move into **More tools and views (...)** as the window narrows and return when widened. No horizontal toolbar scrollbar is needed.
+- **Shrinking document tabs:** labels shorten as space runs out, the selected tab stays visible, and **Open documents** lists every tab, including those that cannot fit.
+- **Mermaid insertion at the caret:** Visual insertion stays in Visual and places the diagram at the current selection, not the end. Source insertion uses its own caret, preserves editable dual view, and changes only the active split document. One undo removes the insertion.
+
+These are working features in the **verified 0.6.6 installer**. The official build runs the desktop tests against the extracted installer application. Installer-speed and early running-app prompt improvements remain separate pending work.
+
+### Included from 0.6.5
+
+- The single-row toolbar ships in the actual desktop app, with formatting, lists, quotes, links, images, tables, code, rule, table-of-contents, and Mermaid controls.
 - **Split** is directly beside **Visual + Source**: Split pairs two different documents; the switch shows two editable views of one document.
 - The compact right-click menu now ships with twelve direct buttons: Cut, Copy, Paste, Delete, Bold, Italic, Code, Link, Quote, Numbered list, Bullet list, and Task list. Copy / Paste As, Paragraph, Insert, and Table keep their existing choices.
 - Menu actions work in Visual and Source, preserve selection, and target the clicked split pane. Shift+F10, keyboard navigation, Escape focus restoration, spelling suggestions, and viewport-safe submenus are included.
 
-These are working features in the **verified 0.6.5 installer**, not design previews. The official build runs the desktop tests against the extracted installer application. Installer-speed and early running-app prompt improvements remain separate pending work.
+These features remain included in the **verified 0.6.6 installer**, not design previews.
 
 ### Included from 0.6.4
 
@@ -26,7 +35,7 @@ These are working features in the **verified 0.6.5 installer**, not design previ
 - Status-bar zoom-out, percentage/reset, and zoom-in controls stay synchronized with View-menu and keyboard zoom.
 - Save confirmations name the actual file, including its new name after Save As: for example, `Notes.md saved`.
 
-These improvements remain included in the **verified 0.6.5 installer**.
+These improvements remain included in the **verified 0.6.6 installer**.
 
 ### Included from 0.6.3
 
@@ -36,7 +45,7 @@ Start with one blank **Untitled** document, without a Welcome document. Opening 
 
 Turn on the **Visual + Source** switch for editable Visual on the left and Markdown Source on the right. Changes appear in both panes, with the formatting toolbar available; turning the switch off returns to Visual. Source-only and the existing read-only Source + Preview remain available through **More (...)** and the View menu.
 
-These interface changes remain included in the **verified 0.6.5 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
+These interface changes remain included in the **verified 0.6.6 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
 
 ### Included from 0.6.2
 
@@ -55,7 +64,7 @@ Close Markdown Studio before upgrading with the new MSI. If Windows no longer re
 
 ### Included from 0.6.0
 
-All five additions below remain included in the **0.6.5 installer**, not just the source checkout.
+All five additions below remain included in the **0.6.6 installer**, not just the source checkout.
 
 | Feature | What you can do |
 | --- | --- |
