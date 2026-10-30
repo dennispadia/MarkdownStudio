@@ -197,6 +197,20 @@ try {
     await ui(`document.querySelector('[data-action=${JSON.stringify(name)}]').click()`);
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), name);
   };
+  const clickControl = async selector => {
+    const point = await ui(`(() => {const control=document.querySelector(${JSON.stringify(selector)});const bounds=control.getBoundingClientRect();return {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2,visible:bounds.width>0 && bounds.height>0}})()`);
+    assert.ok(point.visible, `Control must be visible before clicking: ${selector}`);
+    for (const type of ['mousePressed', 'mouseReleased']) {
+      await browser.call('Input.dispatchMouseEvent', {type,x:point.x,y:point.y,button:'left',buttons:type === 'mousePressed' ? 1 : 0,clickCount:1}, sessionId);
+    }
+    await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'control action');
+  };
+  const clickMermaid = async () => {
+    if (await ui("document.querySelector('#toolbar-overflow [data-action=\"insert:mermaid\"]') !== null")) {
+      await clickControl('[data-action="format-menu"]');
+    }
+    await clickControl('[data-action="insert:mermaid"]');
+  };
   const menuAction = async name => {
     await main.evaluate(`smokeElectron.BrowserWindow.getAllWindows()[0].webContents.send('app:action', ${JSON.stringify(name)})`);
     await delay(100);
@@ -339,10 +353,12 @@ try {
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
   await delay(200);
   assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar')).flexWrap"), 'nowrap', 'Editable dual-view toolbar stays on one row at minimum width');
-  await ui("document.querySelector('.toolbar > [data-action=redo]').scrollIntoView({block:'nearest',inline:'nearest'})");
-  await delay(100);
-  const scrolledToolbar = await ui("(() => {const button=document.querySelector('.toolbar > [data-action=redo]').getBoundingClientRect();const toolbar=document.querySelector('.toolbar');const bounds=toolbar.getBoundingClientRect();return {left:button.left,right:button.right,toolbarLeft:bounds.left,toolbarRight:bounds.right,scroll:toolbar.scrollLeft,width:toolbar.scrollWidth,client:toolbar.clientWidth}})()");
-  assert.ok(scrolledToolbar.left >= scrolledToolbar.toolbarLeft - 1 && scrolledToolbar.right <= scrolledToolbar.toolbarRight + 1, `The last command remains reachable by horizontal scrolling: ${JSON.stringify(scrolledToolbar)}`);
+  assert.ok(await ui("document.querySelector('.toolbar').scrollWidth <= document.querySelector('.toolbar').clientWidth"), 'Toolbar fits without horizontal scrolling');
+  assert.ok(await ui("document.querySelector('#toolbar-overflow').children.length > 0"), 'Narrow toolbar moves commands into More');
+  await action('format-menu');
+  assert.ok(await ui("document.querySelector('#toolbar-overflow [data-action=redo]').getClientRects().length > 0"), 'The last command is visible in More');
+  assert.equal(await ui("document.querySelector('#toolbar-overflow [data-action=redo] span').textContent"), 'Redo');
+  await nativeShortcut('Escape', [], false);
   assert.ok(await ui("document.querySelector('.source-surface').getBoundingClientRect().right <= innerWidth"), 'Source remains beside Visual at minimum window width');
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
   await menuAction('side-by-side');
@@ -590,6 +606,36 @@ try {
   })()`);
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false' && (document.querySelector('#source-editor').value.match(/assets\\//g)||[]).length === 2"), 'dropped image uses assets storage');
   await ui("window.smokeImageStorage='embedded'");
+  const insertionFixture = '# Before diagram\n\nAlpha middle omega.\n\n## After diagram\n\nTail remains.\n';
+  for (const width of [1320, 850]) {
+    await main.evaluate(`smokeElectron.BrowserWindow.getAllWindows()[0].setSize(${width},900)`);
+    await delay(150);
+    await sourceEdit(insertionFixture);
+    await action('visual');
+    await ui(`(() => {const editor=document.querySelector('#visual-editor .tiptap');editor.focus();const range=document.createRange();range.setStart(editor.querySelector('p').firstChild,6);range.collapse(true);window.getSelection().removeAllRanges();window.getSelection().addRange(range)})()`);
+    await clickMermaid();
+    assert.equal(await ui("document.querySelector('#source-editor').hidden"), true, 'Visual Mermaid insertion keeps Visual mode');
+    await waitFor(async () => ui("document.querySelector('#visual-editor .mermaid-preview img')?.naturalWidth > 0"), 'inserted Mermaid renders at caret');
+    assert.deepEqual(await ui("(() => {const block=document.querySelector('#visual-editor .code-block');return [block.previousElementSibling.textContent,block.nextElementSibling.textContent]})()"), ['Alpha ', 'middle omega.'], 'Mermaid is inserted between the text before and after the middle caret, not appended');
+    assert.equal(await ui("document.querySelector('#visual-editor .tiptap').lastElementChild.textContent"), 'Tail remains.');
+    await menuAction('undo');
+    assert.equal(await ui("document.querySelector('#visual-editor .code-block')"), null, 'One undo removes diagram insertion');
+    assert.equal(await ui("document.querySelector('#visual-editor .tiptap p').textContent"), 'Alpha middle omega.');
+    await action('source');
+  }
+  await sourceEdit(insertionFixture);
+  const insertionCaret = insertionFixture.indexOf('middle');
+  await ui(`document.querySelector('#source-editor').setSelectionRange(${insertionCaret},${insertionCaret})`);
+  await clickMermaid();
+  const insertedSource = await ui("document.querySelector('#source-editor').value");
+  assert.ok(insertedSource.indexOf('```mermaid') > insertedSource.indexOf('Alpha '));
+  assert.ok(insertedSource.indexOf('```mermaid') < insertedSource.indexOf('middle omega.'));
+  assert.ok(insertedSource.endsWith('Tail remains.\n'), 'Source Mermaid insertion preserves following content');
+  await menuAction('undo');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), insertionFixture, 'Source Mermaid insertion is one undo step');
+  await action('source');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+  console.log('PASS: real toolbar and overflow-menu Mermaid insertion at a middle Visual caret, rendered position, preserved trailing content/mode, Source caret insertion, and single-step undo');
   await sourceEdit('# Diagrams\n\n```mermaid\nflowchart LR\n  A[Start] --> B[Done]\n```\n');
   await action('preview');
   await waitFor(async () => ui("document.querySelector('.live-preview .mermaid-preview img')?.complete && document.querySelector('.live-preview .mermaid-preview img')?.naturalWidth > 0"), 'offline Mermaid live preview');
@@ -1577,7 +1623,9 @@ try {
   const pane = id => `.document-pane[data-document-id="${id}"]`;
   const paneSource = async id => ui(`document.querySelector(${JSON.stringify(pane(id) + ' .document-source')}).value`);
   const paneMode = async (id, mode) => {
-    await ui(`document.querySelector(${JSON.stringify(pane(id) + ` [data-pane-mode="${mode}"]`)}).click()`);
+    await ui(`(() => {const pane=document.querySelector(${JSON.stringify(pane(id))});(pane.querySelector('.document-source:not([hidden])') ?? pane.querySelector('.tiptap')).focus()})()`);
+    await action('format-menu');
+    await ui(`document.querySelector('#format-menu [data-action="${mode}"]').click()`);
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'pane mode');
   };
   const confirmSplit = async (right, keyboard = false) => {
@@ -1632,7 +1680,13 @@ try {
   await waitFor(async () => ui("!document.querySelector('#split-dialog').open"), 'Escape cancels the preview picker');
   assert.equal(await tabCount(), 4);
   await selectTab(splitIds[0]);
-  assert.equal(await ui("document.querySelector('.global-modes').hidden"), true, 'Split mode uses pane-specific controls only');
+  assert.equal(await ui("document.querySelector('.global-modes').hidden"), false, 'Split mode retains the shared switch');
+  assert.equal(await ui("document.querySelectorAll('[role=switch]').length"), 1, 'Only one Visual + Source switch exists, including split mode');
+  assert.equal(await ui("document.querySelectorAll('.pane-header button').length"), 0, 'Pane headers do not duplicate view controls');
+  if (process.env.STUDIO_SCREENSHOT) {
+    const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
+    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'responsive-split.png'), Buffer.from(screenshot.data, 'base64'));
+  }
   assert.match(await ui("document.querySelector('.paired-tab .tab-select').textContent"), /left\.md.*right\.md/);
   await waitFor(async () => ui("Array.from(document.querySelectorAll('.document-pane .tiptap img')).every(image => image.complete && image.naturalWidth > 0)"), 'both split local images');
   assert.deepEqual(await ui("Array.from(document.querySelectorAll('.document-pane .tiptap img'), image => image.naturalWidth)"), [2,3]);
@@ -1650,8 +1704,12 @@ try {
   };
   const beforePairedDual = await Promise.all(splitIds.slice(0, 2).map(paneSource));
   for (const id of splitIds.slice(0, 2)) {
-    await ui(`document.querySelector(${JSON.stringify(pane(id) + ' [data-pane-side-by-side]')}).click()`);
-    assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(id) + ' [data-pane-side-by-side]')}).getAttribute('aria-checked')`), 'true');
+    await ui(`document.querySelector(${JSON.stringify(pane(id) + ' .tiptap')}).focus()`);
+    assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'false', 'Switch reflects the newly active pane');
+    await ui("document.querySelector('#view-switch').click()");
+    await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'shared switch toggles active pane');
+    assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'true');
+    assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(id) + ' .pane-content')}).classList.contains('side-by-side')`), true);
   }
   await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')}).focus()`);
   await sourceEdit(beforePairedDual[1] + '\nOnly the right dual view changes.');
@@ -1664,11 +1722,28 @@ try {
   assert.equal(await paneSource(splitIds[1]), beforePairedDual[1]);
   await menuAction('undo');
   assert.equal(await paneSource(splitIds[0]), beforePairedDual[0]);
+  await ui(`(() => {const source=document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')});source.focus();const caret=source.value.indexOf('right original paragraph.')+5;source.setSelectionRange(caret,caret)})()`);
+  await clickMermaid();
+  assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'true', 'Source-side Mermaid insertion preserves editable dual view');
+  assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .pane-content')}).classList.contains('side-by-side')`), true);
+  const dualDiagramSource = await paneSource(splitIds[1]);
+  assert.ok(dualDiagramSource.indexOf('```mermaid') < dualDiagramSource.indexOf(' original paragraph.'));
+  assert.equal(await paneSource(splitIds[0]), beforePairedDual[0], 'Source-side diagram insertion leaves the other split document unchanged');
+  await menuAction('undo');
+  assert.equal(await paneSource(splitIds[1]), beforePairedDual[1], 'Source-side Mermaid insertion is undoable without leaving dual view');
   await paneMode(splitIds[1], 'preview');
   assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .pane-content')}).classList.contains('side-by-side')`), false, 'Legacy Preview and editable dual view are mutually exclusive');
   assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .pane-content')}).classList.contains('side-by-side')`), true, 'Other paired file keeps its editable dual view');
   await paneMode(splitIds[1], 'visual');
   await paneMode(splitIds[0], 'visual');
+  const leftBeforeDiagram = await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .tiptap')}).innerHTML`);
+  await ui(`(() => {const editor=document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .tiptap')});editor.focus();const range=document.createRange();range.setStart(editor.querySelector('p').firstChild,5);range.collapse(true);window.getSelection().removeAllRanges();window.getSelection().addRange(range)})()`);
+  await clickMermaid();
+  await waitFor(async () => ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .mermaid-preview img')})?.naturalWidth > 0`), 'split Mermaid renders in active pane');
+  assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .tiptap')}).innerHTML`), leftBeforeDiagram, 'Mermaid insertion leaves the inactive document unchanged');
+  assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .code-block')}).previousElementSibling.textContent`), 'right');
+  await menuAction('undo');
+  assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .code-block')})`), null);
   console.log('PASS: both files can independently use editable dual view, Source/Visual updates and undo stay scoped, and legacy Preview disables only its own dual view');
   const leftBeforeContext = await paneSource(splitIds[0]);
   await showContext(pane(splitIds[1]) + ' .tiptap p');
@@ -1909,18 +1984,23 @@ try {
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
   await delay(250);
   assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar-more')).display"), 'block');
-  assert.notEqual(await ui("getComputedStyle(document.querySelector('.toolbar > [data-command=quote]')).display"), 'none');
   assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar')).flexWrap"), 'nowrap');
-  assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar')).overflowX"), 'auto', 'Narrow windows scroll instead of hiding editing commands');
+  assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar')).overflowX"), 'hidden', 'Narrow windows use an overflow menu, not a scrollbar');
+  assert.ok(await ui("document.querySelector('.toolbar').scrollWidth <= document.querySelector('.toolbar').clientWidth"), 'Toolbar fits available width');
   assert.ok(await ui("(() => {const toolbar=document.querySelector('.toolbar');const controls=[...toolbar.querySelectorAll('button,select')].filter(control=>control.getClientRects().length);return controls.every(control=>Math.abs(control.getBoundingClientRect().top-controls[0].getBoundingClientRect().top)<8)})()"), 'All controls remain on one row');
   assert.ok(await ui("document.querySelector('.workspace-actions').getBoundingClientRect().right <= innerWidth"), 'File actions fit the minimum supported window');
   assert.ok(await ui("document.querySelector('#outline').clientHeight > 30 && document.querySelector('#outline').scrollHeight > document.querySelector('#outline').clientHeight"), 'Long outline has independently scrollable room');
   assert.ok(await ui("document.querySelector('#theme-toggle').getBoundingClientRect().bottom < innerHeight"), 'Theme toggle remains anchored and visible');
   await action('format-menu');
   assert.equal(await ui("document.querySelector('#format-menu').hidden"), false);
-  await ui("document.querySelector('.toolbar > [data-command=quote]').click()");
+  await ui("document.querySelector('[data-command=quote]').click()");
   assert.equal(await ui("document.querySelector('#format-menu').hidden"), true);
   assert.equal(await ui("Boolean(document.querySelector('#visual-editor blockquote'))"), true);
+  await menuAction('undo');
+  await action('format-menu');
+  await ui("document.querySelector('#toolbar-overflow [data-action=redo]').click()");
+  await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'overflow command completes');
+  assert.equal(await ui("Boolean(document.querySelector('#visual-editor blockquote'))"), true, 'Actual overflow Redo restores the edit in the active document');
   await action('save-menu');
   assert.equal(await ui("document.querySelector('#save-menu').hidden"), false);
   assert.equal(await ui("document.querySelectorAll('.workspace-actions > [data-action=save-all]').length"), 0);
@@ -1935,6 +2015,48 @@ try {
   await nativeShortcut('Escape', [], false);
   assert.equal(await ui("document.querySelector('#save-menu').hidden"), true);
   assert.equal(await ui("document.activeElement.dataset.action"), 'save-menu');
+  const beforeCompactTabs = await activeTab();
+  const compactIds = [];
+  for (let index = 0; index < 12; index++) {
+    await action('new');
+    compactIds.push(await activeTab());
+  }
+  await delay(150);
+  assert.ok(await ui("document.querySelector('#tabs').scrollWidth <= document.querySelector('#tabs').clientWidth"), 'Many tabs fit without horizontal scrolling');
+  assert.ok(await ui("document.querySelectorAll('.document-tab[hidden]').length > 0"), 'Excess tabs are available through the document list');
+  assert.ok(await ui("[...document.querySelectorAll('.document-tab:not([hidden])')].every(tab => tab.getBoundingClientRect().width <= 80)"), 'Visible tabs shrink to browser-style compact tabs');
+  await action('tabs-menu');
+  assert.equal(await ui("document.querySelectorAll('#tabs-menu button').length"), await tabCount(), 'Document dropdown lists every tab');
+  if (process.env.STUDIO_SCREENSHOT) {
+    const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
+    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'responsive-tabs.png'), Buffer.from(screenshot.data, 'base64'));
+  }
+  await ui("document.querySelector('#tabs-menu button').click()");
+  await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'document list activation');
+  await delay(100);
+  assert.ok(await ui("document.querySelector('.document-tab.selected').getClientRects().length > 0"), 'Selecting an overflow tab makes it visible');
+  assert.ok(await ui("document.querySelector('#tabs').scrollWidth <= document.querySelector('#tabs').clientWidth"));
+  await ui("document.querySelector('#tabs [aria-selected=true]').focus()");
+  await nativeShortcut('End', [], false);
+  await delay(150);
+  assert.equal(await activeTab(), compactIds.at(-1), 'End can activate a tab hidden in overflow');
+  assert.ok(await ui("document.querySelector('.document-tab.selected').getClientRects().length > 0"));
+  assert.equal(await ui("document.querySelector('#tabs').scrollLeft"), 0, 'Keyboard activation does not leave the compact strip horizontally scrolled');
+  await ui("document.querySelector('[aria-controls=tabs-menu]').focus()");
+  await nativeShortcut('Down', [], false);
+  assert.equal(await ui("document.activeElement.closest('#tabs-menu') !== null"), true, 'Keyboard opens document list');
+  await nativeShortcut('Escape', [], false);
+  assert.equal(await ui("document.activeElement.dataset.action"), 'tabs-menu');
+  for (const id of compactIds) {
+    await selectTab(id);
+    await menuAction('close-tab');
+  }
+  await selectTab(beforeCompactTabs);
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+  await delay(150);
+  assert.equal(await ui("document.querySelector('#toolbar-overflow').children.length"), 0, 'Widening restores all original controls');
+  assert.ok(await ui("document.querySelector('.toolbar > [data-command=quote]') !== null"), 'Restored toolbar command is not duplicated');
+  assert.equal(await ui("document.querySelectorAll('[data-command=quote]').length"), 1);
   await menuAction('theme:light');
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'sidebar Light theme');
   if (process.env.STUDIO_SCREENSHOT) {

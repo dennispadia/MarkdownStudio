@@ -88,6 +88,7 @@ app.innerHTML = `
   </aside>
   <main>
     <header class="tabs-bar">
+      <button type="button" data-action="tabs-menu" class="icon-only" aria-label="Open documents" title="Open documents" aria-haspopup="menu" aria-controls="tabs-menu" aria-expanded="false">${icon('chevron')}</button>
       <div id="tabs" role="tablist" aria-label="Open documents"></div>${button('new', 'New tab', 'plus', 'icon-only')}
       <div class="document-name sr-only"><span id="filename">Untitled.md</span><span id="dirty-indicator"></span></div>
       <div class="workspace-actions">
@@ -110,7 +111,7 @@ app.innerHTML = `
       ${formatButton('codeblock', 'Code block')}${formatButton('rule', 'Horizontal rule')}
       <span class="divider"></span>
       ${button('insert:toc', 'Insert table of contents', 'contents', 'icon-only')}${button('insert:toc-update', 'Update table of contents', 'refresh', 'icon-only')}${button('insert:mermaid', 'Mermaid diagram', 'diagram', 'icon-only')}
-      <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More views and help" title="More views and help" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button></div>
+      <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More tools and views" title="More tools and views" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button></div>
       <span class="toolbar-spacer"></span>
       ${button('undo', 'Undo', 'undo', 'icon-only')}${button('redo', 'Redo', 'redo', 'icon-only')}
     </div>
@@ -125,7 +126,8 @@ app.innerHTML = `
     <div class="canvas" id="canvas"><article class="paper" id="visual-editor" aria-label="Visual Markdown editor"></article><textarea id="source-editor" aria-label="Markdown source" spellcheck="false" hidden></textarea></div>
     <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><span id="save-status" aria-live="polite">Ready to write</span><div class="zoom-controls" role="group" aria-label="Zoom controls"><button type="button" id="zoom-out" data-action="zoom-out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" id="zoom-reset" data-action="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%">100%</button><button type="button" id="zoom-in" data-action="zoom-in" aria-label="Zoom in" title="Zoom in">+</button></div></footer>
   </main>
-  <div id="format-menu" class="dropdown view-menu" role="menu" hidden>${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('help', 'Getting started', 'help')}</div>
+  <div id="tabs-menu" class="dropdown view-menu" role="menu" aria-label="Open documents" hidden></div>
+  <div id="format-menu" class="dropdown view-menu" role="menu" hidden><div id="toolbar-overflow" role="group" aria-label="More editing tools" hidden></div>${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('help', 'Getting started', 'help')}</div>
   <div id="notification" role="status" hidden></div>
   <dialog id="image-storage-dialog" aria-labelledby="image-storage-title"><form method="dialog">
     <h2 id="image-storage-title">Store this image</h2>
@@ -284,6 +286,7 @@ interface DocumentTab {
 const tabs: DocumentTab[] = [];
 const pairs: SplitPair[] = [];
 let activeTab: DocumentTab | undefined;
+let responsiveFrame = 0;
 let untitledCount = 0;
 let contextImageSource: string | null = null;
 const draftKey = 'markdown-studio-draft-v1';
@@ -609,7 +612,7 @@ function createPane(host: HTMLElement, text: HTMLTextAreaElement): { pane: HTMLE
   const header = document.createElement('div');
   header.className = 'pane-header';
   header.hidden = true;
-  header.innerHTML = '<span class="pane-title"></span><div class="pane-modes" role="group" aria-label="Editor mode"><button type="button" data-pane-side-by-side class="view-switch" role="switch" aria-checked="false" title="Show Source beside Visual"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span>Visual + Source</span></button><button type="button" data-pane-mode="visual">Visual</button><button type="button" data-pane-mode="source">Source</button><button type="button" data-pane-mode="preview">Source + Preview</button></div>';
+  header.innerHTML = '<span class="pane-title"></span>';
   const viewport = document.createElement('div');
   viewport.className = 'pane-content';
   text.classList.add('document-source');
@@ -745,12 +748,6 @@ function updatePaneHeaders(): void {
     const header = tab.pane.querySelector<HTMLElement>('.pane-header')!;
     header.hidden = !pair;
     header.querySelector<HTMLElement>('.pane-title')!.textContent = `${tab.name}${tab.markdown !== tab.savedMarkdown ? ' \u2022' : ''}`;
-    header.querySelector('[data-pane-side-by-side]')!.setAttribute('aria-checked', String(Boolean(tab.sideBySide)));
-    for (const control of header.querySelectorAll<HTMLButtonElement>('[data-pane-mode]')) {
-      const selected = control.dataset.paneMode === (tab.preview ? 'preview' : tab.mode);
-      control.classList.toggle('selected', selected);
-      control.setAttribute('aria-pressed', String(selected));
-    }
   }
   const control = document.querySelector<HTMLButtonElement>('[data-action="split"]')!;
   const label = pair ? 'Unsplit' : 'Split';
@@ -758,6 +755,7 @@ function updatePaneHeaders(): void {
   control.title = pair ? 'Unsplit the two documents' : 'Split with another document';
   control.setAttribute('aria-pressed', String(Boolean(pair)));
   control.disabled = !pair && !tabs.some(tab => tab.id !== documentId && !pairFor(pairs, tab.id));
+  scheduleResponsiveLayout();
 }
 
 function showWorkspace(): void {
@@ -765,7 +763,6 @@ function showWorkspace(): void {
   const visible = visibleTabs();
   const pair = pairFor(pairs, documentId);
   root.classList.toggle('is-split', Boolean(pair));
-  document.querySelector<HTMLElement>('.global-modes')!.hidden = Boolean(pair);
   if (pair) resizeSplit(pair, pair.ratio);
   else root.style.removeProperty('grid-template-columns');
   const mounted = [...root.querySelectorAll<HTMLElement>(':scope > .document-pane')];
@@ -808,6 +805,8 @@ function renderTabs(): void {
   captureTab();
   const list = element('tabs');
   list.replaceChildren();
+  const menu = element('tabs-menu');
+  menu.replaceChildren();
   for (const group of groupTabs(tabs.map(tab => tab.id), pairs)) {
     const members = group.documentIds.map(id => tabs.find(tab => tab.id === id)!);
     const selected = group.documentIds.includes(documentId);
@@ -839,7 +838,19 @@ function renderTabs(): void {
     });
     wrapper.append(select, close);
     list.append(wrapper);
+    const menuItem = document.createElement('button');
+    menuItem.type = 'button';
+    menuItem.setAttribute('role', 'menuitemradio');
+    menuItem.setAttribute('aria-checked', String(selected));
+    menuItem.textContent = select.textContent;
+    menuItem.title = select.title;
+    menuItem.addEventListener('click', () => {
+      closeDropdowns();
+      void run(async () => activateTab(group.pair?.activeId ?? group.id));
+    });
+    menu.append(menuItem);
   }
+  scheduleResponsiveLayout();
 }
 
 function showMode(): void {
@@ -852,7 +863,7 @@ function showMode(): void {
   activeTab?.viewport.classList.toggle('has-preview', preview);
   if (activeTab) activeTab.viewport.querySelector<HTMLElement>('.live-preview')!.hidden = !preview;
   element('view-switch').setAttribute('aria-checked', String(sideBySide));
-  element('view-switch').title = sideBySide ? 'Hide Source; keep Visual' : 'Show Source beside Visual';
+  element('view-switch').title = `${sideBySide ? 'Hide Source; keep Visual' : 'Show Source beside Visual'}${activeTab ? ` - ${activeTab.name}` : ''}`;
   document.querySelector('.toolbar')!.classList.toggle('source-toolbar', mode === 'source');
   if (activeTab) activeTab.mode = mode;
   updatePaneHeaders();
@@ -888,7 +899,6 @@ function activateTab(id: string): void {
   editor.setEditable(!busy, false);
   source.readOnly = busy;
   update();
-  element('tabs').querySelector<HTMLElement>('.selected')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function addTab(id: string, content: string, name: string, file: string | null, saved = true): void {
@@ -1182,6 +1192,7 @@ function updateToolbar(): void {
     const active = mode === 'visual' && editor.isActive(names[control.dataset.command!] ?? '');
     control.classList.toggle('active', active);
     control.setAttribute('aria-pressed', String(active));
+    if (control.closest('#toolbar-overflow')) control.setAttribute('aria-checked', String(active));
   }
   const sourceLineStart = source.selectionStart === 0 ? 0 : source.value.lastIndexOf('\n', source.selectionStart - 1) + 1;
   const level = mode === 'visual'
@@ -1497,9 +1508,17 @@ async function dispatch(action: string): Promise<void> {
       notify('Table of contents updated. Surrounding Markdown is unchanged.');
     }
     else if (kind === 'mermaid') {
-      if (mode !== 'source') switchMode('source');
-      insertSource('\n```mermaid\nflowchart LR\n  A[Start] --> B[Write something]\n```\n');
-      if (!activeTab?.preview) togglePreview();
+      const template = 'flowchart LR\n  A[Start] --> B[Write something]';
+      if (mode === 'visual') {
+        const inserted = editor.chain().focus()
+          .command(({ tr }) => { closeHistory(tr); return true; })
+          .insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: template }] })
+          .run();
+        if (!inserted) throw new Error('The Mermaid diagram could not be inserted at the current selection.');
+      } else {
+        insertSource(`\n\`\`\`mermaid\n${template}\n\`\`\`\n`);
+        if (!activeTab?.preview && !activeTab?.sideBySide) togglePreview();
+      }
     }
     else insertAdvanced(kind);
     return;
@@ -1727,15 +1746,6 @@ document.querySelector('.toolbar')!.addEventListener('mousedown', event => {
 });
 document.addEventListener('click', event => {
   const target = event.target as HTMLElement;
-  const paneMode = target.closest<HTMLElement>('[data-pane-mode]')?.dataset.paneMode;
-  if (target.closest('[data-pane-side-by-side]')) {
-    if (!busy) { activateEventPane(event); toggleSideBySide(); }
-    return;
-  }
-  if (paneMode === 'visual' || paneMode === 'source' || paneMode === 'preview') {
-    if (!busy) { activateEventPane(event); if (paneMode === 'preview') togglePreview(); else switchMode(paneMode); }
-    return;
-  }
   const command = target.closest<HTMLElement>('[data-command]')?.dataset.command;
   if (command) {
     closeDropdowns();
@@ -2053,7 +2063,7 @@ document.addEventListener('keydown', event => {
     setFocusMode(false);
   }
 });
-const dropdownIds = ['save-menu', 'export-menu', 'format-menu'];
+const dropdownIds = ['save-menu', 'export-menu', 'format-menu', 'tabs-menu'];
 function closeDropdowns(): void {
   for (const id of dropdownIds) {
     element(id).hidden = true;
@@ -2061,13 +2071,85 @@ function closeDropdowns(): void {
   }
 }
 function positionViewMenu(): void {
-  const menu = element('format-menu');
-  if (menu.hidden) return;
-  const trigger = document.querySelector<HTMLElement>('[aria-controls="format-menu"]')!.getBoundingClientRect();
-  const bounds = menu.getBoundingClientRect();
-  menu.style.left = `${Math.max(8, Math.min(trigger.right - bounds.width, innerWidth - bounds.width - 8))}px`;
-  menu.style.top = `${Math.max(8, Math.min(trigger.bottom + 5, innerHeight - bounds.height - 8))}px`;
+  for (const id of ['format-menu', 'tabs-menu']) {
+    const menu = element(id);
+    if (menu.hidden) continue;
+    const trigger = document.querySelector<HTMLElement>(`[aria-controls="${id}"]`)!.getBoundingClientRect();
+    const bounds = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(trigger.right - bounds.width, innerWidth - bounds.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(trigger.bottom + 5, innerHeight - bounds.height - 8))}px`;
+  }
 }
+const toolbar = document.querySelector<HTMLElement>('.toolbar')!;
+const overflow = element('toolbar-overflow');
+const toolbarSlots = [...toolbar.children]
+  .filter((node): node is HTMLElement => node instanceof HTMLElement && node.matches('button:not(.split-control), select, .divider'))
+  .map(control => {
+    const slot = document.createComment('toolbar position');
+    control.before(slot);
+    return { control, slot };
+  });
+let toolbarLayoutKey = '';
+function scheduleResponsiveLayout(): void {
+  if (responsiveFrame) return;
+  responsiveFrame = requestAnimationFrame(() => {
+    responsiveFrame = 0;
+    layoutResponsiveChrome();
+  });
+}
+function layoutResponsiveChrome(): void {
+  if (!toolbar.getClientRects().length) return;
+  const focused = document.activeElement;
+  const key = `${toolbar.clientWidth}:${toolbar.querySelector('.split-control')!.textContent}`;
+  if (key !== toolbarLayoutKey) {
+    toolbarLayoutKey = key;
+    for (const { control, slot } of toolbarSlots) {
+      slot.after(control);
+      control.hidden = false;
+      if (control instanceof HTMLButtonElement) {
+        control.removeAttribute('role');
+        control.removeAttribute('aria-checked');
+      }
+    }
+    // Move the original controls, retaining selection, handlers, and formatting state.
+    for (const { control } of [...toolbarSlots].reverse()) {
+      if (toolbar.scrollWidth <= toolbar.clientWidth) break;
+      overflow.prepend(control);
+      if (control instanceof HTMLButtonElement) {
+        control.setAttribute('role', control.dataset.command ? 'menuitemcheckbox' : 'menuitem');
+        if (control.dataset.command) control.setAttribute('aria-checked', control.getAttribute('aria-pressed') ?? 'false');
+      }
+    }
+    for (const divider of toolbar.querySelectorAll<HTMLElement>(':scope > .divider')) {
+      if (!divider.nextElementSibling || divider.nextElementSibling.matches('.toolbar-more, .toolbar-spacer')) divider.hidden = true;
+    }
+    toolbar.scrollLeft = 0;
+    overflow.hidden = !overflow.children.length;
+    if (focused instanceof HTMLElement && overflow.contains(focused) && element('format-menu').hidden) {
+      document.querySelector<HTMLButtonElement>('[aria-controls="format-menu"]')!.focus();
+    }
+  }
+  const list = element('tabs');
+  const allTabs = [...list.querySelectorAll<HTMLElement>('.document-tab')];
+  for (const tab of allTabs) tab.hidden = false;
+  for (const tab of [...allTabs].reverse()) {
+    if (list.scrollWidth <= list.clientWidth) break;
+    if (!tab.classList.contains('selected')) tab.hidden = true;
+  }
+  list.scrollLeft = 0;
+  if (focused instanceof HTMLElement && focused.closest('.document-tab[hidden]')) {
+    document.querySelector<HTMLButtonElement>('[aria-controls="tabs-menu"]')!.focus();
+  }
+  positionViewMenu();
+}
+const chromeObserver = new ResizeObserver(scheduleResponsiveLayout);
+chromeObserver.observe(toolbar);
+chromeObserver.observe(document.querySelector('.tabs-bar')!);
+chromeObserver.observe(element('tabs'));
+overflow.addEventListener('mousedown', event => {
+  if ((event.target as HTMLElement).closest('button')) event.preventDefault();
+});
+scheduleResponsiveLayout();
 for (const id of dropdownIds) {
   const trigger = document.querySelector<HTMLButtonElement>(`[aria-controls="${id}"]`)!;
   const menu = element(id);

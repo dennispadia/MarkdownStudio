@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Use one shared Visual + Source switch for single and paired documents. In a split pair it reflects and changes only the active document; remove duplicate pane switches and mode bars.
+- Adapt the single-row toolbar to available width by moving commands into More tools and views, restoring them when space returns, without horizontal scrolling.
+- Shrink document tabs like browser tabs, keep the selected tab visible, and provide an Open documents dropdown for all tabs, including those that cannot fit.
+- Insert Mermaid diagrams at the current Visual selection rather than switching to Source and using its unrelated caret. Preserve Visual mode, active split-pane targeting, following content, and single-step undo.
+
 ## 0.6.5
 
 - Ship the approved single-row editing toolbar in the actual desktop application, with direct formatting, lists, quotes, links, images, tables, code, rule, table-of-contents, and Mermaid controls. Narrow windows scroll horizontally instead of hiding editing commands.
