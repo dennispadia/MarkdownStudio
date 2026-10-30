@@ -112,7 +112,7 @@ app.innerHTML = `
     </section>
     <div id="recovery-banner" hidden>Unsaved drafts from your last session are available. ${button('recover', 'Recover drafts')}${button('dismiss-recovery', 'Dismiss')}</div>
     <div class="canvas" id="canvas"><article class="paper" id="visual-editor" aria-label="Visual Markdown editor"></article><textarea id="source-editor" aria-label="Markdown source" spellcheck="false" hidden></textarea></div>
-    <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><span id="save-status" aria-live="polite">Ready to write</span></footer>
+    <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><span id="save-status" aria-live="polite">Ready to write</span><div class="zoom-controls" role="group" aria-label="Zoom controls"><button type="button" id="zoom-out" data-action="zoom-out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" id="zoom-reset" data-action="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%">100%</button><button type="button" id="zoom-in" data-action="zoom-in" aria-label="Zoom in" title="Zoom in">+</button></div></footer>
   </main>
   <div id="notification" role="status" hidden></div>
   <dialog id="image-storage-dialog" aria-labelledby="image-storage-title"><form method="dialog">
@@ -1075,8 +1075,8 @@ function update(): void {
   outline.replaceChildren();
   for (const [index, item] of headings(markdown).entries()) {
     const entry = document.createElement('button');
-    entry.textContent = item.text || 'Untitled heading';
-    entry.title = item.text;
+    entry.textContent = item.displayText || 'Untitled heading';
+    entry.title = item.displayText;
     entry.style.paddingLeft = `${12 + (item.level - 1) * 12}px`;
     entry.addEventListener('click', () => {
       if (mode === 'source') {
@@ -1266,9 +1266,27 @@ async function save(saveAs = false): Promise<boolean> {
   update();
   storeDraft();
   await refreshRecent();
-  notify('Markdown file saved.');
+  notify(`${documentName} saved`);
   return true;
 }
+
+let zoomRevision = 0;
+async function refreshZoom(command?: 'in' | 'out' | 'reset'): Promise<void> {
+  const revision = ++zoomRevision;
+  const factor = unwrap(await window.studio.zoom(command));
+  if (revision !== zoomRevision) return;
+  const percentage = Math.round(factor * 100);
+  element('zoom-reset').textContent = `${percentage}%`;
+  element<HTMLButtonElement>('zoom-out').disabled = percentage <= 50;
+  element<HTMLButtonElement>('zoom-in').disabled = percentage >= 300;
+}
+let zoomTimer: ReturnType<typeof setTimeout>;
+window.addEventListener('resize', () => {
+  clearTimeout(zoomTimer);
+  zoomTimer = setTimeout(() => {
+    void refreshZoom().catch(error => notify(`Zoom could not be refreshed: ${String(error)}`, true));
+  }, 100);
+});
 
 async function mayDiscard(): Promise<boolean> {
   if (markdown === savedMarkdown) return true;
@@ -1520,6 +1538,9 @@ async function dispatch(action: string): Promise<void> {
     case 'open': await open(); break;
     case 'save': await save(); break;
     case 'save-as': await save(true); break;
+    case 'zoom-in': await refreshZoom('in'); break;
+    case 'zoom-out': await refreshZoom('out'); break;
+    case 'zoom-reset': await refreshZoom('reset'); break;
     case 'clear-recent':
       unwrap(await window.studio.clearRecent());
       await refreshRecent();
@@ -2063,6 +2084,7 @@ void run(async () => {
   resetVisual(markdown);
   showWorkspace();
   update();
+  await refreshZoom();
   await applyTheme(theme);
   await refreshRecent();
   await openPending();

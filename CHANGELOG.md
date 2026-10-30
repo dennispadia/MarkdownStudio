@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Show readable heading descriptions in the document outline and its tooltips instead of Markdown link syntax or destination URLs. Preserve document links, heading navigation, and existing anchors.
+- Limit Recent Files to the five most recently used files, newest first, including existing saved history.
+- Add status-bar zoom-out, percentage/reset, and zoom-in controls synchronized with native View-menu and keyboard zoom.
+- Name the saved file in save confirmations, including the new filename after Save As.
+
 ## 0.6.3
 
 - Apply the approved minimalist interface with enlarged original branding, compact tabs and actions, a centered Export label, and Graphite + Teal Dark colors. Preserve Light and saved theme preferences.

@@ -228,6 +228,9 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; container-t
 footer { height: 29px; display: flex; gap: 17px; align-items: center; flex-shrink: 0; padding: 0 23px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
 #save-status { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 footer > div { display: flex; gap: 19px; }
+.zoom-controls { gap: 0; flex-shrink: 0; }
+.zoom-controls button { min-width: 24px; height: 24px; padding: 2px 4px; font-size: 13px; }
+#zoom-reset { min-width: 44px; font-size: 10px; font-variant-numeric: tabular-nums; }
 #find-panel { padding: 10px 25px; display: flex; align-items: center; gap: 8px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 input { min-width: 0; border: 1px solid var(--line); background: var(--paper); color: var(--text); border-radius: 5px; padding: 8px 10px; font-size: 12px; }
 #find-panel input { flex: 1; width: 120px; }
@@ -312,4 +315,19 @@ dialog input { display: block; width: 100%; margin-top: 6px; min-width: 300px; }
   .workspace-bar, .tabs-bar { padding-left: 12px; padding-right: 12px; }
   .pane-header { flex-wrap: wrap; }
   .pane-title { flex-basis: 100%; }
+}
+@container (max-width: 480px) {
+  footer { padding: 0 8px; gap: 6px; }
+  footer .local-status { display: none; }
+  #save-status { min-width: 0; overflow: hidden; white-space: nowrap; flex: 1; }
+  #word-count { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+}
+@container (max-width: 300px) {
+  footer > #word-count, footer > #save-status { display: none; }
+  .zoom-controls { margin-left: auto; }
+}
+@container (max-width: 120px) {
+  footer { padding: 0; }
+  .zoom-controls button { min-width: 20px; padding: 2px 1px; font-size: 11px; }
+  #zoom-reset { min-width: 32px; font-size: 9px; }
 }

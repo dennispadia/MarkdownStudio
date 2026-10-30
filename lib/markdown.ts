@@ -8,10 +8,20 @@ parser.block.ruler.before('paragraph', 'studio_toc_marker', (state, startLine, _
   return true;
 }, { alt: ['paragraph', 'list', 'blockquote'] });
 
-export function headings(markdown: string): { level: number; text: string; line: number }[] {
+export function headings(markdown: string): { level: number; text: string; displayText: string; line: number }[] {
   const tokens = parser.parse(markdown, {});
+  const inlineText = (children: typeof tokens): string => children.map(token => {
+    if (token.children) return inlineText(token.children);
+    if (token.type === 'text' || token.type === 'code_inline') return token.content;
+    return token.type === 'softbreak' || token.type === 'hardbreak' ? ' ' : '';
+  }).join('');
   return tokens.flatMap((token, index) => token.type === 'heading_open'
-    ? [{ level: Number(token.tag.slice(1)), text: tokens[index + 1].content, line: token.map?.[0] ?? 0 }]
+    ? [{
+      level: Number(token.tag.slice(1)),
+      text: tokens[index + 1].content,
+      displayText: inlineText(tokens[index + 1].children ?? []).trim(),
+      line: token.map?.[0] ?? 0,
+    }]
     : []);
 }
 

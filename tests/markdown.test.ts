@@ -4,10 +4,41 @@ import { documentPreviewHTML, headingAnchor, headings, imageDisplayURL, isSafeLi
 
 test('outline handles ATX and Setext headings and excludes code blocks', () => {
   assert.deepEqual(headings('# Title\n\n```\n# not a heading\n```\n\nSubtitle\n---\n\n### Details'), [
-    { level: 1, text: 'Title', line: 0 },
-    { level: 2, text: 'Subtitle', line: 6 },
-    { level: 3, text: 'Details', line: 9 },
+    { level: 1, text: 'Title', displayText: 'Title', line: 0 },
+    { level: 2, text: 'Subtitle', displayText: 'Subtitle', line: 6 },
+    { level: 3, text: 'Details', displayText: 'Details', line: 9 },
   ]);
+});
+
+test('outline labels show link descriptions without URLs or inline formatting syntax', () => {
+  const cases = [
+    ['Scenario 1: [Deployment **guide**](https://example.com/a_(b) "Guide")', 'Scenario 1: Deployment guide'],
+    ['[A *readable* `label`](<https://example.com/a%20b>)', 'A readable label'],
+    ['[First](https://example.com/first) and [second](https://example.com/second)', 'First and second'],
+    ['[![Build **status**](badge.png)](https://example.com/build)', 'Build status'],
+    ['Literal \\[brackets\\], \\*stars\\* &amp; `[code](not-a-link)`', 'Literal [brackets], *stars* & [code](not-a-link)'],
+    ['<https://example.com/visible>', 'https://example.com/visible'],
+    ['\u4f60\u597d [\u4e16\u754c](https://example.com)', '\u4f60\u597d \u4e16\u754c'],
+    ['', ''],
+  ];
+  for (const [source, displayText] of cases) {
+    assert.deepEqual(headings(`## ${source}`), [{ level: 2, text: source, displayText, line: 0 }]);
+  }
+});
+
+test('outline labels resolve reference links and preserve Setext heading locations', () => {
+  assert.deepEqual(headings('## [**Full** reference][guide]\n\n[guide]: https://example.com/guide\n\nSetext [guide][]\n---\n\n[guide]\n===\n'), [
+    { level: 2, text: '[**Full** reference][guide]', displayText: 'Full reference', line: 0 },
+    { level: 2, text: 'Setext [guide][]', displayText: 'Setext guide', line: 4 },
+    { level: 1, text: '[guide]', displayText: 'guide', line: 7 },
+  ]);
+});
+
+test('readable outline labels retain original heading markup for existing anchors', () => {
+  const [heading] = headings('# Literal \\*stars\\* and [**Guide**](https://example.com)');
+  assert.equal(heading.displayText, 'Literal *stars* and Guide');
+  assert.equal(heading.text, 'Literal \\*stars\\* and [**Guide**](https://example.com)');
+  assert.equal(headingAnchor(heading.text, new Map()), 'literal-stars-and-guide');
 });
 
 test('word count handles punctuation, empty text, and non-Latin words', () => {

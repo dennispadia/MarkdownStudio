@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('studio', {
   storeImage: (id, source, storage) => ipcRenderer.invoke('document:store-image', id, source, storage),
   recent: () => ipcRenderer.invoke('document:recent'),
   clearRecent: () => ipcRenderer.invoke('document:clear-recent'),
+  zoom: (command) => ipcRenderer.invoke('app:zoom', command),
   setTheme: (theme) => ipcRenderer.invoke('app:theme', theme),
   confirmUnsaved: (name) => ipcRenderer.invoke('document:confirm', name),
   setEditorContext: (context) => ipcRenderer.send('editor:context', context),

@@ -31,6 +31,7 @@ const documents = new Map<string, NativeDocument>();
 let dirty = false;
 let allowClose = false;
 let recentFiles: string[] = [];
+const RECENT_FILE_LIMIT = 5;
 let editorContext: EditorContext = { mode: 'visual', active: [], heading: 0, inTable: false };
 const entryURL = pathToFileURL(path.join(app.getAppPath(), 'dist', 'index.html')).href;
 const recentPath = () => path.join(app.getPath('userData'), 'recent-files.json');
@@ -65,7 +66,7 @@ function handle<T, Args extends unknown[]>(channel: string, callback: (...args: 
 }
 
 async function remember(file: string): Promise<void> {
-  recentFiles = [file, ...recentFiles.filter(item => item !== file)].slice(0, 8);
+  recentFiles = [file, ...recentFiles.filter(item => item !== file)].slice(0, RECENT_FILE_LIMIT);
   try { await atomicWrite(recentPath(), JSON.stringify(recentFiles)); }
   catch (error) {
     console.error('Could not update recent files:', error);
@@ -293,6 +294,15 @@ function installIPC(): void {
     }
   });
   handle('document:recent', async () => recentFiles);
+  handle('app:zoom', async (command: unknown) => {
+    if (command !== undefined) {
+      if (command !== 'in' && command !== 'out' && command !== 'reset') throw new Error('Choose Zoom in, Zoom out, or Reset zoom.');
+      const current = window.webContents.getZoomLevel();
+      const level = command === 'reset' ? 0 : current + (command === 'in' ? 0.5 : -0.5);
+      window.webContents.setZoomLevel(Math.max(Math.log(0.5) / Math.log(1.2), Math.min(Math.log(3) / Math.log(1.2), level)));
+    }
+    return window.webContents.getZoomFactor();
+  });
   handle('document:clear-recent', async () => {
     await atomicWrite(recentPath(), '[]');
     recentFiles = [];
@@ -569,7 +579,14 @@ if (primaryInstance) void app.whenReady().then(async () => {
   try {
     const saved: unknown = JSON.parse(await readFile(recentPath(), 'utf8'));
     if (!Array.isArray(saved) || !saved.every(item => typeof item === 'string')) throw new Error('Invalid recent-file list.');
-    recentFiles = saved.slice(0, 8);
+    recentFiles = saved.slice(0, RECENT_FILE_LIMIT);
+    if (saved.length > RECENT_FILE_LIMIT) {
+      try { await atomicWrite(recentPath(), JSON.stringify(recentFiles)); }
+      catch (error) {
+        console.error('Could not shorten recent-file history:', error);
+        dialog.showErrorBox('Recent-file history could not be updated', String(error));
+      }
+    }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       console.error('Could not load recent files:', error);

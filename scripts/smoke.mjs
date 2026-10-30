@@ -33,6 +33,9 @@ const executable = process.argv[2] ?? createRequire(import.meta.url)('electron')
 const packaged = Boolean(process.argv[2]);
 const startupFile = path.join(temporary, 'Startup résumé 日本語.md');
 await writeFile(startupFile, '# Opened from Explorer\n\nStartup document with spaces and Unicode.\n');
+const legacyRecentFiles = Array.from({length:8}, (_, index) => path.join(temporary, `Earlier ${index}.md`));
+await mkdir(path.join(temporary, 'profile'));
+await writeFile(path.join(temporary, 'profile', 'recent-files.json'), JSON.stringify(legacyRecentFiles));
 const child = spawn(executable, [
   ...(packaged ? [] : ['.']),
   '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
@@ -116,6 +119,9 @@ try {
   await waitFor(async () => ui(`document.querySelector('#filename').textContent === ${JSON.stringify(path.basename(startupFile))}`), 'cold-launch file opens after renderer initialization');
   assert.match(await ui("document.querySelector('#visual-editor').textContent"), /Opened from Explorer/);
   assert.equal(await ui("document.querySelectorAll('.document-tab').length"), 1, 'Explorer launch has no redundant blank or welcome tab');
+  const startupRecentFiles = [startupFile, ...legacyRecentFiles.slice(0, 4)];
+  assert.deepEqual(await ui("[...document.querySelectorAll('#recent button')].map(button => button.title)"), startupRecentFiles);
+  assert.deepEqual(JSON.parse(await readFile(path.join(temporary, 'profile', 'recent-files.json'), 'utf8')), startupRecentFiles, 'Existing eight-file history is limited to five and persisted');
   console.log('PASS: cold launch opens the requested file, including spaces and Unicode, after editor initialization');
   await ui("globalThis.smokeBeforeBlankReload = true");
   await browser.call('Page.reload', {}, sessionId);
@@ -222,6 +228,32 @@ try {
   await action('export-menu');
   assert.equal(await ui("document.querySelector('#export-menu').hidden"), false);
   await action('export-menu');
+  assert.equal(await ui("document.querySelector('#zoom-reset').textContent"), '100%');
+  const beforeZoomText = await ui("document.querySelector('#visual-editor').textContent");
+  await action('zoom-in');
+  await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent !== '100%'"), 'zoom-in percentage');
+  const zoomedFactor = await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].webContents.getZoomFactor()");
+  assert.ok(zoomedFactor > 1);
+  assert.equal(await ui("document.querySelector('#zoom-reset').textContent"), `${Math.round(zoomedFactor * 100)}%`);
+  await action('zoom-out');
+  await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent === '100%'"), 'zoom-out percentage');
+  await main.evaluate("(() => {const view=smokeElectron.Menu.getApplicationMenu().items.find(item=>item.label.includes('View'));const window=smokeElectron.BrowserWindow.getAllWindows()[0];view.submenu.items.find(item=>item.role?.toLowerCase()==='zoomin').click({},window,window.webContents);})()");
+  await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent !== '100%'"), 'native menu zoom synchronization');
+  await nativeShortcut('-', ['control'], false);
+  await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent === '100%'"), 'native keyboard zoom synchronization');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(0.5)");
+  await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent === '50%'"), 'minimum zoom percentage');
+  assert.equal(await ui("document.querySelector('#zoom-out').disabled"), true);
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600);smokeElectron.BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(3)");
+  await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent === '300%'"), 'maximum zoom percentage');
+  assert.equal(await ui("document.querySelector('#zoom-in').disabled"), true);
+  assert.ok(await ui("(() => {const controls=document.querySelector('.zoom-controls').getBoundingClientRect();return controls.left >= 0 && controls.right <= innerWidth;})()"), 'Reset remains reachable at maximum zoom in the minimum window');
+  await action('zoom-reset');
+  await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent === '100%'"), 'reset percentage');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+  assert.equal(await ui("document.querySelector('#visual-editor').textContent"), beforeZoomText, 'Zoom does not modify document text');
+  assert.equal(await ui("window.studio.zoom('invalid').then(result => result.ok)"), false, 'Invalid zoom commands are rejected');
+  console.log('PASS: zoom controls and percentage, native menu/keyboard synchronization, 50%-300% bounds, visible reset, and unchanged document text');
   const raw = '# Exact source\r\n\r\nUnusual   spacing & Unicode: \u4f60\u597d\r\n\r\n- [ ] A task\r\n';
   const file = path.join(temporary, 'original.md');
   await writeFile(file, raw);
@@ -229,6 +261,7 @@ try {
   await action('open');
   assert.equal(await ui("document.querySelector('#filename').textContent"), 'original.md');
   await action('save');
+  assert.equal(await ui("document.querySelector('#notification').textContent"), 'original.md saved');
   assert.equal(await readFile(file, 'utf8'), raw);
   await action('source');
   assert.equal(await ui("document.querySelector('#source-editor').value"), raw.replace(/\r\n/g, '\n'));
@@ -493,6 +526,7 @@ try {
   const copied = path.join(temporary, 'saved-as.md');
   await main.evaluate(`smokeSavePath = ${JSON.stringify(copied)}`);
   await menuAction('save-as');
+  assert.equal(await ui("document.querySelector('#notification').textContent"), 'saved-as.md saved', 'Save As confirms the new filename');
   assert.equal(await readFile(copied, 'utf8'), content);
   assert.equal(await readFile(file, 'utf8'), '# External change');
   console.log('PASS: native Save As preserves both versions');
@@ -1342,10 +1376,25 @@ try {
   await menuAction('close-tab');
   console.log('PASS: searchable code languages, alias/keyboard selection, per-block colors, undo/redo, raw copy, real visual editing, safe unknown/plain fences, mode/tab isolation, save/reopen and native PDF/Word exports');
 
+  const recentFixtures = Array.from({length:7}, (_, index) => path.join(temporary, `Recent ${index}.md`));
+  for (const [index, fixture] of recentFixtures.entries()) {
+    await writeFile(fixture, `# Recent fixture ${index}\n`);
+    await main.evaluate(`smokeOpenPath = ${JSON.stringify(fixture)}`);
+    await action('open');
+    await menuAction('close-tab');
+  }
+  const expectedRecent = recentFixtures.slice(-5).reverse();
+  assert.deepEqual(await ui("[...document.querySelectorAll('#recent button')].map(button => button.title)"), expectedRecent);
+  await main.evaluate(`smokeOpenPath = ${JSON.stringify(expectedRecent[3])}`);
+  await action('open');
+  await menuAction('close-tab');
+  const reorderedRecent = [expectedRecent[3], ...expectedRecent.filter(file => file !== expectedRecent[3])];
+  assert.deepEqual(await ui("[...document.querySelectorAll('#recent button')].map(button => button.title)"), reorderedRecent, 'Reopening moves an existing file to the front without duplicates');
   const historyPath = path.join(temporary, 'profile', 'recent-files.json');
+  assert.deepEqual(JSON.parse(await readFile(historyPath, 'utf8')), reorderedRecent, 'The same five-file order is persisted');
   const historyBackup = path.join(temporary, 'profile', 'recent-files.backup');
   const recentCount = await ui("document.querySelectorAll('#recent button').length");
-  assert.ok(recentCount > 0);
+  assert.equal(recentCount, 5);
   assert.equal(await ui("document.querySelector('#recent').hidden"), true, 'Recent Files starts collapsed');
   assert.equal(await ui("document.querySelector('#recent-toggle').getAttribute('aria-expanded')"), 'false');
   assert.equal(await ui("document.querySelector('#recent-count').textContent"), `(${recentCount})`);
@@ -1708,6 +1757,23 @@ try {
 
   await action('new');
   await action('source');
+  const linkedOutlineMarkdown = '# Overview\n\n## Scenario 1: [Deployment **guide**](https://example.com/guide)\n\n## [Reference label][guide]\n\n[guide]: https://example.com/reference\n';
+  await sourceEdit(linkedOutlineMarkdown);
+  const linkedOutlineLabels = ['Overview', 'Scenario 1: Deployment guide', 'Reference label'];
+  assert.deepEqual(await ui("[...document.querySelectorAll('#outline button')].map(button => button.textContent)"), linkedOutlineLabels);
+  assert.deepEqual(await ui("[...document.querySelectorAll('#outline button')].map(button => button.title)"), linkedOutlineLabels);
+  await ui("document.querySelectorAll('#outline button')[1].click()");
+  assert.equal(await ui("document.querySelector('#source-editor').selectionStart"), linkedOutlineMarkdown.indexOf('## Scenario 1:'));
+  assert.equal(await ui("document.querySelector('#source-editor').value"), linkedOutlineMarkdown, 'Outline navigation never modifies the heading link');
+  await action('visual');
+  assert.deepEqual(await ui("[...document.querySelectorAll('#outline button')].map(button => button.textContent)"), linkedOutlineLabels);
+  assert.equal(await ui("document.querySelector('#visual-editor h2 a').getAttribute('href')"), 'https://example.com/guide');
+  assert.equal(await ui("document.querySelector('#visual-editor h2 a').textContent"), 'Deployment guide');
+  await ui("document.querySelectorAll('#outline button')[1].click()");
+  assert.equal(await ui("document.querySelector('#link-dialog').open"), false, 'Outline labels navigate instead of opening the linked address');
+  await action('source');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), linkedOutlineMarkdown, 'Rendering readable outline labels preserves original Markdown');
+  console.log('PASS: readable linked-heading outline labels and tooltips, reference links, unchanged document links, and Source/Visual navigation');
   await sourceEdit(Array.from({length:45}, (_, index) => `## Heading ${index}\n\nSome outline content.`).join('\n\n'));
   await action('visual');
   await action('sidebar');

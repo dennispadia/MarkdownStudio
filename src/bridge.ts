@@ -17,6 +17,7 @@ export interface StudioAPI {
   storeImage: (id: string, source: string, storage: 'embedded' | 'assets') => Promise<Result<string>>;
   recent: () => Promise<Result<string[]>>;
   clearRecent: () => Promise<Result<void>>;
+  zoom: (command?: 'in' | 'out' | 'reset') => Promise<Result<number>>;
   setTheme: (theme: Theme) => Promise<Result<void>>;
   confirmUnsaved: (name: string) => Promise<Result<'save' | 'discard' | 'cancel'>>;
   setEditorContext: (context: EditorContext) => void;
