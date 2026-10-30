@@ -2,7 +2,7 @@
 
 A local-first Windows desktop application for writing Markdown with a friendly visual editor and exporting to Word and PDF.
 
-**Source-checkout note:** the layout, blank startup, and editable Visual + Source switch described below are unreleased source changes. The published 0.6.2 installer still uses the previous layout and separate Visual/Source controls.
+**Version note:** the layout, blank startup, and editable Visual + Source switch described below were introduced in 0.6.3. Version 0.6.2 uses the previous layout and separate Visual/Source controls.
 
 ## Open the application
 

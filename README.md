@@ -10,15 +10,15 @@ The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account
 
 **Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Latest source changes (unreleased)
+## What's new in 0.6.3
 
-The source checkout now includes the approved minimalist layout: original enlarged branding, compact tabs and file actions, a centered text-only Export button, and Graphite + Teal Dark colors. The upper-left hamburger collapses the sidebar into a narrow rail that keeps New, Open, theme, and keyboard shortcuts available.
+Version 0.6.3 includes the approved minimalist layout: original enlarged branding, compact tabs and file actions, a centered text-only Export button, and Graphite + Teal Dark colors. The upper-left hamburger collapses the sidebar into a narrow rail that keeps New, Open, theme, and keyboard shortcuts available.
 
 Start with one blank **Untitled** document, without a Welcome document. Opening a file from Explorer starts directly in that file without an extra blank tab.
 
 Turn on the **Visual + Source** switch for editable Visual on the left and Markdown Source on the right. Changes appear in both panes, with the formatting toolbar available; turning the switch off returns to Visual. Source-only and the existing read-only Source + Preview remain available through **More (...)** and the View menu.
 
-These changes are **not included in the published 0.6.2 MSI**. The download links and screenshots below still describe that released version. See [CHANGELOG.md](CHANGELOG.md) for the source changes.
+Installer publication follows successful Windows build and verification. Use the download links above for the latest verified public installer. Version 0.6.2 does not include these UI changes; the historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## What's new in 0.6.2
 

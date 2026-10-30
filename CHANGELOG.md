@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.3
 
 - Apply the approved minimalist interface with enlarged original branding, compact tabs and actions, a centered Export label, and Graphite + Teal Dark colors. Preserve Light and saved theme preferences.
 - Collapse the sidebar from its upper-left hamburger into a narrow action rail retaining New, Open, theme, and keyboard shortcuts. Keep the resizable expanded sidebar and remembered preferences.
@@ -8,7 +8,7 @@
 - Add an accessible Visual + Source on/off switch: editable Visual on the left, Source on the right, two-way document updates, and toolbar commands targeting the active editor. Preserve raw Source when simply rendering, per-tab view state, and Visual/Source scroll offsets when hiding or showing Source.
 - Retain Source-only and read-only Source + Preview in More and native menus; retain independent two-file split tabs.
 
-Source changes only; no new installer has been published. DOCX/PDF formatting-fidelity improvements and comprehensive cross-mode reading-position alignment remain separate pending work.
+Known limitations: DOCX/PDF formatting-fidelity improvements and comprehensive cross-mode reading-position alignment remain separate pending work. The application and installer remain unsigned.
 
 ## 0.6.2
 
