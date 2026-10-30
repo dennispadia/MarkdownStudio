@@ -2,9 +2,9 @@
 
 # Markdown Studio
 
-A calm, local-first **Windows Markdown editor** with visual editing, **Source + Preview**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
+A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download the Windows x64 installer (0.6.2)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.2/Markdown-Studio-0.6.2-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.2) · [User guide](docs/USER_GUIDE.md)
+**[Download the Windows x64 installer (0.6.3)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.3/Markdown-Studio-0.6.3-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/MarkdownStudio/releases/tag/v0.6.3) · [User guide](docs/USER_GUIDE.md)
 
 The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
@@ -18,9 +18,9 @@ Start with one blank **Untitled** document, without a Welcome document. Opening 
 
 Turn on the **Visual + Source** switch for editable Visual on the left and Markdown Source on the right. Changes appear in both panes, with the formatting toolbar available; turning the switch off returns to Visual. Source-only and the existing read-only Source + Preview remain available through **More (...)** and the View menu.
 
-Installer publication follows successful Windows build and verification. Use the download links above for the latest verified public installer. Version 0.6.2 does not include these UI changes; the historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details.
+These changes are included in the **verified 0.6.3 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
 
-## What's new in 0.6.2
+### Included from 0.6.2
 
 - Click a link in Visual mode to edit its text and address without switching to Source. The toolbar link button, **Ctrl+K**, and right-click **Edit link...** work too.
 - **Ctrl+click** opens web/email links through the existing confirmation dialog. Generated table-of-contents links still navigate with an ordinary click.
@@ -37,7 +37,7 @@ Close Markdown Studio before upgrading with the new MSI. If Windows no longer re
 
 ### Included from 0.6.0
 
-All five additions below remain included in the **0.6.2 installer**, not just the source checkout.
+All five additions below remain included in the **0.6.3 installer**, not just the source checkout.
 
 | Feature | What you can do |
 | --- | --- |
@@ -98,15 +98,15 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.6.2** includes Visual link editing, the Explorer-opening fix, and the features shown above. This release is unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **0.6.3** includes the minimalist workspace, editable Visual + Source, collapsed action rail, and blank startup, while retaining Visual link editing, Explorer opening, and the features shown above. This release is unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the Windows x64 MSI installer (0.6.2)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.2/Markdown-Studio-0.6.2-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
+1. **[Download the Windows x64 MSI installer (0.6.3)](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.3/Markdown-Studio-0.6.3-x64.msi)**, or open [Releases](https://github.com/dennispadia/MarkdownStudio/releases) for all downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
 3. Open **Markdown Studio** from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.2/SHA256SUMS.txt) and a clean source ZIP are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/MarkdownStudio/releases/download/v0.6.3/SHA256SUMS.txt) and a clean source ZIP are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
@@ -114,8 +114,8 @@ Uninstall through **Windows Settings > Apps > Installed apps**. Your Markdown do
 
 ## Start writing
 
-1. Open a `.md` file or choose **New document**.
-2. Choose **Visual** for formatted editing, **Source** for Markdown text, or **Source + Preview** to see both the source and its read-only rendering.
+1. Start in the blank Untitled document, open a `.md` file, or choose **New** for another document.
+2. Write in **Visual**, or turn on **Visual + Source** for editable Visual on the left and Markdown on the right. Source-only and read-only Source + Preview remain available through **More (...)** and View.
 3. Use **Ctrl+F** to search, **Ctrl+T** to insert a table, or **F1** for the keyboard reference.
 4. Save the Markdown with **Ctrl+S**. The **Save** arrow provides Save All and Save As.
 5. Use **Export** to create a separate `.docx` or `.pdf` when ready to share.

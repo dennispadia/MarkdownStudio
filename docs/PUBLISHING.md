@@ -30,12 +30,12 @@ npm.cmd run release:checksums
 
 For later releases, increment `version` using `npm version <version> --no-git-tag-version`, keep the lockfile synchronized, and update the changelog.
 
-**Current release status:** version **0.6.2** adds Visual link editing and Ctrl+click opening, while retaining the Explorer-opening/single-window fixes and 0.6.0 writing features. It remains unsigned; no trusted signing provider is configured. Successful Windows CI verifies the installer and extracted application, including link editing, split-pane targeting, real startup and second-process file launches, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
+**Current release status:** version **0.6.3** adds the minimalist workspace, editable Visual + Source, collapsed action rail, and blank Untitled startup, while retaining Visual link editing, Explorer opening, and earlier writing features. It remains unsigned; no trusted signing provider is configured. Successful Windows CI verifies the installer and extracted application, including two-way editing, focus/undo routing, split-pane targeting, real startup and second-process file launches, and **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
 
 On GitHub:
 
 1. Open the repository's **Releases > Draft a new release**.
-2. Create a tag matching the version, such as `v0.6.2`, targeting the reviewed commit.
+2. Create a tag matching the version, such as `v0.6.3`, targeting the reviewed commit.
 3. Add a description of the release, known limitations, the unsigned-installer warning, and the no-support policy.
 4. Attach these files from `release`:
    - `Markdown-Studio-<version>-x64.msi`
