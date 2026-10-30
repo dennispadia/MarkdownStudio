@@ -27,47 +27,6 @@ syntaxStyle.textContent = [
 ].join('\n');
 document.head.append(syntaxStyle);
 
-const welcome = `# A little space for big ideas
-
-Welcome to **Markdown Studio**. A calm place to write, organize your thoughts, and turn them into something worth sharing.
-
-## Make yourself at home
-
-Write naturally here, or switch to **Source** to work directly with Markdown. Use the toolbar to add formatting without remembering any syntax.
-
-- **Open** a Markdown file from your computer
-- Add headings, links, images, and tables
-- **Save** your work as a regular \`.md\` file
-- Export a polished **Word document** or **PDF**
-
-> Your words stay yours. Editing and exports happen on your computer, without an account or cloud service.
-
-## A simple plan
-
-| Step | What to do |
-| --- | --- |
-| 1 | Gather your ideas |
-| 2 | Write a first draft |
-| 3 | Make it your own |
-
-### Try a checklist
-
-- [ ] Start something new
-- [ ] Find the right words
-- [ ] Share the finished document
-
-### A place for code, too
-
-\`\`\`javascript
-const idea = "Something wonderful";
-console.log(idea);
-\`\`\`
-
----
-
-**Ready?** Choose **New document** for a blank page, or **Open file** to bring your own.
-`;
-
 const icons = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   folder: '<path d="M3 8V5h7l2 3h9v12H3Z"/>',
@@ -76,6 +35,8 @@ const icons = {
   search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',
   moon: '<path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10z"/>',
   sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  menu: '<path d="M5 7h14M5 12h14M5 17h14"/>',
+  keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h1m4 0h1m4 0h1M6 12h1m4 0h1m4 0h1M7 16h10"/>',
   split: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',
   chevron: '<path d="m8 10 4 4 4-4"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m3 17 6-6 4 4 3-3 5 5"/>',
@@ -100,46 +61,45 @@ const icons = {
 type Icon = keyof typeof icons;
 const icon = (name: Icon) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
 const button = (action: string, label: string, name?: Icon, className = '') => `<button type="button" data-action="${action}" class="${className}" title="${label}">${name ? icon(name) : ''}<span>${label}</span></button>`;
-const formatButton = (command: Icon, label: string, optional = false) => `<button type="button" data-command="${command}" title="${label}" aria-label="${label}" class="${optional ? 'toolbar-optional' : ''}">${icon(command)}</button>`;
+const formatButton = (command: Icon, label: string, optional = false) => `<button type="button" data-command="${command}" title="${label}" aria-label="${label}" class="${optional ? 'toolbar-optional' : ''}">${icon(command)}<span>${label}</span></button>`;
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const brandIcon = new URL('../assets/icon.svg', import.meta.url).href;
 const brandDarkIcon = new URL('../assets/icon-dark.svg', import.meta.url).href;
 app.innerHTML = `
   <aside class="sidebar" id="sidebar">
+    <button type="button" id="sidebar-toggle" data-action="sidebar" aria-controls="sidebar" aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+Shift+B)">${icon('menu')}</button>
     <div class="brand"><div class="brand-mark"><img id="brand-icon" src="${brandIcon}" alt="" /></div><div>Markdown<span>STUDIO</span></div></div>
-    ${button('new', 'New document', 'plus', 'new-button')}
-    ${button('open', 'Open file', 'folder', 'sidebar-button')}
-    <section class="outline-section"><div class="section-label">DOCUMENT OUTLINE</div><nav id="outline" aria-label="Document headings"></nav></section>
+    <div class="file-actions">${button('new', 'New', 'plus', 'new-button')}${button('open', 'Open', 'folder', 'sidebar-button')}</div>
+    <section class="outline-section"><div class="section-label">IN THIS DOCUMENT</div><nav id="outline" aria-label="Document headings"></nav></section>
     <section class="recent-section"><div class="recent-header"><button id="recent-toggle" aria-expanded="false" aria-controls="recent" title="Expand recent files">${icon('chevron')}<span>RECENT FILES</span><span id="recent-count">(0)</span></button><button id="clear-recent" data-action="clear-recent" title="Clear recent file history" hidden disabled>Clear</button></div><div id="recent" hidden><p class="empty-note">Your opened files will appear here.</p></div></section>
     <div class="sidebar-bottom">
-      ${button('help', 'Getting started', 'help', 'sidebar-button')}
-      <div class="theme-switch" role="group" aria-label="Color theme">${themes.map(item => `<button type="button" data-theme-option="${item.id}" aria-pressed="false" title="${item.label} theme">${icon(item.id === 'light' ? 'sun' : 'moon')}<span>${item.label}</span></button>`).join('')}</div>
-      <div class="privacy"><span class="status-dot"></span> Local files. Your space.</div>
+      <button type="button" id="theme-toggle" data-action="theme" title="Switch to dark theme" aria-label="Switch to dark theme">${icon('moon')}<span>Light</span></button>
+      <button type="button" data-action="shortcuts" class="icon-only" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (F1)">${icon('keyboard')}</button>
     </div>
     <div id="sidebar-resizer" role="separator" tabindex="0" aria-label="Resize sidebar" aria-controls="sidebar" aria-orientation="vertical" title="Drag to resize; Left/Right keys resize, Home/End set limits; double-click to reset"></div>
   </aside>
   <main>
-    <div class="tabs-bar"><div id="tabs" role="tablist" aria-label="Open documents"></div>${button('new', 'New tab', 'plus', 'icon-only')}</div>
-    <header class="workspace-bar topbar">
-      <div class="document-name sr-only"><span id="filename">Welcome</span><span id="dirty-indicator"></span></div>
-      <div class="workspace-navigation"><button type="button" id="sidebar-toggle" data-action="sidebar" aria-controls="sidebar" aria-expanded="true" aria-label="Hide sidebar" title="Hide sidebar (Ctrl+Shift+B)">${icon('sidebar')}</button><div class="mode-switch global-modes" role="group" aria-label="Editor mode"><button id="visual-mode" data-action="visual" class="selected" aria-pressed="true">Visual</button><button id="source-mode" data-action="source" aria-pressed="false">Source</button><button id="preview-mode" data-action="preview" aria-pressed="false">Source + Preview</button></div></div>
+    <header class="tabs-bar">
+      <div id="tabs" role="tablist" aria-label="Open documents"></div>${button('new', 'New tab', 'plus', 'icon-only')}
+      <div class="document-name sr-only"><span id="filename">Untitled.md</span><span id="dirty-indicator"></span></div>
       <div class="workspace-actions">
-        ${button('find', 'Find', 'search', 'quiet')}
-        ${button('split', 'Split with...', 'split', 'split-control')}
+        ${button('find', 'Find and replace', 'search', 'icon-only quiet')}
         <div class="save-control"><div class="save-button">${button('save', 'Save', 'save')}<button type="button" data-action="save-menu" aria-label="More save actions" title="More save actions" aria-haspopup="menu" aria-controls="save-menu" aria-expanded="false">${icon('chevron')}</button></div><div id="save-menu" class="dropdown" role="menu" hidden><button type="button" data-action="save-all" role="menuitem">Save all files<kbd>Ctrl+Alt+S</kbd></button><button type="button" data-action="save-as" role="menuitem">Save as...<kbd>Ctrl+Shift+S</kbd></button></div></div>
-        <div class="export-control"><button type="button" data-action="export-menu" class="primary" title="Export document" aria-haspopup="menu" aria-controls="export-menu" aria-expanded="false">${icon('export')}<span>Export</span>${icon('chevron')}</button><div id="export-menu" class="dropdown" role="menu" hidden>${button('export-docx', 'Word document (.docx)')}${button('export-pdf', 'PDF document (.pdf)')}</div></div>
+        <div class="export-control"><button type="button" data-action="export-menu" class="primary" title="Export as Word or PDF" aria-haspopup="menu" aria-controls="export-menu" aria-expanded="false"><span>Export</span></button><div id="export-menu" class="dropdown" role="menu" hidden>${button('export-docx', 'Word document (.docx)')}${button('export-pdf', 'PDF document (.pdf)')}</div></div>
       </div>
     </header>
     <div class="toolbar" role="toolbar" aria-label="Text formatting">
+      <div class="global-modes"><button type="button" id="view-switch" data-action="side-by-side" class="view-switch" role="switch" aria-checked="false" aria-controls="canvas" title="Show Source beside Visual"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span>Visual + Source</span></button></div>
+      <span class="divider"></span>
       <select id="heading" aria-label="Paragraph style"><option value="0">Paragraph</option><option value="1">Heading 1</option><option value="2">Heading 2</option><option value="3">Heading 3</option><option value="4">Heading 4</option><option value="5">Heading 5</option><option value="6">Heading 6</option></select>
       <span class="divider"></span>
-      ${formatButton('bold', 'Bold')}${formatButton('italic', 'Italic')}${formatButton('strike', 'Strikethrough')}${formatButton('code', 'Inline code')}
+      ${formatButton('bold', 'Bold')}${formatButton('italic', 'Italic')}${formatButton('strike', 'Strikethrough', true)}${formatButton('code', 'Inline code', true)}
       <span class="divider"></span>
-      ${formatButton('bullet', 'Bullet list')}${formatButton('ordered', 'Numbered list')}${formatButton('task', 'Task list')}${formatButton('quote', 'Block quote', true)}
+      ${formatButton('bullet', 'Bullet list')}${formatButton('ordered', 'Numbered list', true)}${formatButton('task', 'Task list', true)}${formatButton('quote', 'Block quote', true)}
       <span class="divider"></span>
       ${button('link', 'Insert / edit link', 'link', 'icon-only')}${button('image', 'Insert image', 'image', 'icon-only toolbar-optional')}${button('table', 'Insert table', 'table', 'icon-only toolbar-optional')}
       ${formatButton('codeblock', 'Code block', true)}${formatButton('rule', 'Horizontal rule', true)}
-      <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More formatting" title="More formatting" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button><div id="format-menu" class="dropdown" role="menu" hidden><button type="button" data-command="quote" role="menuitem">${icon('quote')}<span>Block quote</span><kbd>Ctrl+Shift+Q</kbd></button>${button('image', 'Insert image', 'image')}${button('table', 'Insert table', 'table')}<button type="button" data-command="codeblock" role="menuitem">${icon('codeblock')}<span>Code block</span><kbd>Ctrl+Shift+K</kbd></button><button type="button" data-command="rule" role="menuitem">${icon('rule')}<span>Horizontal rule</span></button></div></div>
+      <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More formatting and views" title="More formatting and views" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button><div id="format-menu" class="dropdown" role="menu" hidden>${formatButton('strike', 'Strikethrough')}${formatButton('code', 'Inline code')}${formatButton('ordered', 'Numbered list')}${formatButton('task', 'Task list')}<button type="button" data-command="quote" role="menuitem">${icon('quote')}<span>Block quote</span><kbd>Ctrl+Shift+Q</kbd></button>${button('image', 'Insert image', 'image')}${button('table', 'Insert table', 'table')}<button type="button" data-command="codeblock" role="menuitem">${icon('codeblock')}<span>Code block</span><kbd>Ctrl+Shift+K</kbd></button><button type="button" data-command="rule" role="menuitem">${icon('rule')}<span>Horizontal rule</span></button>${button('split', 'Split with...', 'split', 'split-control')}${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('help', 'Getting started', 'help')}</div></div>
       <span class="toolbar-spacer"></span>
       ${button('undo', 'Undo', 'undo', 'icon-only')}${button('redo', 'Redo', 'redo', 'icon-only')}
     </div>
@@ -152,7 +112,7 @@ app.innerHTML = `
     </section>
     <div id="recovery-banner" hidden>Unsaved drafts from your last session are available. ${button('recover', 'Recover drafts')}${button('dismiss-recovery', 'Dismiss')}</div>
     <div class="canvas" id="canvas"><article class="paper" id="visual-editor" aria-label="Visual Markdown editor"></article><textarea id="source-editor" aria-label="Markdown source" spellcheck="false" hidden></textarea></div>
-    <footer><span id="word-count">0 words</span><span id="save-status" class="sr-only" aria-live="polite">Ready to write</span></footer>
+    <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><span id="save-status" aria-live="polite">Ready to write</span></footer>
   </main>
   <div id="notification" role="status" hidden></div>
   <dialog id="image-storage-dialog" aria-labelledby="image-storage-title"><form method="dialog">
@@ -267,10 +227,10 @@ let source = element<HTMLTextAreaElement>('source-editor');
 let visual = element<HTMLElement>('visual-editor');
 const initialPane = createPane(visual, source);
 let documentId = '';
-let markdown = welcome;
-let savedMarkdown = welcome;
+let markdown = '';
+let savedMarkdown = '';
 let documentPath: string | null = null;
-let documentName = 'Welcome';
+let documentName = 'Untitled.md';
 let mode: 'visual' | 'source' = 'visual';
 let busy = false;
 let sourceUndo: string[] = [];
@@ -301,6 +261,9 @@ interface DocumentTab {
   source: HTMLTextAreaElement;
   pane: HTMLElement;
   viewport: HTMLElement;
+  visualViewport: HTMLElement;
+  visualMarkdown: string;
+  sideBySide?: boolean;
   preview?: boolean;
   previewMarkdown?: string;
 }
@@ -355,11 +318,10 @@ updateRecentDisclosure();
 
 function updateThemeUI(): void {
   document.documentElement.dataset.theme = theme;
-  for (const control of document.querySelectorAll<HTMLButtonElement>('[data-theme-option]')) {
-    const selected = control.dataset.themeOption === theme;
-    control.classList.toggle('selected', selected);
-    control.setAttribute('aria-pressed', String(selected));
-  }
+  const control = element<HTMLButtonElement>('theme-toggle');
+  control.querySelector('span')!.textContent = theme === 'dark' ? 'Dark' : 'Light';
+  control.title = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
+  control.setAttribute('aria-label', control.title);
   element<HTMLImageElement>('brand-icon').src = theme === 'light' ? brandIcon : brandDarkIcon;
 }
 
@@ -374,11 +336,12 @@ function updateRecentDisclosure(): void {
 function updateSidebar(): void {
   const visible = !sidebarHidden && !document.body.classList.contains('focus-mode');
   document.body.classList.toggle('sidebar-hidden', sidebarHidden);
-  element('sidebar').hidden = !visible;
+  element('sidebar').hidden = document.body.classList.contains('focus-mode');
   const control = element<HTMLButtonElement>('sidebar-toggle');
   control.setAttribute('aria-expanded', String(visible));
-  control.setAttribute('aria-label', visible ? 'Hide sidebar' : 'Show sidebar');
-  control.title = `${visible ? 'Hide' : 'Show'} sidebar (Ctrl+Shift+B)`;
+  control.setAttribute('aria-label', visible ? 'Collapse sidebar' : 'Expand sidebar');
+  control.title = `${visible ? 'Collapse' : 'Expand'} sidebar (Ctrl+Shift+B)`;
+  updateSidebarWidth();
 }
 
 function setFocusMode(enabled: boolean): void {
@@ -388,7 +351,7 @@ function setFocusMode(enabled: boolean): void {
 
 function updateSidebarWidth(): void {
   const width = sidebarWidth(preferredSidebarWidth, window.innerWidth);
-  element('sidebar').style.width = `${width}px`;
+  element('sidebar').style.width = `${sidebarHidden ? 40 : width}px`;
   const divider = element('sidebar-resizer');
   divider.setAttribute('aria-valuemin', String(MIN_SIDEBAR_WIDTH));
   divider.setAttribute('aria-valuemax', String(sidebarWidth(MAX_SIDEBAR_WIDTH, window.innerWidth)));
@@ -436,11 +399,11 @@ function refreshPreview(tab: DocumentTab): void {
 function togglePreview(): void {
   if (!activeTab) return;
   const enabled = !activeTab.preview;
-  if (mode !== 'source') switchMode('source');
+  switchMode('source');
   activeTab.preview = enabled;
   showMode();
   refreshPreview(activeTab);
-  source.focus();
+  source.focus({ preventScroll: true });
 }
 
 function searchKey(): string {
@@ -536,7 +499,7 @@ function scheduleSearch(): void {
 async function navigateSearch(backward = false): Promise<void> {
   clearTimeout(searchTimer);
   if (!element<HTMLInputElement>('find-text').value) throw new Error('Enter some text to find.');
-  if (mode !== 'source') switchMode('source');
+  useSource();
   const result = await refreshSearch();
   if (!result?.matches.length) return;
   searchIndex = (searchIndex + (backward ? (searchIndex < 0 ? 0 : -1) : 1) + result.matches.length) % result.matches.length;
@@ -551,7 +514,7 @@ async function navigateSearch(backward = false): Promise<void> {
 async function replaceFound(all: boolean): Promise<void> {
   clearTimeout(searchTimer);
   if (!element<HTMLInputElement>('find-text').value) throw new Error('Enter some text to find.');
-  if (mode !== 'source') switchMode('source');
+  useSource();
   const result = await refreshSearch();
   if (!result) throw new Error('The search changed. Try replacing again.');
   if (result.truncated) throw new Error('More than 10,000 matches. Narrow the search before replacing.');
@@ -605,11 +568,16 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
   contentType: 'markdown',
   editorProps: { attributes: { 'aria-label': 'Document text', spellcheck: 'true' } },
   onUpdate: ({ editor: updated }) => {
-    if (updated === editor && mode === 'visual') changed(updated.getMarkdown());
+    if (updated === editor && mode === 'visual') {
+      if (activeTab) activeTab.visualMarkdown = updated.getMarkdown();
+      changed(updated.getMarkdown());
+    }
     else {
       const tab = tabs.find(tab => tab.id === id);
       if (tab?.mode === 'visual') {
         tab.markdown = updated.getMarkdown();
+        tab.visualMarkdown = tab.markdown;
+        if (tab.sideBySide) mirrorSource(tab);
         update();
         scheduleDraft();
       }
@@ -620,14 +588,14 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
 }
 let editor = createEditor(markdown);
 
-function createPane(host: HTMLElement, text: HTMLTextAreaElement): { pane: HTMLElement; viewport: HTMLElement } {
+function createPane(host: HTMLElement, text: HTMLTextAreaElement): { pane: HTMLElement; viewport: HTMLElement; visualViewport: HTMLElement } {
   const pane = document.createElement('section');
   pane.className = 'document-pane';
   pane.setAttribute('role', 'region');
   const header = document.createElement('div');
   header.className = 'pane-header';
   header.hidden = true;
-  header.innerHTML = '<span class="pane-title"></span><div class="pane-modes" role="group" aria-label="Editor mode"><button type="button" data-pane-mode="visual">Visual</button><button type="button" data-pane-mode="source">Source</button><button type="button" data-pane-mode="preview">Source + Preview</button></div>';
+  header.innerHTML = '<span class="pane-title"></span><div class="pane-modes" role="group" aria-label="Editor mode"><button type="button" data-pane-side-by-side class="view-switch" role="switch" aria-checked="false" title="Show Source beside Visual"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span>Visual + Source</span></button><button type="button" data-pane-mode="visual">Visual</button><button type="button" data-pane-mode="source">Source</button><button type="button" data-pane-mode="preview">Source + Preview</button></div>';
   const viewport = document.createElement('div');
   viewport.className = 'pane-content';
   text.classList.add('document-source');
@@ -655,9 +623,52 @@ function createPane(host: HTMLElement, text: HTMLTextAreaElement): { pane: HTMLE
     if (!preview.hidden) sync(text, preview);
   });
   preview.addEventListener('scroll', () => sync(preview, text));
-  viewport.append(host, surface, preview);
+  const visualViewport = document.createElement('div');
+  visualViewport.className = 'visual-surface';
+  visualViewport.append(host);
+  viewport.append(visualViewport, surface, preview);
   pane.append(header, viewport);
-  return { pane, viewport };
+  return { pane, viewport, visualViewport };
+}
+
+function visualScroll(tab: DocumentTab): HTMLElement {
+  return tab.sideBySide ? tab.visualViewport : tab.viewport;
+}
+
+function mirrorSource(tab: DocumentTab): void {
+  if (tab.source.value === tab.markdown) return;
+  const { selectionStart, selectionEnd, scrollTop, scrollLeft } = tab.source;
+  tab.source.value = tab.markdown;
+  tab.source.setSelectionRange(selectionStart, selectionEnd);
+  tab.source.scrollTop = scrollTop;
+  tab.source.scrollLeft = scrollLeft;
+}
+
+function syncVisual(): void {
+  if (!activeTab || activeTab.visualMarkdown === markdown) return;
+  const scroll = visualScroll(activeTab);
+  const top = scroll.scrollTop;
+  editor.commands.setContent(markdown, { contentType: 'markdown', emitUpdate: false });
+  activeTab.visualMarkdown = markdown;
+  scroll.scrollTop = top;
+}
+
+function toggleSideBySide(): void {
+  if (!activeTab) return;
+  const top = visualScroll(activeTab).scrollTop;
+  const sourceTop = source.hidden ? activeTab.sourceScroll : source.scrollTop;
+  const sourceFocused = document.activeElement === source;
+  syncVisual();
+  activeTab.sourceScroll = sourceTop;
+  activeTab.sideBySide = !activeTab.sideBySide;
+  activeTab.preview = false;
+  if (!activeTab.sideBySide) mode = 'visual';
+  mirrorSource(activeTab);
+  showMode();
+  if (!activeTab.sideBySide && sourceFocused && !busy) editor.view.focus();
+  visualScroll(activeTab).scrollTop = top;
+  source.scrollTop = sourceTop;
+  updateToolbar();
 }
 
 function visibleTabs(): DocumentTab[] {
@@ -720,6 +731,7 @@ function updatePaneHeaders(): void {
     const header = tab.pane.querySelector<HTMLElement>('.pane-header')!;
     header.hidden = !pair;
     header.querySelector<HTMLElement>('.pane-title')!.textContent = `${tab.name}${tab.markdown !== tab.savedMarkdown ? ' \u2022' : ''}`;
+    header.querySelector('[data-pane-side-by-side]')!.setAttribute('aria-checked', String(Boolean(tab.sideBySide)));
     for (const control of header.querySelectorAll<HTMLButtonElement>('[data-pane-mode]')) {
       const selected = control.dataset.paneMode === (tab.preview ? 'preview' : tab.mode);
       control.classList.toggle('selected', selected);
@@ -746,13 +758,13 @@ function showWorkspace(): void {
   if (mounted.length !== visible.length || mounted.some((pane, index) => pane !== visible[index].pane)) {
     for (const tab of tabs) {
       if (tab.pane.parentElement === root) {
-        tab.canvasScroll = tab.viewport.scrollTop;
-        tab.sourceScroll = tab.source.scrollTop;
+        tab.canvasScroll = visualScroll(tab).scrollTop;
+        if (!tab.source.hidden) tab.sourceScroll = tab.source.scrollTop;
       }
     }
     root.replaceChildren(...(pair ? [visible[0].pane, splitDivider(pair), visible[1].pane] : [visible[0].pane]));
     for (const tab of visible) {
-      tab.viewport.scrollTop = tab.canvasScroll;
+      visualScroll(tab).scrollTop = tab.canvasScroll;
       tab.source.scrollTop = tab.sourceScroll;
     }
   }
@@ -774,7 +786,7 @@ function captureTab(): void {
     markdown, savedMarkdown, name: documentName, path: documentPath, mode, editor, visual,
     undo: sourceUndo, redo: sourceRedo,
     selection: [source.selectionStart, source.selectionEnd],
-    sourceScroll: source.scrollTop, canvasScroll: activeTab.viewport.scrollTop,
+    sourceScroll: source.hidden ? activeTab.sourceScroll : source.scrollTop, canvasScroll: visualScroll(activeTab).scrollTop,
   });
 }
 
@@ -817,18 +829,16 @@ function renderTabs(): void {
 }
 
 function showMode(): void {
-  source.hidden = mode !== 'source';
-  source.closest<HTMLElement>('.source-surface')!.hidden = mode !== 'source';
-  visual.hidden = mode !== 'visual';
+  const sideBySide = Boolean(activeTab?.sideBySide);
+  source.hidden = !sideBySide && mode !== 'source';
+  source.closest<HTMLElement>('.source-surface')!.hidden = source.hidden;
+  visual.hidden = !sideBySide && mode !== 'visual';
+  activeTab?.viewport.classList.toggle('side-by-side', sideBySide);
   const preview = Boolean(activeTab?.preview && mode === 'source');
   activeTab?.viewport.classList.toggle('has-preview', preview);
   if (activeTab) activeTab.viewport.querySelector<HTMLElement>('.live-preview')!.hidden = !preview;
-  for (const type of ['visual', 'source'] as const) {
-    element(`${type}-mode`).classList.toggle('selected', mode === type && !preview);
-    element(`${type}-mode`).setAttribute('aria-pressed', String(mode === type && !preview));
-  }
-  element('preview-mode').classList.toggle('selected', preview);
-  element('preview-mode').setAttribute('aria-pressed', String(preview));
+  element('view-switch').setAttribute('aria-checked', String(sideBySide));
+  element('view-switch').title = sideBySide ? 'Hide Source; keep Visual' : 'Show Source beside Visual';
   document.querySelector('.toolbar')!.classList.toggle('source-toolbar', mode === 'source');
   if (activeTab) activeTab.mode = mode;
   updatePaneHeaders();
@@ -856,7 +866,7 @@ function activateTab(id: string): void {
   showWorkspace();
   source.setSelectionRange(...next.selection);
   source.scrollTop = next.sourceScroll;
-  next.viewport.scrollTop = next.canvasScroll;
+  visualScroll(next).scrollTop = next.canvasScroll;
   searchMatches = [];
   searchIndex = -1;
   element('find-result').textContent = '';
@@ -880,7 +890,7 @@ function addTab(id: string, content: string, name: string, file: string | null, 
   const pane = createPane(host, text);
   pane.pane.dataset.documentId = id;
   const tab: DocumentTab = {
-    id, markdown: content, savedMarkdown: saved ? content : '', name, path: file, mode,
+    id, markdown: content, savedMarkdown: saved ? content : '', name, path: file, mode, visualMarkdown: content,
     editor: createEditor(content, id, host), visual: host, undo: [], redo: [],
     selection: [0, 0], sourceScroll: 0, canvasScroll: 0,
     source: text, ...pane,
@@ -892,8 +902,12 @@ function addTab(id: string, content: string, name: string, file: string | null, 
 
 async function newTab(): Promise<void> {
   const id = unwrap(await window.studio.newDocument());
-  untitledCount++;
-  addTab(id, '', untitledCount === 1 ? 'Untitled.md' : `Untitled ${untitledCount}.md`, null);
+  let name: string;
+  do {
+    untitledCount++;
+    name = untitledCount === 1 ? 'Untitled.md' : `Untitled ${untitledCount}.md`;
+  } while (tabs.some(tab => tab.name === name));
+  addTab(id, '', name, null);
 }
 
 function unsplit(): void {
@@ -1024,7 +1038,7 @@ function resetVisual(content: string): void {
   editor.destroy();
   visual.replaceChildren();
   editor = createEditor(content);
-  if (activeTab) activeTab.editor = editor;
+  if (activeTab) { activeTab.editor = editor; activeTab.visualMarkdown = content; }
   if (busy) editor.setEditable(false, false);
 }
 
@@ -1093,6 +1107,15 @@ function changed(content: string, record = true): void {
     sourceRedo.length = 0;
   }
   markdown = content;
+  if (activeTab?.sideBySide) {
+    activeTab.markdown = markdown;
+    if (mode === 'source') syncVisual();
+    else {
+      mirrorSource(activeTab);
+      sourceUndo.length = 0;
+      sourceRedo.length = 0;
+    }
+  }
   update();
   scheduleDraft();
 }
@@ -1113,7 +1136,7 @@ function storeDraft(): void {
 }
 
 function switchMode(next: 'visual' | 'source'): void {
-  if (activeTab) activeTab.preview = false;
+  if (activeTab) { activeTab.preview = false; activeTab.sideBySide = false; }
   if (next === mode) { showMode(); return; }
   if (next === 'source') {
     source.value = markdown;
@@ -1124,8 +1147,16 @@ function switchMode(next: 'visual' | 'source'): void {
   mode = next;
   showMode();
   updateToolbar();
-  if (next === 'source') source.focus();
-  else editor.commands.focus();
+  if (next === 'source') source.focus({ preventScroll: true });
+  else editor.view.focus();
+}
+
+function useSource(): void {
+  if (activeTab?.sideBySide) {
+    mode = 'source';
+    activeTab.mode = mode;
+    updateToolbar();
+  } else if (mode !== 'source') switchMode('source');
 }
 
 function updateToolbar(): void {
@@ -1286,9 +1317,10 @@ async function openPending(): Promise<void> {
 
 async function run(operation: () => Promise<unknown>): Promise<void> {
   if (busy) { notify('Please wait for the current operation to finish.'); return; }
+  const focusedTab = document.activeElement === source ? activeTab : undefined;
   busy = true;
   app.setAttribute('aria-busy', 'true');
-  for (const control of document.querySelectorAll<HTMLButtonElement>('[data-theme-option]')) control.disabled = true;
+  element<HTMLButtonElement>('theme-toggle').disabled = true;
   for (const tab of tabs) {
     tab.editor.setEditable(false, false);
     tab.source.readOnly = true;
@@ -1299,12 +1331,18 @@ async function run(operation: () => Promise<unknown>): Promise<void> {
   finally {
     busy = false;
     app.setAttribute('aria-busy', 'false');
-    for (const control of document.querySelectorAll<HTMLButtonElement>('[data-theme-option]')) control.disabled = false;
+    element<HTMLButtonElement>('theme-toggle').disabled = false;
     for (const tab of tabs) {
       tab.editor.setEditable(true, false);
       tab.source.readOnly = false;
     }
     if (!tabs.length) { editor.setEditable(true, false); source.readOnly = false; }
+    if (focusedTab && focusedTab === activeTab && source.hidden && mode === 'visual') {
+      const scroll = visualScroll(focusedTab);
+      const top = scroll.scrollTop;
+      editor.view.focus();
+      scroll.scrollTop = top;
+    }
     if (pendingExternalOpen) {
       pendingExternalOpen = false;
       void run(openPending);
@@ -1432,6 +1470,7 @@ async function dispatch(action: string): Promise<void> {
     return;
   }
   switch (action) {
+    case 'side-by-side': toggleSideBySide(); break;
     case 'split': openSplit(); break;
     case 'preview': togglePreview(); break;
     case 'unsplit': unsplit(); break;
@@ -1608,6 +1647,14 @@ function activateEventPane(event: Event): void {
   if (busy || !(event.target instanceof HTMLElement)) return;
   const id = event.target.closest<HTMLElement>('.document-pane')?.dataset.documentId;
   if (id && id !== documentId) activateTab(id);
+  if (activeTab?.sideBySide) {
+    const next = event.target.closest('.source-surface') ? 'source' : event.target.closest('.visual-surface') ? 'visual' : null;
+    if (next && next !== mode) {
+      mode = next;
+      activeTab.mode = next;
+      updateToolbar();
+    }
+  }
 }
 element('canvas').addEventListener('pointerdown', activateEventPane, true);
 element('canvas').addEventListener('focusin', activateEventPane, true);
@@ -1642,15 +1689,11 @@ document.querySelector('.toolbar')!.addEventListener('mousedown', event => {
 });
 document.addEventListener('click', event => {
   const target = event.target as HTMLElement;
-  const themeOption = target.closest<HTMLElement>('[data-theme-option]')?.dataset.themeOption;
-  if (themeOption) {
-    void run(async () => {
-      if (!isTheme(themeOption)) throw new Error('Unsupported color theme.');
-      await applyTheme(themeOption);
-    });
+  const paneMode = target.closest<HTMLElement>('[data-pane-mode]')?.dataset.paneMode;
+  if (target.closest('[data-pane-side-by-side]')) {
+    if (!busy) { activateEventPane(event); toggleSideBySide(); }
     return;
   }
-  const paneMode = target.closest<HTMLElement>('[data-pane-mode]')?.dataset.paneMode;
   if (paneMode === 'visual' || paneMode === 'source' || paneMode === 'preview') {
     if (!busy) { activateEventPane(event); if (paneMode === 'preview') togglePreview(); else switchMode(paneMode); }
     return;
@@ -2012,7 +2055,7 @@ void run(async () => {
   activeTab = {
     id: documentId, markdown, savedMarkdown, name: documentName, path: null, mode,
     editor, visual, undo: sourceUndo, redo: sourceRedo, selection: [0, 0], sourceScroll: 0, canvasScroll: 0,
-    source, ...initialPane,
+    source, visualMarkdown: markdown, ...initialPane,
   };
   initialPane.pane.dataset.documentId = documentId;
   tabs.push(activeTab);
@@ -2023,4 +2066,12 @@ void run(async () => {
   await applyTheme(theme);
   await refreshRecent();
   await openPending();
+  const initial = tabs.find(tab => tab.id === initialPane.pane.dataset.documentId);
+  if (tabs.length > 1 && initial && initial !== activeTab && !initial.path && initial.markdown === '' && initial.savedMarkdown === '') {
+    unwrap(await window.studio.closeDocument(initial.id));
+    initial.editor.destroy();
+    initial.pane.remove();
+    tabs.splice(tabs.indexOf(initial), 1);
+    update();
+  }
 });

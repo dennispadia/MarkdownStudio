@@ -1,6 +1,6 @@
 export const themes = [
-  { id: 'light', label: 'Light', background: '#f8faf8', dark: false },
-  { id: 'dark', label: 'Dark', background: '#0d1117', dark: true },
+  { id: 'light', label: 'Light', background: '#f7f9f8', dark: false },
+  { id: 'dark', label: 'Dark', background: '#0b1115', dark: true },
 ] as const;
 
 export type Theme = (typeof themes)[number]['id'];

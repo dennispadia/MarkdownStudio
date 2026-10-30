@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Apply the approved minimalist interface with enlarged original branding, compact tabs and actions, a centered Export label, and Graphite + Teal Dark colors. Preserve Light and saved theme preferences.
+- Collapse the sidebar from its upper-left hamburger into a narrow action rail retaining New, Open, theme, and keyboard shortcuts. Keep the resizable expanded sidebar and remembered preferences.
+- Start with one blank Untitled document instead of generated Welcome content. Explorer startup opens the requested file without a redundant blank tab; draft recovery remains available.
+- Add an accessible Visual + Source on/off switch: editable Visual on the left, Source on the right, two-way document updates, and toolbar commands targeting the active editor. Preserve raw Source when simply rendering, per-tab view state, and Visual/Source scroll offsets when hiding or showing Source.
+- Retain Source-only and read-only Source + Preview in More and native menus; retain independent two-file split tabs.
+
+Source changes only; no new installer has been published. DOCX/PDF formatting-fidelity improvements and comprehensive cross-mode reading-position alignment remain separate pending work.
+
 ## 0.6.2
 
 - Edit an existing Visual link's text and address by clicking it, using the link toolbar button or Ctrl+K, or choosing **Edit link...** from its right-click menu. Remove a link without removing its text.

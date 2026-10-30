@@ -544,6 +544,7 @@ function createWindow(): void {
       { type: 'separator' }, { label: 'Paragraph', submenu: paragraphItems() }, { label: 'Insert', submenu: insertItems() },
     ] },
     { label: '&View', submenu: [
+      { label: 'Visual + Source', click: send('side-by-side') },
       { label: 'Visual / source', accelerator: 'CmdOrCtrl+/', click: send('mode') },
       { label: 'Source + Preview', click: send('preview') },
       { label: 'Toggle sidebar', accelerator: 'CmdOrCtrl+Shift+B', click: send('sidebar') },

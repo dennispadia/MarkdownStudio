@@ -115,9 +115,22 @@ try {
   await main.evaluate(`globalThis.smokeElectron = ${electron}`);
   await waitFor(async () => ui(`document.querySelector('#filename').textContent === ${JSON.stringify(path.basename(startupFile))}`), 'cold-launch file opens after renderer initialization');
   assert.match(await ui("document.querySelector('#visual-editor').textContent"), /Opened from Explorer/);
-  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].webContents.send('app:action', 'close-tab')");
-  await waitFor(async () => ui("document.querySelector('#filename').textContent === 'Welcome' && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'welcome remains after closing startup file');
+  assert.equal(await ui("document.querySelectorAll('.document-tab').length"), 1, 'Explorer launch has no redundant blank or welcome tab');
   console.log('PASS: cold launch opens the requested file, including spaces and Unicode, after editor initialization');
+  await ui("globalThis.smokeBeforeBlankReload = true");
+  await browser.call('Page.reload', {}, sessionId);
+  await waitFor(async () => ui("!globalThis.smokeBeforeBlankReload && document.querySelector('#filename')?.textContent === 'Untitled.md' && document.querySelector('#app')?.getAttribute('aria-busy') === 'false'"), 'blank startup without pending files');
+  assert.equal(await ui("document.querySelectorAll('.document-tab').length"), 1);
+  assert.equal(await ui("document.querySelector('.tiptap').textContent"), '');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), '');
+  assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'false');
+  console.log('PASS: startup opens one pristine blank Untitled document, never a welcome document');
+  const baseline = path.join(temporary, 'Smoke baseline.md');
+  await writeFile(baseline, '# Desktop test\n\n## Writing\n\nA generic desktop regression fixture.\n\n## Tasks\n\n- [ ] First task\n- [x] Second task\n- [ ] Third task\n\n## Table\n\n| Name | Value |\n| --- | --- |\n| Example | One |\n\n## Finish\n\nEnd of fixture.\n');
+  await main.evaluate(`smokeElectron.dialog.showOpenDialog = async () => ({canceled:false,filePaths:[${JSON.stringify(baseline)}]}); smokeElectron.BrowserWindow.getAllWindows()[0].webContents.send('app:action','open')`);
+  await waitFor(async () => ui("document.querySelector('#filename').textContent === 'Smoke baseline.md' && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'generic regression fixture');
+  await ui("document.querySelector('.document-tab:not(.selected) .tab-close').click()");
+  await waitFor(async () => ui("document.querySelectorAll('.document-tab').length === 1 && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'pristine blank closes without prompting');
   const imageChoices = `(() => {
     window.smokeImageStorage = 'embedded';
     setInterval(() => {
@@ -201,6 +214,14 @@ try {
     await ui(`document.querySelector('[data-document-id=${JSON.stringify(id)}] .tab-select').click()`);
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'tab switch');
   };
+  const exportGeometry = await ui("(() => {const button=document.querySelector('[data-action=export-menu]');const bounds=button.getBoundingClientRect();const label=button.querySelector('span').getBoundingClientRect();return {width:bounds.width,height:bounds.height,x:Math.abs(label.left+label.width/2-bounds.left-bounds.width/2),y:Math.abs(label.top+label.height/2-bounds.top-bounds.height/2),icons:button.querySelectorAll('svg').length};})()");
+  assert.equal(exportGeometry.width, 80);
+  assert.equal(exportGeometry.height, 31);
+  assert.equal(exportGeometry.icons, 0);
+  assert.ok(exportGeometry.x <= 1 && exportGeometry.y <= 1, JSON.stringify(exportGeometry));
+  await action('export-menu');
+  assert.equal(await ui("document.querySelector('#export-menu').hidden"), false);
+  await action('export-menu');
   const raw = '# Exact source\r\n\r\nUnusual   spacing & Unicode: \u4f60\u597d\r\n\r\n- [ ] A task\r\n';
   const file = path.join(temporary, 'original.md');
   await writeFile(file, raw);
@@ -218,6 +239,83 @@ try {
 
   await action('source');
   const sourceEdit = async text => ui(`(() => { const source = document.querySelector('#source-editor'); source.value = ${JSON.stringify(text)}; source.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+  const beforeDualTab = await activeTab();
+  await action('new');
+  await sourceEdit('one');
+  await sourceEdit('one two');
+  await ui("document.querySelector('#source-editor').focus()");
+  await action('side-by-side');
+  assert.equal(await ui("document.activeElement === document.querySelector('#source-editor')"), true, 'Enabling dual view retains Source focus');
+  await nativeShortcut('Z', ['control'], false);
+  assert.equal(await ui("document.querySelector('#source-editor').value"), 'one', 'Undo after enabling dual view uses the still-focused Source history');
+  assert.equal(await ui("document.querySelector('.tiptap').textContent"), 'one');
+  await nativeShortcut('Z', ['control','shift'], false);
+  assert.equal(await ui("document.querySelector('#source-editor').value"), 'one two');
+  await sourceEdit('');
+  assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'true');
+  assert.equal(await ui("document.querySelector('#source-editor').hidden || document.querySelector('#visual-editor').hidden"), false);
+  const dualLayout = await ui("(() => {const visual=document.querySelector('.visual-surface').getBoundingClientRect();const source=document.querySelector('.source-surface').getBoundingClientRect();return {left:visual.left,right:visual.right,sourceLeft:source.left,sourceWidth:source.width};})()");
+  assert.ok(dualLayout.right <= dualLayout.sourceLeft && dualLayout.sourceWidth > 200, JSON.stringify(dualLayout));
+  const dualRaw = '# Dual view\n\nUnusual   spacing stays in source.\n\n## Last section\n\nKeep editing here.\n';
+  await sourceEdit(dualRaw);
+  assert.equal(await ui("document.querySelector('#visual-editor h1').textContent"), 'Dual view');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), dualRaw, 'Rendering does not normalize raw Source');
+  await action('undo');
+  assert.equal(await ui("document.querySelector('.tiptap').textContent"), '');
+  await action('redo');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), dualRaw);
+  await ui("(() => {const editor=document.querySelector('.tiptap');editor.focus();const text=editor.querySelector('p').firstChild;const range=document.createRange();range.setStart(text,0);range.setEnd(text,7);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);})()");
+  await ui("document.querySelector('.toolbar > [data-command=bold]').click()");
+  await waitFor(async () => ui("document.querySelector('#source-editor').value.includes('**Unusual**')"), 'Visual toolbar edits synchronize Source');
+  assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'true', 'Formatting leaves both panes visible');
+  await ui("document.querySelector('.tiptap').focus()");
+  await browser.call('Input.insertText', {text:'Typed visually '}, sessionId);
+  await waitFor(async () => ui("document.querySelector('#source-editor').value.includes('Typed visually')"), 'Visual typing synchronizes Source');
+  await sourceEdit(dualRaw.replace('Keep editing here.', 'A **source edit** appears visually.'));
+  assert.equal(await ui("document.querySelector('#visual-editor strong').textContent"), 'source edit');
+  if (process.env.STUDIO_APPROVED_SCREENSHOT) {
+    await menuAction('theme:dark');
+    await ui("document.querySelector('#notification').click();document.activeElement.blur()");
+    const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
+    await writeFile(process.env.STUDIO_APPROVED_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
+    await action('sidebar');
+    const collapsed = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
+    await writeFile(path.join(path.dirname(process.env.STUDIO_APPROVED_SCREENSHOT), 'approved-interface-collapsed.png'), Buffer.from(collapsed.data, 'base64'));
+    await action('sidebar');
+    await menuAction('theme:light');
+  }
+  await ui("document.querySelector('#view-switch').focus()");
+  await nativeShortcut('Space', [], false);
+  await waitFor(async () => ui("document.querySelector('#view-switch').getAttribute('aria-checked') === 'false'"), 'keyboard switch disables Source');
+  assert.equal(await ui("document.querySelector('#source-editor').hidden"), true);
+  await nativeShortcut('Space', [], false);
+  await waitFor(async () => ui("document.querySelector('#view-switch').getAttribute('aria-checked') === 'true'"), 'keyboard switch enables Source');
+  const longDual = Array.from({length:60}, (_, index) => `## Section ${index}\n\nParagraph ${index} with enough content for scrolling.`).join('\n\n');
+  await sourceEdit(longDual);
+  await ui("document.querySelector('#source-editor').focus();document.querySelector('.visual-surface').scrollTop=1500;document.querySelector('#source-editor').scrollTop=700");
+  await action('side-by-side');
+  assert.equal(await ui("document.activeElement === document.querySelector('.tiptap')"), true, 'Hiding focused Source transfers focus to Visual');
+  assert.ok(await ui("document.querySelector('.pane-content').scrollTop") > 1000, 'Disabling Source retains the Visual scroll position');
+  await action('side-by-side');
+  assert.ok(await ui("document.querySelector('.visual-surface').scrollTop") > 1000, 'Enabling Source retains the Visual scroll position');
+  assert.equal(await ui("document.querySelector('#source-editor').scrollTop"), 700);
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
+  await delay(200);
+  assert.ok(await ui("document.querySelector('.toolbar').scrollWidth <= document.querySelector('.toolbar').clientWidth"), 'Editable dual-view toolbar fits minimum window width');
+  assert.ok(await ui("document.querySelector('.source-surface').getBoundingClientRect().right <= innerWidth"), 'Source remains beside Visual at minimum window width');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+  await menuAction('side-by-side');
+  assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'false');
+  await menuAction('side-by-side');
+  await action('new');
+  await selectTab(await ui("Array.from(document.querySelectorAll('.document-tab')).at(-2).dataset.documentId"));
+  assert.equal(await ui("document.querySelector('#view-switch').getAttribute('aria-checked')"), 'true', 'Dual view survives tab activation');
+  await main.evaluate('smokeChoice=1');
+  await menuAction('close-tab');
+  await menuAction('close-tab');
+  await selectTab(beforeDualTab);
+  await action('source');
+  console.log('PASS: editable Visual left / Source right, two-way synchronization, raw-source preservation, toolbar, undo/redo, mouse/Space switch, tab state, and retained scroll offsets');
   const launch = async files => {
     const process = spawn(executable, [
       ...(packaged ? [] : [root]), `--user-data-dir=${path.join(temporary, 'profile')}`, ...files,
@@ -511,7 +609,7 @@ try {
   const firstTab = await activeTab();
   const beforeNew = await tabCount();
   await action('new');
-  assert.equal(await ui("document.querySelector('#filename').textContent"), 'Untitled.md');
+  assert.match(await ui("document.querySelector('#filename').textContent"), /^Untitled(?: \d+)?\.md$/);
   assert.equal(await tabCount(), beforeNew + 1);
   const secondTab = await activeTab();
   const secondContent = '# Second document\n\nIndependent words.';
@@ -621,20 +719,20 @@ try {
   await waitFor(async () => ui("document.documentElement.dataset.theme === 'light' && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'native Light menu');
   await main.evaluate("smokeElectron.Menu.getApplicationMenu().getMenuItemById('theme-dark').click()");
   await waitFor(async () => ui("document.documentElement.dataset.theme === 'dark' && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'native Dark menu');
-  assert.equal(await ui("getComputedStyle(document.body).backgroundColor"), 'rgb(13, 17, 23)');
-  assert.equal(await ui("getComputedStyle(document.querySelector('.paper')).backgroundColor"), 'rgb(13, 17, 23)');
-  assert.equal(await ui("getComputedStyle(document.body).getPropertyValue('--accent').trim()"), '#87d5ba');
-  assert.equal(await ui("getComputedStyle(document.querySelector('.primary')).backgroundColor"), 'rgb(40, 115, 93)');
-  assert.deepEqual(await ui("Array.from(document.querySelectorAll('.sidebar [data-theme-option]'), option => option.textContent)"), ['Light', 'Dark']);
-  assert.equal(await ui("document.querySelector('[data-theme-option=dark]').getAttribute('aria-pressed')"), 'true');
+  assert.equal(await ui("getComputedStyle(document.body).backgroundColor"), 'rgb(11, 17, 21)');
+  assert.equal(await ui("getComputedStyle(document.querySelector('.paper')).backgroundColor"), 'rgb(23, 25, 25)');
+  assert.equal(await ui("getComputedStyle(document.body).getPropertyValue('--accent').trim()"), '#80bfb8');
+  assert.equal(await ui("getComputedStyle(document.querySelector('.primary')).backgroundColor"), 'rgb(128, 191, 184)');
+  assert.equal(await ui("document.querySelector('#theme-toggle span').textContent"), 'Dark');
+  assert.equal(await ui("document.querySelector('#theme-toggle').getAttribute('aria-label')"), 'Switch to light theme');
   assert.equal(await ui("localStorage.getItem('markdown-studio-theme')"), 'dark');
   assert.equal(await main.evaluate("smokeElectron.Menu.getApplicationMenu().getMenuItemById('theme-dark').checked"), true);
   assert.equal(await main.evaluate("Boolean(smokeElectron.Menu.getApplicationMenu().getMenuItemById('theme-github-dark'))"), false);
   assert.equal(await main.evaluate("smokeElectron.nativeTheme.themeSource"), 'dark');
   assert.equal(await brandSource(), darkBrandIcon);
-  await ui("document.querySelector('[data-theme-option=light]').click()");
+  await action('theme');
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'light theme selector');
-  assert.equal(await ui("getComputedStyle(document.body).backgroundColor"), 'rgb(248, 250, 248)');
+  assert.equal(await ui("getComputedStyle(document.body).backgroundColor"), 'rgb(247, 249, 248)');
   assert.equal(await main.evaluate("smokeElectron.Menu.getApplicationMenu().getMenuItemById('theme-light').checked"), true);
   assert.equal(await main.evaluate("smokeElectron.nativeTheme.themeSource"), 'light');
   assert.equal(await brandSource(), lightBrandIcon);
@@ -643,17 +741,22 @@ try {
   assert.equal(await ui("document.body.classList.contains('focus-mode')"), true);
   await menuAction('focus');
   assert.equal(await ui("Boolean(document.querySelector('[data-action=focus]'))"), false);
-  const workspaceSpacing = await ui("(() => {const bar=document.querySelector('.workspace-bar');const modes=document.querySelector('.mode-switch');const tabs=document.querySelector('.tabs-bar');return {top:modes.getBoundingClientRect().top-tabs.getBoundingClientRect().bottom,paddingTop:getComputedStyle(bar).paddingTop,paddingBottom:getComputedStyle(bar).paddingBottom};})()");
-  assert.ok(workspaceSpacing.top >= 14, JSON.stringify(workspaceSpacing));
-  assert.equal(workspaceSpacing.paddingTop, '14px');
-  assert.equal(workspaceSpacing.paddingBottom, '14px');
+  const workspaceSpacing = await ui("(() => {const bar=document.querySelector('.toolbar').getBoundingClientRect();const tabs=document.querySelector('.tabs-bar').getBoundingClientRect();return {gap:bar.top-tabs.bottom,height:bar.height};})()");
+  assert.equal(workspaceSpacing.gap, 0);
+  assert.ok(workspaceSpacing.height <= 82, JSON.stringify(workspaceSpacing));
   await action('sidebar');
-  assert.equal(await ui("document.querySelector('#sidebar').hidden"), true);
+  assert.equal(await ui("document.querySelector('#sidebar').hidden"), false);
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 40);
   assert.equal(await ui("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')"), 'false');
-  assert.equal(await ui("getComputedStyle(document.querySelector('.topbar')).display"), 'flex');
+  for (const selector of ['.file-actions [data-action=new]', '.file-actions [data-action=open]', '#theme-toggle', '.sidebar-bottom [data-action=shortcuts]']) {
+    assert.ok(await ui(`document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect().width > 0`), `${selector} stays available in collapsed rail`);
+  }
+  await action('shortcuts');
+  assert.equal(await ui("document.querySelector('#shortcuts-dialog').open"), true);
+  await ui("document.querySelector('#shortcuts-dialog').close()");
   await menuAction('focus');
   await menuAction('focus');
-  assert.equal(await ui("document.querySelector('#sidebar').hidden"), true, 'Leaving Focus mode restores hidden-sidebar preference');
+  assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 40, 'Leaving Focus mode restores collapsed rail');
   await action('sidebar');
   assert.equal(await ui("document.querySelector('#sidebar').hidden"), false);
   assert.ok(await ui("document.querySelector('#sidebar-resizer').getBoundingClientRect().width") >= 8);
@@ -685,9 +788,9 @@ try {
   await action('sidebar');
   assert.equal(await ui("document.body.classList.contains('focus-mode')"), false);
   assert.equal(await ui("document.querySelector('#sidebar').hidden"), false);
-  console.log('PASS: sidebar-only toggle, focus-mode restoration, accessible state, and 14px top/bottom workspace spacing');
+  console.log('PASS: compact header, collapsed action rail, shortcuts, accessible state, and focus-mode restoration');
   await nativeShortcut('B', ['control', 'shift']);
-  await waitFor(async () => ui("document.querySelector('#sidebar').hidden"), 'native sidebar shortcut');
+  await waitFor(async () => ui("document.body.classList.contains('sidebar-hidden')"), 'native sidebar shortcut');
   assert.equal(await ui("localStorage.getItem('markdown-studio-sidebar-hidden')"), 'true');
   await action('help');
   assert.equal(await ui("document.querySelector('#help-dialog').open"), true);
@@ -708,7 +811,7 @@ try {
   await menuAction('theme:dark');
   assert.equal(await ui("document.documentElement.dataset.theme"), 'dark');
   assert.equal(await brandSource(), darkBrandIcon);
-  console.log('PASS: only Light and teal-accented GitHub-based Dark, selector, native title-bar mode, synchronized menu, and saved preference');
+  console.log('PASS: Light and Graphite + Teal Dark, theme toggle, native title-bar mode, synchronized menu, and saved preference');
   console.log('PASS: sidebar artwork switches through all theme controls, restores the original in Light, and uses the brighter variant in Dark');
 
   await selectTab(secondTab);
@@ -721,7 +824,7 @@ try {
   await ui("localStorage.setItem('markdown-studio-sidebar-width','invalid')");
   await browser.call('Page.reload', {}, sessionId);
   await waitFor(async () => ui("document.querySelector('#recovery-banner') && !document.querySelector('#recovery-banner').hidden && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'draft recovery');
-  assert.equal(await ui("document.querySelector('#sidebar').hidden"), true, 'Sidebar preference survives reload');
+  assert.equal(await ui("document.body.classList.contains('sidebar-hidden')"), true, 'Sidebar preference survives reload');
   await action('sidebar');
   assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 220, 'Invalid sidebar width uses the default without blocking draft recovery');
   assert.match(await ui("document.querySelector('#notification').textContent"), /Sidebar width could not be read/);
@@ -1281,7 +1384,7 @@ try {
   await browser.call('Page.reload', {}, sessionId);
   await waitFor(async () => ui("document.querySelector('#recovery-banner') && !document.querySelector('#recovery-banner').hidden && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'legacy recovery banner');
   assert.equal(await ui("document.documentElement.dataset.theme"), 'dark');
-  assert.equal(await ui("document.querySelector('[data-theme-option=dark]').getAttribute('aria-pressed')"), 'true');
+  assert.equal(await ui("document.querySelector('#theme-toggle span').textContent"), 'Dark');
   assert.equal(await ui("document.querySelector('#recent-toggle').getAttribute('aria-expanded')"), 'true', 'Recent Files preference survives reload');
   await ui("document.querySelector('#recent-toggle').click()");
   assert.equal(await ui("localStorage.getItem('markdown-studio-recent-expanded')"), 'false');
@@ -1385,6 +1488,28 @@ try {
     })()`);
     await browser.call('Input.insertText', {text}, sessionId);
   };
+  const beforePairedDual = await Promise.all(splitIds.slice(0, 2).map(paneSource));
+  for (const id of splitIds.slice(0, 2)) {
+    await ui(`document.querySelector(${JSON.stringify(pane(id) + ' [data-pane-side-by-side]')}).click()`);
+    assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(id) + ' [data-pane-side-by-side]')}).getAttribute('aria-checked')`), 'true');
+  }
+  await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .document-source')}).focus()`);
+  await sourceEdit(beforePairedDual[1] + '\nOnly the right dual view changes.');
+  assert.match(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .tiptap')}).textContent`), /Only the right dual view changes/);
+  assert.equal(await paneSource(splitIds[0]), beforePairedDual[0]);
+  await menuAction('undo');
+  assert.equal(await paneSource(splitIds[1]), beforePairedDual[1]);
+  await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .document-source')}).focus()`);
+  await sourceEdit(beforePairedDual[0] + '\nOnly the left dual view changes.');
+  assert.equal(await paneSource(splitIds[1]), beforePairedDual[1]);
+  await menuAction('undo');
+  assert.equal(await paneSource(splitIds[0]), beforePairedDual[0]);
+  await paneMode(splitIds[1], 'preview');
+  assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[1]) + ' .pane-content')}).classList.contains('side-by-side')`), false, 'Legacy Preview and editable dual view are mutually exclusive');
+  assert.equal(await ui(`document.querySelector(${JSON.stringify(pane(splitIds[0]) + ' .pane-content')}).classList.contains('side-by-side')`), true, 'Other paired file keeps its editable dual view');
+  await paneMode(splitIds[1], 'visual');
+  await paneMode(splitIds[0], 'visual');
+  console.log('PASS: both files can independently use editable dual view, Source/Visual updates and undo stay scoped, and legacy Preview disables only its own dual view');
   await visualAppend(splitIds[1], ' RIGHT EDIT');
   assert.equal(await ui("document.querySelector('#filename').textContent"), 'right.md');
   await menuAction('undo');
@@ -1586,7 +1711,7 @@ try {
   await sourceEdit(Array.from({length:45}, (_, index) => `## Heading ${index}\n\nSome outline content.`).join('\n\n'));
   await action('visual');
   await action('sidebar');
-  if (await ui("document.querySelector('#sidebar').hidden")) await action('sidebar');
+  if (await ui("document.body.classList.contains('sidebar-hidden')")) await action('sidebar');
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
   await delay(250);
   assert.equal(await ui("getComputedStyle(document.querySelector('.toolbar-more')).display"), 'block');
@@ -1594,7 +1719,7 @@ try {
   assert.ok(await ui("document.querySelector('.toolbar').scrollWidth <= document.querySelector('.toolbar').clientWidth"), 'Toolbar fits the minimum supported window');
   assert.ok(await ui("document.querySelector('.workspace-actions').getBoundingClientRect().right <= innerWidth"), 'File actions fit the minimum supported window');
   assert.ok(await ui("document.querySelector('#outline').clientHeight > 30 && document.querySelector('#outline').scrollHeight > document.querySelector('#outline').clientHeight"), 'Long outline has independently scrollable room');
-  assert.ok(await ui("document.querySelector('.theme-switch').getBoundingClientRect().bottom < innerHeight"), 'Theme switch remains anchored and visible');
+  assert.ok(await ui("document.querySelector('#theme-toggle').getBoundingClientRect().bottom < innerHeight"), 'Theme toggle remains anchored and visible');
   await action('format-menu');
   assert.equal(await ui("document.querySelector('#format-menu').hidden"), false);
   await ui("document.querySelector('#format-menu [data-command=quote]').click()");
@@ -1614,7 +1739,7 @@ try {
   await nativeShortcut('Escape', [], false);
   assert.equal(await ui("document.querySelector('#save-menu').hidden"), true);
   assert.equal(await ui("document.activeElement.dataset.action"), 'save-menu');
-  await ui("document.querySelector('[data-theme-option=light]').click()");
+  await menuAction('theme:light');
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'sidebar Light theme');
   if (process.env.STUDIO_SCREENSHOT) {
     await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
@@ -1622,7 +1747,7 @@ try {
     const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
     await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'apple-interface-light-desktop.png'), Buffer.from(screenshot.data, 'base64'));
   }
-  await ui("document.querySelector('[data-theme-option=dark]').click()");
+  await menuAction('theme:dark');
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'sidebar Dark theme');
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
   await menuAction('close-tab');
@@ -1687,10 +1812,10 @@ try {
   if (process.env.STUDIO_PUBLIC_SCREENSHOTS === '1') {
     const images = path.join(root, 'docs', 'images');
     await mkdir(images, {recursive:true});
-    if (await ui("document.querySelector('#sidebar').hidden")) await action('sidebar');
+    if (await ui("document.body.classList.contains('sidebar-hidden')")) await action('sidebar');
     if (await ui("document.querySelector('#recent-toggle').getAttribute('aria-expanded') === 'true'")) await ui("document.querySelector('#recent-toggle').click()");
     await action('visual');
-    await ui("document.querySelector('[data-theme-option=light]').click()");
+    await menuAction('theme:light');
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'README Light theme');
     await ui("document.querySelector('#notification').click(); document.activeElement.blur()");
     let capture = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
@@ -1710,7 +1835,7 @@ try {
     await selectTab(ids[0]);
     await action('split');
     await confirmSplit(ids[1]);
-    await ui("document.querySelector('[data-theme-option=dark]').click()");
+    await menuAction('theme:dark');
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'README Dark theme');
     await ui("document.querySelector('#notification').click(); document.activeElement.blur()");
     capture = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
