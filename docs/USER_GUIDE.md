@@ -6,7 +6,7 @@ A local-first Windows desktop application for writing Markdown with a friendly v
 
 ## Open the application
 
-Install the shared x64 MSI, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without administrator access. The historical published 0.6.6 release still opens as Markdown Studio; the 0.7.0 Lekh installer is not published yet.
+Install the shared Lekh 0.7.0 x64 MSI, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without administrator access. Use the verified download linked from the [README](../README.md#install-on-windows).
 
 For a source checkout, double-click **Launch.cmd** in the project root. The developer build is **release\win-unpacked\Lekh - Markdown editor.exe**; keep that entire folder together.
 
@@ -198,7 +198,7 @@ Existing relative image paths, such as `assets/photo.png`, are supported when th
 
 Visual editing can normalize Markdown syntax and may not preserve unsupported constructs. Use **Source mode** for exact editing of YAML front matter, raw HTML, math, footnotes, or custom Markdown extensions. Simply opening, switching modes, and saving without edits preserves the original text.
 
-Not included yet: a folder workspace, cloud sync, automatic updates, custom export templates, advanced pagination, interactive Word form checkboxes, and LaTeX rendering. Task lists export as readable text, not interactive form controls. Paired side-by-side editing and syntax highlighting are supported. The new Source + Preview, enhanced search, refreshable contents, image storage choice, and Mermaid features are source changes awaiting a future installer release; they are not in the published 0.5.1 installer.
+Not included yet: a folder workspace, cloud sync, automatic updates, custom export templates, advanced pagination, interactive Word form checkboxes, and LaTeX rendering. Task lists export as readable text, not interactive form controls. Paired side-by-side editing, syntax highlighting, Source + Preview, enhanced search, refreshable contents, image storage choice, and Mermaid diagrams are included in the published Lekh 0.7.0 installer.
 
 ## Privacy
 

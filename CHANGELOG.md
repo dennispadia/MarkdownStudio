@@ -6,9 +6,9 @@
 - Rename application titles, About information, export metadata, shortcuts, executable, MSI/source archives, and build artifacts. The executable is `Lekh - Markdown editor.exe`; MSI builds use the GitHub-safe download name `Lekh-Markdown-editor-0.7.0-x64.msi`.
 - Retain every existing editing feature, original user-data and Chromium-storage profile, draft/preferences keys, recent-file history, diagram partition, and refreshable table-of-contents markers.
 - Explicitly retain the original MSI upgrade code and AppUserModelId. Windows default-file associations and pinned shortcuts may need to be reselected because the executable filename changes.
-- Keep historical release assets, screenshots, and copyright notices unchanged.
+- Retain historical screenshots and copyright notices. Previous Markdown Studio release downloads have been retired; their Git tags and source history remain available.
 
-The Lekh installer has not yet been published. Animated premium Setup.exe, installer-speed improvements, and early running-app prompts remain separate pending work. The application and MSI remain unsigned; real install/upgrade/repair/uninstall testing in a disposable VM is still pending.
+The Lekh 0.7.0 installer is published, with successful Windows MSI and extracted-application validation and independently verified public downloads/checksums. Animated premium Setup.exe, installer-speed improvements, and early running-app prompts remain separate pending work. The application and MSI remain unsigned; real install/upgrade/repair/uninstall testing in a disposable VM is still pending.
 
 ## 0.6.6
 

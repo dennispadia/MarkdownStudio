@@ -6,9 +6,9 @@
 
 A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download the verified Windows x64 installer (Markdown Studio 0.6.6)](https://github.com/dennispadia/lekh/releases/download/v0.6.6/Markdown-Studio-0.6.6-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.6.6) · [User guide](docs/USER_GUIDE.md)
+**[Download Lekh 0.7.0 for Windows x64](https://github.com/dennispadia/lekh/releases/download/v0.7.0/Lekh-Markdown-editor-0.7.0-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.7.0) · [User guide](docs/USER_GUIDE.md)
 
-The **0.7.0 source rebrand** uses Segoe UI Light, a smaller Sanskrit लेख beside Lekh, and the refined quill in Graphite + Teal. It changes branding, not editing features. The Lekh installer has **not yet been published**; the verified download above retains its original name and branding.
+The **published 0.7.0 release** uses Segoe UI Light, a smaller Sanskrit लेख beside Lekh, and the refined quill in Graphite + Teal. It changes branding, not editing features. The installer and extracted application passed the complete Windows desktop tests; the public MSI and source ZIP were independently downloaded and matched the published SHA-256 checksums and GitHub asset digests.
 
 ### Upgrading to Lekh
 
@@ -18,14 +18,14 @@ The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account
 
 **Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## What's new in 0.6.6
+## Included from 0.6.6
 
 - **One Visual + Source switch**, including paired split documents. It reflects and changes only the active document, without duplicate switches or mode bars in pane headers.
 - **Browser-style toolbar overflow:** commands move into **More tools and views (...)** as the window narrows and return when widened. No horizontal toolbar scrollbar is needed.
 - **Shrinking document tabs:** labels shorten as space runs out, the selected tab stays visible, and **Open documents** lists every tab, including those that cannot fit.
 - **Mermaid insertion at the caret:** Visual insertion stays in Visual and places the diagram at the current selection, not the end. Source insertion uses its own caret, preserves editable dual view, and changes only the active split document. One undo removes the insertion.
 
-These are working features in the **verified 0.6.6 installer**. The official build runs the desktop tests against the extracted installer application. Installer-speed and early running-app prompt improvements remain separate pending work.
+These are working features retained in the **verified Lekh 0.7.0 installer**. The official build runs the desktop tests against the extracted installer application. Installer-speed and early running-app prompt improvements remain separate pending work.
 
 ### Included from 0.6.5
 
@@ -34,7 +34,7 @@ These are working features in the **verified 0.6.6 installer**. The official bui
 - The compact right-click menu now ships with twelve direct buttons: Cut, Copy, Paste, Delete, Bold, Italic, Code, Link, Quote, Numbered list, Bullet list, and Task list. Copy / Paste As, Paragraph, Insert, and Table keep their existing choices.
 - Menu actions work in Visual and Source, preserve selection, and target the clicked split pane. Shift+F10, keyboard navigation, Escape focus restoration, spelling suggestions, and viewport-safe submenus are included.
 
-These features remain included in the **verified 0.6.6 installer**, not design previews.
+These features remain included in the **verified Lekh 0.7.0 installer**, not design previews.
 
 ### Included from 0.6.4
 
@@ -43,7 +43,7 @@ These features remain included in the **verified 0.6.6 installer**, not design p
 - Status-bar zoom-out, percentage/reset, and zoom-in controls stay synchronized with View-menu and keyboard zoom.
 - Save confirmations name the actual file, including its new name after Save As: for example, `Notes.md saved`.
 
-These improvements remain included in the **verified 0.6.6 installer**.
+These improvements remain included in the **verified Lekh 0.7.0 installer**.
 
 ### Included from 0.6.3
 
@@ -53,7 +53,7 @@ Start with one blank **Untitled** document, without a Welcome document. Opening 
 
 Turn on the **Visual + Source** switch for editable Visual on the left and Markdown Source on the right. Changes appear in both panes, with the formatting toolbar available; turning the switch off returns to Visual. Source-only and the existing read-only Source + Preview remain available through **More (...)** and the View menu.
 
-These interface changes remain included in the **verified 0.6.6 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
+These interface changes remain included in the **verified Lekh 0.7.0 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
 
 ### Included from 0.6.2
 
@@ -72,7 +72,7 @@ Close the app before upgrading with a new MSI. For Lekh builds, choose **Open wi
 
 ### Included from 0.6.0
 
-All five additions below remain included in the **0.6.6 installer**, not just the source checkout.
+All five additions below remain included in the **Lekh 0.7.0 installer**, not just the source checkout.
 
 | Feature | What you can do |
 | --- | --- |
@@ -141,15 +141,15 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 **Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **0.6.6** is the latest published, verified installer and retains its historical Markdown Studio branding. The source checkout is now Lekh 0.7.0; that installer is not published yet. All existing editing features are retained. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **Lekh 0.7.0** is the latest published, verified installer. All existing editing features are retained. Previous Markdown Studio release downloads have been retired; their Git tags and source history remain available. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the verified Windows x64 MSI installer (Markdown Studio 0.6.6)](https://github.com/dennispadia/lekh/releases/download/v0.6.6/Markdown-Studio-0.6.6-x64.msi)**, or open [Releases](https://github.com/dennispadia/lekh/releases) for all downloads and release notes.
+1. **[Download the verified Lekh 0.7.0 Windows x64 MSI installer](https://github.com/dennispadia/lekh/releases/download/v0.7.0/Lekh-Markdown-editor-0.7.0-x64.msi)**, or open [Releases](https://github.com/dennispadia/lekh/releases) for downloads and release notes.
 2. Double-click the MSI to install for your current Windows user.
-3. Open **Markdown Studio** for the historical 0.6.6 release, or **Lekh** for a new Lekh build, from the desktop or Start menu.
+3. Open **Lekh** from the desktop or Start menu.
 
 The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/lekh/releases/download/v0.6.6/SHA256SUMS.txt) and a clean source ZIP are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/lekh/releases/download/v0.7.0/SHA256SUMS.txt) and a [clean source ZIP](https://github.com/dennispadia/lekh/releases/download/v0.7.0/Lekh-0.7.0-source.zip) are available with the release.
 
 **Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
