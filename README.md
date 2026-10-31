@@ -22,14 +22,15 @@ Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue]
 | **Responsive interface** | One formatting toolbar, More tools and views overflow, shrinking tabs, an Open documents list, and a collapsible sidebar. |
 | **Links and tables** | Edit link text/addresses in place, remove links without deleting text, choose table dimensions, and add/remove table rows and columns. |
 | **Code and diagrams** | Search the offline language catalog, highlight code, copy raw code, and insert editable Mermaid diagrams at the current selection. Code is displayed, never executed. |
-| **Editable alerts** | Add Note, Tip, Important, Caution or Warning from **Blocks > Alerts**, then type and format directly in Visual. Each type has its own icon, label and matching Light/Dark colors. |
-| **Publishing blocks** | Use the icon tools in **Blocks > Content blocks** for tabbed examples, variant selectors, structured steps, described images, metadata and local includes. Hover or focus a tool for its description. |
+| **Editable alerts** | Add Note, Tip, Important, Caution or Warning from the separate **Alerts** toolbar menu, then type and format directly in Visual. Each type has its own icon, label and matching Light/Dark colors. |
+| **Editable publishing blocks** | **Blocks** has tabbed examples, selectors, independently placed variant content, steps, image descriptions, metadata and includes. Edit names, options, fields and rich bodies directly in Visual. |
+| **Synchronized scrolling** | Visual + Source scroll together in both directions by default. Content anchors account for wrapped Source lines and different rendered block heights. Paired documents remain independent. |
 | **Find/Replace** | Match case, Unicode whole words, regex, match counts, navigation, and replacement. |
 | **Writing assistance** | Optional offline English grammar checks powered by the bundled Harper engine. Review, apply, ignore, or ignore a suggestion throughout the current document. No text is sent online or changed automatically. |
 | **Word and PDF export** | Export the active document, including unsaved edits, with an explicit heading hierarchy, formatted links, aligned tables, nested lists, task boxes, syntax-colored code, supported images, and Mermaid diagrams. Export does not save the Markdown. |
 | **Workspace** | Light/Dark themes, a resizable sidebar, heading outline, five recent files, zoom controls, word count, and Focus mode (F9). |
 | **Safeguards** | Unsaved-change prompts, external-edit detection, atomic saves, recovery drafts, Save As, and Save All. Recovery is not a backup. |
-| **Keyboard and context menus** | Formatting/file shortcuts, contextual editing commands, spelling suggestions, and an F1 keyboard reference. |
+| **Keyboard and context menus** | Formatting/file shortcuts, contextual Alerts/Blocks and view tools, nested keyboard-accessible menus, spelling suggestions, and an F1 keyboard reference. |
 
 Switching between Visual and Source resets that tab's undo history; switching tabs preserves it. Source + Preview uses the Source history.
 
@@ -53,9 +54,11 @@ Exports retain every tab and variant as labeled content rather than dropping ina
 Variant controls live within the document's Visual area or read-only preview, never above the Source column.
 Tabbed examples have explicit readable text and surface colors in both themes.
 
-Complex publishing containers remain source-preserving: **Edit source** selects their original Markdown without flattening custom syntax.
-Metadata has a collapsed source view instead of becoming article body text. Unsupported directives remain visible.
+**Every supported publishing block is editable in Visual.** Tab names and every tab body, selector prompts/options, structured steps, described images and metadata fields no longer require Edit source.
+Insert a selector once, then use **Blocks > Variant content** to place content for its existing options anywhere in the document. Inactive content has **Show and edit**, and stable option IDs preserve connections when labels change.
+Metadata is collapsed outside the article body, with editable title/description and a YAML field for arbitrary keys and comments. Unsupported or over-depth syntax stays visible and editable in its inline block field.
 Local includes require a saved document and an explicit, per-document project-folder grant. No remote content is fetched, and access can be revoked from **More tools > Stop local includes**.
+Include names/paths are editable in Visual; **Open shared file in Visual** edits the included file in its own tab without flattening the parent directive. Saving shared content refreshes authorized parent previews.
 Publishing systems can supply additional metadata or build-time configuration; Lekh is not a replacement for their final validation pipeline.
 
 ## Screenshots

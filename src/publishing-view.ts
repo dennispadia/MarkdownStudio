@@ -4,6 +4,12 @@ import { codeLanguages, highlightedHTML, resolveCodeLanguage } from '../lib/high
 let nextGroup = 0;
 const selectedVariants = new Map<string, string>();
 
+export function choosePublishingVariant(pane: HTMLElement, id: string): void {
+  if (!pane.dataset.documentId) return;
+  selectedVariants.set(pane.dataset.documentId, id);
+  refreshPublishingVariants(pane);
+}
+
 export async function publishingHTML(markdown: string, documentId: string): Promise<string> {
   if ((/\[!INCLUDE\b/.test(markdown) || /^zone_pivot_groups\s*:/m.test(markdown)) && documentId) {
     const result = await window.lekh.preparePublishing(documentId, markdown);
@@ -172,11 +178,20 @@ export function refreshPublishingVariants(pane: HTMLElement): void {
     selected = choices.keys().next().value!;
     selectedVariants.set(documentId, selected);
   }
+  pane.dataset.variantSelection = selected;
   for (const button of pane.querySelectorAll<HTMLElement>('[data-publishing-choice]')) {
     button.setAttribute('aria-pressed', String(button.dataset.publishingChoice === selected));
   }
   for (const zone of zones) {
-    zone.hidden = !(zone.dataset.publishingZone ?? '').split(',').some(value => value.trim() === selected);
+    const visible = (zone.dataset.publishingZone ?? '').split(',').some(value => value.trim() === selected);
+    if (zone.dataset.lekhEditableZone === 'true') {
+      zone.hidden = false;
+      zone.classList.toggle('publishing-zone-inactive', !visible);
+      const content = zone.querySelector<HTMLElement>(':scope > .publishing-editable-body');
+      if (content) content.hidden = !visible;
+      const show = zone.querySelector<HTMLButtonElement>(':scope > .publishing-edit-header button');
+      if (show) show.hidden = visible;
+    } else zone.hidden = !visible;
   }
   for (const block of pane.querySelectorAll<HTMLElement>('[data-publishing-zone-block]')) {
     const children = [...block.querySelectorAll<HTMLElement>('[data-publishing-zone]')];

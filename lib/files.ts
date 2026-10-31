@@ -17,7 +17,10 @@ export async function atomicWrite(file: string, data: string | Buffer): Promise<
 }
 
 export async function readMarkdown(file: string): Promise<string> {
-  const data = await readFile(file);
+  return decodeMarkdown(await readFile(file));
+}
+
+export function decodeMarkdown(data: Uint8Array): string {
   if (data.length > 10 * 1024 * 1024) throw new Error('This file exceeds the 10 MB editing limit.');
   if (data.includes(0)) throw new Error('This does not appear to be a UTF-8 text file. Please convert it to UTF-8 first.');
   try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(data); }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { preparePublishing } from '../lib/includes.js';
+import { preparePublishing, readAuthorizedInclude } from '../lib/includes.js';
 
 const limit = 10 * 1024 * 1024;
 const include = (file: string) => `[!INCLUDE [Section](${file})]`;
@@ -28,6 +28,25 @@ test('no authorized root preserves every byte without requiring any existing loc
   const markdown = `# Unsaved\r\n${include('missing.md')}\r\n`;
   assert.deepEqual(await preparePublishing(markdown, null, null), { markdown, includes: [] });
   assert.deepEqual(await preparePublishing(markdown, 'Z:\\does-not-exist.md', null), { markdown, includes: [] });
+});
+
+test('opening an authorized shared file reads its own bytes even when its child includes are broken', async () => {
+  await fixture(async (root, document, put) => {
+    const content = '# Edit this file\n\n[!INCLUDE [Broken](missing.md)]\n';
+    const file = await put('includes/shared.md', content);
+    assert.deepEqual(await readAuthorizedInclude('../includes/shared.md', document, root), { path: await realpath(file), content });
+    assert.equal(await readFile(file, 'utf8'), content);
+    await assert.rejects(readAuthorizedInclude('../includes/shared.md', document, null), /Allow.*project folder/);
+    await assert.rejects(readAuthorizedInclude('https://example.com/shared.md', document, root), /relative local/);
+    await assert.rejects(readAuthorizedInclude('../../outside.md', document, root), /outside/);
+    await assert.rejects(readAuthorizedInclude('../includes/missing.md', document, root), /Missing or inaccessible/);
+    await put('includes/huge.md', Buffer.alloc(limit + 1, 32));
+    await assert.rejects(readAuthorizedInclude('../includes/huge.md', document, root), /10 MB/);
+    await put('includes/binary.md', Buffer.from([65, 0, 66]));
+    await assert.rejects(readAuthorizedInclude('../includes/binary.md', document, root), /UTF-8/);
+    await put('includes/invalid.md', Buffer.from([0xc3, 0x28]));
+    await assert.rejects(readAuthorizedInclude('../includes/invalid.md', document, root), /not valid UTF-8/);
+  });
 });
 
 test('authorization requires a saved, real, regular source document inside a real directory grant', async () => {

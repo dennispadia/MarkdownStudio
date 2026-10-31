@@ -92,7 +92,7 @@ namespace Lekh.Setup
 
     internal sealed class SetupWindow
     {
-        public static readonly string[] PreviewStates = { "ready", "open", "preparing", "installing", "finishing", "success", "restart", "error", "stopping", "cancelled" };
+        public static readonly string[] PreviewStates = { "ready", "upgrade", "repair", "downgrade", "open", "preparing", "removing", "installing", "finishing", "rollback", "success", "restart", "error", "stopping", "cancelled" };
         public readonly Window Window;
         public int ExitCode { get; private set; }
         private readonly bool preview;
@@ -100,6 +100,7 @@ namespace Lekh.Setup
         private StreamWriter log;
         private readonly object logLock = new object();
         private NativeEngine engine;
+        private InstalledProduct previousProduct;
         private volatile bool requestedCancel;
         private bool busy, allowClose;
         private Window confirmation;
@@ -188,7 +189,15 @@ namespace Lekh.Setup
                 if (log != null) log.Dispose();
             };
             if (preview) Find<TextBlock>("PreviewBadge").Visibility = Visibility.Visible;
-            Render(previewState ?? "ready", null);
+            if (preview)
+            {
+                if (previewState == "upgrade" || previewState == "removing" || previewState == "rollback")
+                    previousProduct = new InstalledProduct("{11111111-1111-1111-1111-111111111111}", "0.8.1");
+                else if (previewState == "repair") previousProduct = new InstalledProduct("{11111111-1111-1111-1111-111111111111}", BuildInfo.Version);
+                else if (previewState == "downgrade") previousProduct = new InstalledProduct("{11111111-1111-1111-1111-111111111111}", "99.0.0");
+                Render(previewState, null);
+            }
+            else RefreshReady();
             Window.ContentRendered += (sender, args) => { if (primary.IsVisible) primary.Focus(); else secondary.Focus(); };
         }
         private T Find<T>(string name) where T : FrameworkElement
@@ -206,6 +215,21 @@ namespace Lekh.Setup
                 log.Flush();
             }
         }
+        private void RefreshReady()
+        {
+            try
+            {
+                previousProduct = ProductDiscovery.Detect();
+                Render(previousProduct != null && previousProduct.Mode == "downgrade" ? "downgrade" :
+                    SetupPolicy.AppIsOpen() ? "open" : previousProduct == null ? "ready" : previousProduct.Mode, null);
+            }
+            catch (Exception error)
+            {
+                Render("detection-error", null);
+                description.Text = "Setup could not safely check the installed Lekh version.\n" + error.Message;
+                ExitCode = 1;
+            }
+        }
         private void Render(string next, int? percent)
         {
             state = next;
@@ -218,15 +242,45 @@ namespace Lekh.Setup
                     action = "Install Lekh"; secondaryAction = "Not now";
                     note = "Unsigned software: Windows may warn about or block setup. Follow your organization's policies; do not disable security protections.";
                     break;
+                case "upgrade":
+                    label = "BEFORE WE UPDATE"; title = "Update Lekh " + previousProduct.Version + ".";
+                    body = previousProduct.Guidance;
+                    action = "Save and close, then update"; secondaryAction = "Not now";
+                    note = "Setup will visibly remove this version, then install Lekh " + BuildInfo.Version +
+                        " in one Windows Installer transaction. If it fails or is cancelled, Windows rolls back the changes. Your profile and documents are preserved.";
+                    break;
+                case "repair":
+                    label = "ALREADY INSTALLED"; title = "Lekh " + previousProduct.Version + " is installed.";
+                    body = previousProduct.Guidance;
+                    action = "Save and close, then reinstall"; secondaryAction = "Not now";
+                    note = "Setup repairs this exact product, or transactionally replaces a same-version build. Your profile and documents are preserved.";
+                    break;
+                case "downgrade":
+                    label = "NEWER VERSION INSTALLED"; title = "Keep Lekh " + previousProduct.Version + ".";
+                    body = "This installer contains Lekh " + BuildInfo.Version + ".\nSetup will not replace your newer installation.";
+                    secondaryAction = "Close"; break;
+                case "detection-error":
+                    label = "BEFORE WE BEGIN"; title = "Check the installed version.";
+                    body = "Setup could not safely check the existing installation.\nNo application changes have been made.";
+                    action = "Check again"; secondaryAction = "Close"; break;
                 case "open":
                     label = "BEFORE WE BEGIN"; title = "Save your work first.";
-                    body = "Lekh is open. Save your edits and close the app,\nthen check again to continue.";
+                    body = (previousProduct == null ? "Lekh is open." : "Lekh " + previousProduct.Version + " is installed and open.") +
+                        "\nSave your work and close Lekh, then check again.";
                     note = "Setup will never force-close the editor or discard unsaved work.";
                     action = "Check again"; secondaryAction = "Not now"; break;
                 case "preparing":
                     title = "Getting things ready."; body = "Checking Windows and verifying the offline installer.\nYou can keep working in your other apps."; break;
                 case "installing":
-                    title = "Installing Lekh."; body = "Adding the application and its shortcuts.\nYour Markdown documents are not part of the installation."; break;
+                    title = "Installing Lekh."; body = "Adding Lekh " + BuildInfo.Version + " and its shortcuts.\nYour Markdown documents are not part of the installation."; break;
+                case "removing":
+                    title = "Removing previous Lekh.";
+                    body = "Windows Installer is uninstalling Lekh " + (previousProduct == null ? "previous version" : previousProduct.Version) +
+                        ".\nYour profile, cache and documents are preserved.";
+                    note = "The new application payload has not started. Windows can restore the previous version if this transaction fails or is cancelled."; break;
+                case "rollback":
+                    label = "RESTORING SAFELY"; title = "Rolling back changes.";
+                    body = "Windows is restoring the installation's previous state.\nKeep Setup open. Do not restart Windows yet."; secondaryAction = null; break;
                 case "finishing":
                     label = "ALMOST THERE"; title = "Adding the finishing touches.";
                     body = "Finalizing Windows registration.\nWe will let you know when everything is ready."; break;
@@ -256,14 +310,21 @@ namespace Lekh.Setup
             primary.Content = action; primary.Visibility = action == null ? Visibility.Collapsed : Visibility.Visible;
             secondary.Content = secondaryAction; secondary.Visibility = secondaryAction == null ? Visibility.Collapsed : Visibility.Visible;
             secondary.IsEnabled = true;
-            bool progressing = next == "preparing" || next == "installing" || next == "finishing" || next == "stopping";
+            bool progressing = next == "preparing" || next == "removing" || next == "installing" || next == "finishing" || next == "stopping" || next == "rollback";
             Find<FrameworkElement>("ProgressArea").Visibility = progressing ? Visibility.Visible : Visibility.Collapsed;
             progress.IsIndeterminate = percent == null && SystemParameters.ClientAreaAnimation;
             progress.Value = percent ?? 0;
             caption.Text = next == "preparing" ? "Verifying the embedded installer." : next == "stopping" ? "Waiting for Windows Installer to finish." :
                 percent.HasValue ? percent.Value + "% of the current Windows Installer stage." : "Waiting for Windows Installer.";
-            stages.Visibility = next == "stopping" ? Visibility.Collapsed : Visibility.Visible;
-            stages.Text = next == "preparing" ? "PREPARE    /    Install    /    Finish" : next == "finishing" ? "Prepare    /    Install    /    FINISH" : "Prepare    /    INSTALL    /    Finish";
+            stages.Visibility = next == "stopping" || next == "rollback" ? Visibility.Collapsed : Visibility.Visible;
+            stages.Text = previousProduct != null &&
+                (previousProduct.Mode == "upgrade" || next == "removing" || (engine != null && engine.RemovalConfirmed)) &&
+                (engine == null || !engine.IsRepair) ?
+                next == "preparing" ? "PREPARE    /    Remove old    /    Install new    /    Finish" :
+                next == "removing" ? "Prepare    /    REMOVE OLD    /    Install new    /    Finish" :
+                next == "finishing" ? "Prepare    /    Remove old    /    Install new    /    FINISH" :
+                "Prepare    /    Remove old    /    INSTALL NEW    /    Finish" :
+                next == "preparing" ? "PREPARE    /    Install    /    Finish" : next == "finishing" ? "Prepare    /    Install    /    FINISH" : "Prepare    /    INSTALL    /    Finish";
             Find<TextBlock>("Benefits").Visibility = next == "ready" || next == "success" ? Visibility.Visible : Visibility.Collapsed;
             Find<TextBlock>("Assurance").Text = progressing ? "Your documents stay yours.\nNo forced restart." : "No account. No cloud setup.\nYour documents stay yours.";
             details.Visibility = next == "error" || next == "cancelled" ? Visibility.Visible : Visibility.Collapsed;
@@ -286,7 +347,7 @@ namespace Lekh.Setup
         }
         private void SyncStory()
         {
-            bool active = state == "preparing" || state == "installing" || state == "finishing";
+            bool active = state == "preparing" || state == "removing" || state == "installing" || state == "finishing";
             if (active) storyStarted = true;
             Find<FrameworkElement>("StoryArea").Visibility = storyStarted ? Visibility.Visible : Visibility.Collapsed;
             bool playing = active && !storyPaused && SystemParameters.ClientAreaAnimation &&
@@ -310,7 +371,7 @@ namespace Lekh.Setup
             Find<TextBlock>("StoryCount").Text = (story.Index + 1) + " / " + Story.Chapters.Length;
             Button pause = Find<Button>("StoryPause");
             pause.IsEnabled = SystemParameters.ClientAreaAnimation &&
-                (state == "preparing" || state == "installing" || state == "finishing");
+                (state == "preparing" || state == "removing" || state == "installing" || state == "finishing");
             pause.Content = !SystemParameters.ClientAreaAnimation ? "Animation off" : storyPaused ? "Resume story" : "Pause story";
         }
         private async void Primary()
@@ -329,6 +390,16 @@ namespace Lekh.Setup
                 catch (Exception error) { ShowError(error); }
                 return;
             }
+            if (state == "downgrade") return;
+            if (!preview)
+            {
+                InstalledProduct acknowledged = previousProduct;
+                string oldState = state;
+                RefreshReady();
+                if (state == "detection-error" || state == "downgrade" || state == "open" ||
+                    oldState == "error" || oldState == "cancelled" || oldState == "detection-error" ||
+                    !InstalledProduct.Same(acknowledged, previousProduct)) return;
+            }
             busy = true; requestedCancel = false; ExitCode = 1;
             Render("preparing", null);
             string package = null;
@@ -338,6 +409,17 @@ namespace Lekh.Setup
                 {
                     await Task.Delay(1000);
                     if (requestedCancel) throw new OperationCanceledException();
+                    if (previousProduct != null && previousProduct.Mode == "upgrade")
+                    {
+                        Render("removing", null);
+                        await Task.Delay(1500);
+                        if (requestedCancel)
+                        {
+                            Render("rollback", null);
+                            await Task.Delay(1000);
+                            throw new OperationCanceledException();
+                        }
+                    }
                     Render("installing", 20);
                     await Task.Delay(1500);
                     if (requestedCancel) throw new OperationCanceledException();
@@ -355,9 +437,11 @@ namespace Lekh.Setup
                     log = new StreamWriter(new FileStream(Path.Combine(logDirectory, "setup.log"), FileMode.CreateNew, FileAccess.Write, FileShare.Read));
                 }
                 WriteLog("Starting Lekh Setup " + BuildInfo.Version + ". Current-user, offline installation.");
-                engine = new NativeEngine(OnUpdate, WriteLog);
+                engine = new NativeEngine(OnUpdate, WriteLog, previousProduct);
                 uint result = await Task.Run(() =>
                 {
+                    if (!InstalledProduct.Same(previousProduct, ProductDiscovery.Detect()))
+                        throw new InvalidDataException("The installed Lekh version changed after you acknowledged it. Check again before continuing.");
                     if (SetupPolicy.AppIsOpen()) throw new AppOpenException();
                     package = Payload.Extract(() => requestedCancel);
                     WriteLog("Verified embedded MSI SHA-256 and identity. Cache: " + package);
@@ -366,11 +450,13 @@ namespace Lekh.Setup
                     // Keep the verified file read-locked for the entire native installation.
                     using (FileStream guard = new FileStream(package, FileMode.Open, FileAccess.Read, FileShare.Read))
                     {
+                        if (!InstalledProduct.Same(previousProduct, ProductDiscovery.Detect()))
+                            throw new InvalidDataException("The installed Lekh version changed while preparing setup. Check again before continuing.");
                         return engine.Install(package, Path.Combine(logDirectory, "windows-installer.log"));
                     }
                 });
                 WriteLog("Windows Installer finished with code " + result + ".");
-                if (result == 1602 && engine.FilesInUse)
+                if (result == 1602 && (engine.FilesInUse || engine.CallbackFailed))
                 {
                     Render("error", null);
                     description.Text = engine.FailureMessage;
@@ -412,12 +498,12 @@ namespace Lekh.Setup
         }
         private void OnUpdate(SetupUpdate update)
         {
-            Window.Dispatcher.BeginInvoke(new Action(() =>
+            Window.Dispatcher.Invoke(new Action(() =>
             {
                 if (!busy || allowClose) return;
                 Render(update.Stage, update.Percent);
                 secondary.IsEnabled = update.CanCancel;
-            }));
+            }), DispatcherPriority.Background);
         }
         private void Finish(uint result)
         {

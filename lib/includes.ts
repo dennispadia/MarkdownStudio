@@ -2,6 +2,7 @@ import { open, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import MarkdownIt from 'markdown-it';
 import { imageMime } from './images.js';
+import { decodeMarkdown } from './files.js';
 
 const MAX_DEPTH = 8;
 const MAX_FILES = 32;
@@ -216,6 +217,59 @@ function localPath(source: string, kind: string): string {
   return decoded.replace(/[\\/]/g, path.sep);
 }
 
+async function authorizedDocument(documentPath: string | null, authorizedRoot: string): Promise<{ root: string; document: string; originalPath: string }> {
+  if (!documentPath) throw new Error('Save the Markdown document before expanding local includes.');
+  if (!path.isAbsolute(authorizedRoot) || !path.isAbsolute(documentPath)) throw new Error('The saved document and authorized root must have absolute local paths.');
+  const root = await canonical(authorizedRoot, 'authorized include root');
+  if (!(await stat(root)).isDirectory()) throw new Error('The authorized include root must be a directory.');
+  const document = await canonical(documentPath, 'saved Markdown document');
+  if (!inside(root, document)) throw new Error('The saved Markdown document resolves outside the authorized root (possible symlink escape).');
+  if (!(await stat(document)).isFile()) throw new Error('The saved Markdown document must be a regular file.');
+  return { root, document, originalPath: documentPath };
+}
+
+async function resolvePublishingFile(root: string, source: string, from: string, kind: 'include' | 'image'): Promise<string> {
+  const candidate = path.resolve(path.dirname(from), localPath(source, kind));
+  if (!inside(root, candidate)) throw new Error(`The ${kind} path traverses outside the authorized root: ${source}`);
+  if (kind === 'include' && !/\.(?:md|markdown)$/i.test(candidate)) throw new Error('Local includes must reference Markdown (.md or .markdown) files.');
+  const file = await canonical(candidate, kind);
+  if (!inside(root, file)) throw new Error(`The ${kind} resolves outside the authorized root (symlink or junction escape): ${source}`);
+  if (!(await stat(file)).isFile()) throw new Error(`The ${kind} must reference a regular file: ${source}`);
+  if (kind === 'include' && !/\.(?:md|markdown)$/i.test(file)) throw new Error('An include symlink must resolve to a Markdown file.');
+  if (kind === 'image') { imageMime(candidate); imageMime(file); }
+  return file;
+}
+
+async function readPublishingFile(root: string, file: string, limit: number): Promise<Buffer> {
+  const handle = await open(file, 'r');
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error('An include must be a regular Markdown file.');
+    const confirmed = await canonical(file, 'include');
+    const current = await stat(confirmed);
+    if (!inside(root, confirmed) || current.dev !== info.dev || current.ino !== info.ino) throw new Error('The include changed or escaped its authorized root before reading.');
+    if (info.size > limit) throw new Error('Publishing content exceeds the 10 MB limit.');
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    while (true) {
+      const buffer = Buffer.alloc(Math.min(64 * 1024, limit - bytes + 1));
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
+      if (!bytesRead) break;
+      bytes += bytesRead;
+      if (bytes > limit) throw new Error('Publishing content exceeds the 10 MB limit.');
+      chunks.push(buffer.subarray(0, bytesRead));
+    }
+    return Buffer.concat(chunks);
+  } finally { await handle.close(); }
+}
+
+export async function readAuthorizedInclude(source: string, documentPath: string | null, authorizedRoot: string | null): Promise<{ path: string; content: string }> {
+  if (!authorizedRoot) throw new Error('Allow the document’s project folder before opening a shared file.');
+  const { root, document } = await authorizedDocument(documentPath, authorizedRoot);
+  const file = await resolvePublishingFile(root, source, document, 'include');
+  return { path: file, content: decodeMarkdown(await readPublishingFile(root, file, MAX_BYTES)) };
+}
+
 async function canonical(file: string, kind: string): Promise<string> {
   try { return await realpath(file); }
   catch { throw new Error(`Missing or inaccessible ${kind}: ${file}`); }
@@ -392,63 +446,19 @@ export async function preparePublishing(
   markdown: string, documentPath: string | null, authorizedRoot: string | null,
 ): Promise<{ markdown: string; includes: string[] }> {
   if (!authorizedRoot) return { markdown, includes: [] };
-  if (!documentPath) throw new Error('Save the Markdown document before expanding local includes.');
-  if (!path.isAbsolute(authorizedRoot) || !path.isAbsolute(documentPath)) {
-    throw new Error('The saved document and authorized root must have absolute local paths.');
-  }
-  const root = await canonical(authorizedRoot, 'authorized include root');
-  if (!(await stat(root)).isDirectory()) throw new Error('The authorized include root must be a directory.');
-  const document = await canonical(documentPath, 'saved Markdown document');
-  if (!inside(root, document)) throw new Error('The saved Markdown document resolves outside the authorized root (possible symlink escape).');
-  if (!(await stat(document)).isFile()) throw new Error('The saved Markdown document must be a regular file.');
+  const { root, document, originalPath } = await authorizedDocument(documentPath, authorizedRoot);
   let bytes = Buffer.byteLength(markdown, 'utf8');
   let files = 0;
   const includes: string[] = [];
   const seen = new Set<string>();
   const active = new Set([key(document)]);
-  const topDirectory = await canonical(path.dirname(documentPath), 'saved document folder');
+  const topDirectory = await canonical(path.dirname(originalPath), 'saved document folder');
   if (bytes > MAX_BYTES) throw new Error('Publishing content exceeds the 10 MB limit.');
-  const resolve = async (source: string, from: string, kind: 'include' | 'image'): Promise<string> => {
-    const relative = localPath(source, kind);
-    const candidate = path.resolve(path.dirname(from), relative);
-    if (!inside(root, candidate)) throw new Error(`The ${kind} path traverses outside the authorized root: ${source}`);
-    if (kind === 'include' && !/\.(?:md|markdown)$/i.test(candidate)) {
-      throw new Error('Local includes must reference Markdown (.md or .markdown) files.');
-    }
-    const file = await canonical(candidate, kind);
-    if (!inside(root, file)) throw new Error(`The ${kind} resolves outside the authorized root (symlink or junction escape): ${source}`);
-    if (!(await stat(file)).isFile()) throw new Error(`The ${kind} must reference a regular file: ${source}`);
-    if (kind === 'include' && !/\.(?:md|markdown)$/i.test(file)) {
-      throw new Error('An include symlink must resolve to a Markdown file.');
-    }
-    if (kind === 'image') {
-      imageMime(candidate);
-      imageMime(file);
-    }
-    return file;
-  };
+  const resolve = (source: string, from: string, kind: 'include' | 'image') => resolvePublishingFile(root, source, from, kind);
   const read = async (file: string): Promise<string> => {
-    const handle = await open(file, 'r');
-    try {
-      const info = await handle.stat();
-      if (!info.isFile()) throw new Error('An include must be a regular Markdown file.');
-      const confirmed = await canonical(file, 'include');
-      const current = await stat(confirmed);
-      if (!inside(root, confirmed) || current.dev !== info.dev || current.ino !== info.ino) {
-        throw new Error('The include changed or escaped its authorized root before reading.');
-      }
-      if (info.size > MAX_BYTES - bytes) throw new Error('Publishing content exceeds the 10 MB limit.');
-      const chunks: Buffer[] = [];
-      while (true) {
-        const buffer = Buffer.alloc(Math.min(64 * 1024, MAX_BYTES - bytes + 1));
-        const { bytesRead } = await handle.read(buffer, 0, buffer.length, null);
-        if (!bytesRead) break;
-        bytes += bytesRead;
-        if (bytes > MAX_BYTES) throw new Error('Publishing content exceeds the 10 MB limit.');
-        chunks.push(buffer.subarray(0, bytesRead));
-      }
-      return Buffer.concat(chunks).toString('utf8');
-    } finally { await handle.close(); }
+    const content = await readPublishingFile(root, file, MAX_BYTES - bytes);
+    bytes += content.length;
+    return content.toString('utf8');
   };
   const expand = async (source: string, from: string, depth: number): Promise<string> => {
     const analysis = analyze(source);

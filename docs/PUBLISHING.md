@@ -17,6 +17,8 @@ GitHub's browser uploader does not apply `.gitignore` for you. Do not drag the e
 
 The repository is `dennispadia/lekh`. **[Lekh 0.8.1](https://github.com/dennispadia/lekh/releases/tag/v0.8.1)** is published with directly editable alerts, refined publishing tools, document-scoped variant controls, readable Dark tabs, and the offline grammar engine. Its EXE, source ZIP and checksums were independently downloaded and verified; earlier releases remain unchanged.
 
+The current **0.9.0** checkout adds fully editable publishing containers/fields, distributed variant content, separate contextual Alerts/Blocks tools, synchronized scrolling and visible rollback-safe previous-version removal. Publish it only after the current hosted **0.8.1 -> 0.9.0** upgrade/cancellation-rollback/repair gate succeeds, in addition to unit, packaged desktop and setup checks. The old payload/profile restoration assertion is mandatory; do not replace it with a skipped or label-only scenario.
+
 Lekh's independent identities are npm package `lekh`, application ID `com.lekh.desktop`, `%APPDATA%\Lekh` profile, and `%LOCALAPPDATA%\lekh` application directory. The executable is `Lekh - Markdown editor.exe`. The independent MSI upgrade code is `DCBCF7FA-11DA-4F35-8D27-D066EEC6C582`; keep it stable for future Lekh upgrades and consistent with installer policy and verification tests. Existing Lekh profiles are retained during upgrades. No migration aliases or automatic removal of another product are included.
 
 Publish an installer only after packaging and verification both succeed. Local Windows policy may block validation even when the hosted workflow succeeds; see [installer validation and policy restrictions](BUILDING.md#installer-validation-status-and-policy-restrictions).

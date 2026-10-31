@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+- Make supported tabs, selector prompts/options, distributed variant content, structured steps, image descriptions, metadata and include fields editable directly in Visual, with source-safe serialization and undo/redo.
+- Split **Alerts** and **Blocks** into separate toolbar and contextual Insert menus. Insert selectors independently; gate **Variant content** on existing choices and allow placement anywhere with stable option assignments.
+- Preserve inactive alternatives as **Show and edit** cards; retain every tab/variant in Word and PDF. Keep unknown syntax editable inline without forcing Source.
+- Open authorized shared Markdown as its own Visual document, preserving per-document grants, bounded UTF-8 reads and parent directives. Refresh authorized previews after explicit saves.
+- Synchronize Visual + Source scrolling by default in both directions using document anchors and measured wrapped lines; keep paired documents isolated.
+- Fix nested right-click flyout ancestry/placement, match toolbar icons/help, and include view/writing tools.
+- Detect previous Lekh registration before installation, show version/save-close guidance, visibly remove the old payload before installing the new one inside a rollback-safe Windows Installer transaction. Preserve repair, downgrade safeguards and user profiles.
+- Add exact-source, reference, metadata, export, native editing/shortcut/scroll/menu tests and genuine hosted 0.8.1 -> 0.9.0 removal/cancellation-rollback/upgrade/repair validation.
+
 ## 0.8.1
 
 - Make all five alert types directly editable in Visual, including rich body content, type changes, natural paragraph entry/exit and undo/redo. Preserve unchanged source syntax and safely serialize edits.

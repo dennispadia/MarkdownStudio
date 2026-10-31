@@ -8,6 +8,70 @@ using System.Text;
 
 namespace Lekh.Setup
 {
+    internal sealed class InstalledProduct
+    {
+        public readonly string ProductCode, Version;
+        public InstalledProduct(string code, string version) { ProductCode = code; Version = version; }
+        public string Mode
+        {
+            get
+            {
+                int comparison = ProductDiscovery.ParseVersion(Version).CompareTo(ProductDiscovery.ParseVersion(BuildInfo.Version));
+                return comparison > 0 ? "downgrade" : comparison == 0 ? "repair" : "upgrade";
+            }
+        }
+        public string Guidance
+        {
+            get { return "Lekh " + Version + " is already installed.\nSave your work and close Lekh before continuing."; }
+        }
+        public static bool Same(InstalledProduct a, InstalledProduct b)
+        {
+            return a == null ? b == null : b != null &&
+                String.Equals(a.ProductCode, b.ProductCode, StringComparison.OrdinalIgnoreCase) && a.Version == b.Version;
+        }
+    }
+
+    internal static class ProductDiscovery
+    {
+        internal static Version ParseVersion(string value)
+        {
+            Version parsed;
+            if (!System.Version.TryParse(value, out parsed) || parsed.Build < 0 || (parsed.Revision > 0))
+                throw new InvalidDataException("Windows Installer reported an unsupported Lekh version: " + value + ".");
+            return new Version(parsed.Major, parsed.Minor, parsed.Build);
+        }
+        internal static InstalledProduct Read(IEnumerable<string> codes, Func<string, uint, string, string> property)
+        {
+            InstalledProduct found = null;
+            foreach (string code in codes)
+            {
+                Guid guid;
+                if (!Guid.TryParse(code, out guid)) throw new InvalidDataException("Invalid related MSI ProductCode.");
+                foreach (uint context in new uint[] { 1, 4 })
+                    if (property(code, context, "ProductName") != null)
+                        throw new InvalidDataException("A managed or machine-wide related product is registered. Use Windows Settings to manage it; Setup only updates your current-user installation.");
+                string name = property(code, 2, "ProductName");
+                if (name == null) continue;
+                if (name != BuildInfo.ProductName || property(code, 2, "InstalledProductName") != BuildInfo.ProductName)
+                    throw new InvalidDataException("A related MSI registration is not the expected installed Lekh product. Setup will not modify it.");
+                string version = property(code, 2, "VersionString");
+                ParseVersion(version);
+                if (found != null) throw new InvalidDataException("Multiple related Lekh installations are registered. Manage them in Windows Settings before continuing.");
+                found = new InstalledProduct(code, version);
+            }
+            return found;
+        }
+        public static InstalledProduct Detect() { return Read(Native.RelatedProducts(), Native.ProductProperty); }
+        public static void AssertRemoved(InstalledProduct previous)
+        {
+            foreach (uint context in new uint[] { 1, 2, 4 })
+                if (Native.ProductProperty(previous.ProductCode, context, "ProductName") != null)
+                    throw new InvalidDataException("The previous Lekh ProductCode is still registered. Windows must roll back this upgrade.");
+            if (SetupPolicy.PathExistsExact(SetupPolicy.AppPath) || SetupPolicy.PathExistsExact(SetupPolicy.AsarPath))
+                throw new InvalidDataException("The previous Lekh payload is still present before the new payload stage. Windows must roll back this upgrade.");
+        }
+    }
+
     internal sealed class SetupUpdate
     {
         public readonly string Stage;
@@ -29,6 +93,7 @@ namespace Lekh.Setup
             get { return total <= 0 || estimated ? (int?)null : (int)Math.Max(0, Math.Min(100, position * 100 / total)); }
         }
         public void ResetAction() { actionData = false; }
+        public void ResetStage() { total = position = actionTicks = 0; estimated = true; actionData = backward = false; }
         public void ActionData() { if (actionData) Move(actionTicks); }
         private void Move(long ticks)
         {
@@ -54,10 +119,17 @@ namespace Lekh.Setup
     internal static class SetupPolicy
     {
         public const string UpgradeCode = "DCBCF7FA-11DA-4F35-8D27-D066EEC6C582";
-        public const string InstallProperties = "REBOOT=ReallySuppress MSIRESTARTMANAGERCONTROL=DisableShutdown";
+        public const string InstallProperties = "REBOOT=ReallySuppress MSIRESTARTMANAGERCONTROL=DisableShutdown MSIDISABLERMRESTART=1";
         public static string AppPath
         {
             get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), BuildInfo.InstallDirectory, BuildInfo.ExecutableName); }
+        }
+        public static string AsarPath { get { return Path.Combine(Path.GetDirectoryName(AppPath), "resources", "app.asar"); } }
+        internal static bool PathExistsExact(string path)
+        {
+            try { File.GetAttributes(path); return true; }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
         }
         public static bool IsSuccess(uint result) { return result == 0 || result == 3010; }
         public static string ErrorDescription(uint result)
@@ -107,6 +179,24 @@ namespace Lekh.Setup
                 !properties.TryGetValue("UpgradeCode", out upgrade) || !String.Equals(upgrade.Trim('{', '}'), UpgradeCode, StringComparison.OrdinalIgnoreCase) ||
                 properties.ContainsKey("ALLUSERS") || !properties.TryGetValue("MSIINSTALLPERUSER", out user) || user != "1")
                 throw new InvalidDataException("The embedded MSI does not match the expected per-user Lekh package.");
+            if (properties.ContainsKey("DISABLEROLLBACK"))
+                throw new InvalidDataException("The embedded MSI must not disable Windows Installer rollback.");
+        }
+        internal static void ValidateSchedule(IDictionary<string, int> sequence, bool rollbackGuard, bool removalCheckpoint)
+        {
+            int initialize, remove, checkpoint, components, files;
+            if (!sequence.TryGetValue("InstallInitialize", out initialize) ||
+                !sequence.TryGetValue("RemoveExistingProducts", out remove) ||
+                !sequence.TryGetValue("LekhPreviousVersionRemoved", out checkpoint) ||
+                !sequence.TryGetValue("ProcessComponents", out components) ||
+                !sequence.TryGetValue("InstallFiles", out files) ||
+                remove != initialize + 1 || checkpoint != remove + 1 || checkpoint >= components || checkpoint >= files ||
+                !rollbackGuard || !removalCheckpoint)
+                throw new InvalidDataException("Unsafe MSI upgrade schedule: removal must follow InstallInitialize inside rollback, with a verified checkpoint before new-payload script generation.");
+            foreach (KeyValuePair<string, int> action in sequence)
+                if (action.Value >= initialize && action.Value <= checkpoint && action.Key != "InstallInitialize" &&
+                    action.Key != "RemoveExistingProducts" && action.Key != "LekhPreviousVersionRemoved")
+                    throw new InvalidDataException("Unexpected MSI action before the previous-version removal checkpoint: " + action.Key + ".");
         }
     }
 
@@ -116,25 +206,94 @@ namespace Lekh.Setup
         private readonly Action<string> log;
         private readonly MsiProgress progress = new MsiProgress();
         private volatile bool cancelRequested, canCancel = true;
-        private bool cancelSent, finishing;
+        private bool cancelSent, repair, executing;
+        private readonly InstalledProduct previousProduct;
+        private readonly Action verifyRemoval;
+        private readonly Func<bool> payloadPresent;
+        private string stage = "preparing";
+        internal bool RemovalConfirmed { get; private set; }
         private string lastUpdate;
         public string FailureMessage { get; private set; }
         public bool FilesInUse { get; private set; }
+        public bool CallbackFailed { get; private set; }
         public bool Installed { get; private set; }
         public bool CanCancel { get { return canCancel; } }
-        public NativeEngine(Action<SetupUpdate> report, Action<string> writeLog)
+        public bool IsRepair { get { return repair; } }
+        public NativeEngine(Action<SetupUpdate> report, Action<string> writeLog, InstalledProduct previous = null,
+            Action removalCheck = null, Func<bool> newPayloadPresent = null)
         {
             update = report; log = writeLog;
+            previousProduct = previous;
+            verifyRemoval = removalCheck ?? (() => ProductDiscovery.AssertRemoved(previousProduct));
+            payloadPresent = newPayloadPresent ?? (() => File.Exists(SetupPolicy.AppPath) && File.Exists(SetupPolicy.AsarPath));
         }
         public void Cancel() { if (canCancel) cancelRequested = true; }
+        internal string PropertiesForProduct(string code)
+        {
+            repair = previousProduct != null && String.Equals(code, previousProduct.ProductCode, StringComparison.OrdinalIgnoreCase);
+            if (repair && previousProduct.Mode != "repair")
+                throw new InvalidDataException("Different Lekh versions must not reuse the same ProductCode.");
+            return SetupPolicy.InstallProperties + (repair ? " REINSTALL=ALL REINSTALLMODE=omus" : "");
+        }
+        internal int CancellationReply(uint message)
+        {
+            if (cancelRequested && !cancelSent && canCancel &&
+                (message == 0x0a000000 || message == 0x09000000 || message == 0x08000000))
+            {
+                cancelSent = true;
+                canCancel = false;
+                Report();
+                return 2;
+            }
+            return 1;
+        }
         private void Report()
         {
-            string stage = cancelRequested ? "stopping" : finishing ? "finishing" : "installing";
-            int? percent = cancelRequested ? null : progress.Percent;
-            string key = stage + ":" + percent + ":" + canCancel;
+            string visible = stage == "rollback" ? stage : cancelRequested ? "stopping" : stage;
+            int? percent = cancelRequested || stage == "rollback" ? null : progress.Percent;
+            string key = visible + ":" + percent + ":" + canCancel;
             if (key == lastUpdate) return;
             lastUpdate = key;
-            update(new SetupUpdate(stage, percent, canCancel && !cancelRequested));
+            update(new SetupUpdate(visible, percent, canCancel && !cancelRequested && stage != "rollback"));
+        }
+        internal void ActionStarted(string action)
+        {
+            progress.ResetAction();
+            if (stage == "rollback")
+            {
+                log("Windows Installer rollback action: " + action);
+                Report();
+                return;
+            }
+            if (action == "RemoveExistingProducts" && previousProduct != null && !repair)
+            {
+                stage = "removing";
+                progress.ResetStage();
+            }
+            if (action == "LekhPreviousVersionRemoved" && previousProduct != null && !repair)
+            {
+                verifyRemoval();
+                RemovalConfirmed = true;
+                stage = "installing";
+                progress.ResetStage();
+                log("Verified removal of previous ProductCode " + previousProduct.ProductCode + " and executable/app.asar before new payload.");
+            }
+            // Nested uninstall has its own InstallFiles/InstallFinalize. Neither is the new installation.
+            if (action == "InstallFiles" && (previousProduct == null || repair || RemovalConfirmed))
+            {
+                if (stage != "installing") progress.ResetStage();
+                stage = "installing";
+            }
+            if ((action == "InstallFinalize" || action == "InstallExecute" || action == "InstallExecuteAgain") &&
+                (previousProduct == null || repair || RemovalConfirmed)) executing = true;
+            if (action == "PublishProduct" && executing && payloadPresent())
+            {
+                stage = "finishing";
+                progress.ResetStage();
+            }
+            if (action == "Rollback") stage = "rollback";
+            log("Windows Installer action: " + action);
+            Report();
         }
         private int Callback(IntPtr context, uint type, uint record)
         {
@@ -146,15 +305,12 @@ namespace Lekh.Setup
                     case 0x0a000000:
                         progress.Message(Native.MsiRecordGetInteger(record, 1), Native.MsiRecordGetInteger(record, 2),
                             Native.MsiRecordGetInteger(record, 3), Native.MsiRecordGetInteger(record, 4));
+                        if (cancelSent && progress.Backward) stage = "rollback";
                         Report();
                         break;
                     case 0x09000000: progress.ActionData(); Report(); break;
                     case 0x08000000:
-                        progress.ResetAction();
-                        string action = Native.RecordString(record, 1);
-                        finishing = action == "InstallFinalize";
-                        log("Windows Installer action: " + action);
-                        Report();
+                        ActionStarted(Native.RecordString(record, 1));
                         break;
                     case 0x0b000000:
                         if (Native.MsiRecordGetInteger(record, 1) == 2)
@@ -179,15 +335,7 @@ namespace Lekh.Setup
                     case 0x04000000: return 1;
                     default: return 0;
                 }
-                if (cancelRequested && !cancelSent && canCancel &&
-                    (message == 0x0a000000 || message == 0x09000000 || message == 0x08000000))
-                {
-                    cancelSent = true;
-                    canCancel = false;
-                    Report();
-                    return 2;
-                }
-                return 1;
+                return CancellationReply(message);
             }
             catch (Exception error)
             {
@@ -196,11 +344,15 @@ namespace Lekh.Setup
                 // A failed log must not escape through this unmanaged callback either.
                 try { log(FailureMessage + Environment.NewLine + error); }
                 catch (Exception logError) { FailureMessage += " Diagnostic logging also failed: " + logError.Message; }
-                return -1;
+                CallbackFailed = true;
+                cancelRequested = true; cancelSent = true; canCancel = false;
+                return 2;
             }
         }
         public uint Install(string package, string logPath)
         {
+            string code = Payload.ProductCode(package);
+            string properties = PropertiesForProduct(code);
             Native.Check(Native.MsiEnableLog(0x1fff, logPath, 0), "Enable Windows Installer logging");
             uint previousUI = Native.MsiSetInternalUI(2, IntPtr.Zero);
             if (previousUI == 0) throw new InvalidOperationException("Could not configure Windows Installer UI.");
@@ -211,8 +363,10 @@ namespace Lekh.Setup
                 uint filter = 0xfffu | (1u << 25);
                 Native.Check(Native.MsiSetExternalUIRecord(callback, filter, IntPtr.Zero, out previous), "Register installer progress");
                 registered = true;
-                uint result = Native.MsiInstallProduct(package, SetupPolicy.InstallProperties);
+                uint result = Native.MsiInstallProduct(package, properties);
                 Installed = SetupPolicy.IsSuccess(result);
+                if (Installed && previousProduct != null && !repair && !RemovalConfirmed)
+                    throw new InvalidDataException("Windows did not report the required previous-version removal checkpoint. Inspect the MSI log before using this installation.");
                 return result;
             }
             finally
@@ -231,6 +385,40 @@ namespace Lekh.Setup
 
     internal static class Payload
     {
+        internal static IEnumerable<string[]> Rows(uint database, string query, uint columns)
+        {
+            uint view;
+            Native.Check(Native.MsiDatabaseOpenView(database, query, out view), "Read MSI table");
+            try
+            {
+                Native.Check(Native.MsiViewExecute(view, 0), "Query MSI table");
+                uint record, result;
+                while ((result = Native.MsiViewFetch(view, out record)) == 0)
+                {
+                    string[] row = new string[columns];
+                    try { for (uint field = 1; field <= columns; field++) row[field - 1] = Native.RecordString(record, field); }
+                    finally { Native.MsiCloseHandle(record); }
+                    yield return row;
+                }
+                if (result != 259) Native.Check(result, "Read MSI row");
+            }
+            finally { Native.MsiCloseHandle(view); }
+        }
+        internal static string ProductCode(string package)
+        {
+            uint database;
+            Native.Check(Native.MsiOpenDatabase(package, IntPtr.Zero, out database), "Open MSI identity");
+            try
+            {
+                foreach (string[] row in Rows(database, "SELECT `Value` FROM `Property` WHERE `Property` = 'ProductCode'", 1))
+                {
+                    Guid code;
+                    if (Guid.TryParse(row[0], out code)) return row[0];
+                }
+                throw new InvalidDataException("The embedded MSI has no valid exact ProductCode.");
+            }
+            finally { Native.MsiCloseHandle(database); }
+        }
         public static string Extract(Func<bool> cancelled, string cacheRoot = null)
         {
             string directory = Path.Combine(cacheRoot ?? Path.Combine(
@@ -277,22 +465,24 @@ namespace Lekh.Setup
             Native.Check(Native.MsiOpenDatabase(package, IntPtr.Zero, out database), "Open embedded MSI");
             try
             {
-                uint view;
-                Native.Check(Native.MsiDatabaseOpenView(database, "SELECT `Property`, `Value` FROM `Property`", out view), "Read MSI identity");
-                try
+                Dictionary<string, string> properties = new Dictionary<string, string>();
+                foreach (string[] row in Rows(database, "SELECT `Property`, `Value` FROM `Property`", 2)) properties.Add(row[0], row[1]);
+                SetupPolicy.ValidateProperties(properties);
+                Guid code;
+                if (!properties.ContainsKey("ProductCode") || !Guid.TryParse(properties["ProductCode"], out code))
+                    throw new InvalidDataException("The embedded MSI has no valid exact ProductCode.");
+                Dictionary<string, int> sequence = new Dictionary<string, int>();
+                bool removalCheckpoint = false, checkpointAction = false, rollbackGuard = false;
+                foreach (string[] row in Rows(database, "SELECT `Action`, `Sequence`, `Condition` FROM `InstallExecuteSequence`", 3))
                 {
-                    Native.Check(Native.MsiViewExecute(view, 0), "Query MSI identity");
-                    Dictionary<string, string> properties = new Dictionary<string, string>();
-                    uint record, result;
-                    while ((result = Native.MsiViewFetch(view, out record)) == 0)
-                    {
-                        try { properties.Add(Native.RecordString(record, 1), Native.RecordString(record, 2)); }
-                        finally { Native.MsiCloseHandle(record); }
-                    }
-                    if (result != 259) Native.Check(result, "Read MSI property");
-                    SetupPolicy.ValidateProperties(properties);
+                    sequence.Add(row[0], Int32.Parse(row[1], System.Globalization.CultureInfo.InvariantCulture));
+                    if (row[0] == "LekhPreviousVersionRemoved" && row[2] == "WIX_UPGRADE_DETECTED AND NOT Installed") removalCheckpoint = true;
                 }
-                finally { Native.MsiCloseHandle(view); }
+                foreach (string[] row in Rows(database, "SELECT `Type`, `Source`, `Target` FROM `CustomAction` WHERE `Action` = 'LekhPreviousVersionRemoved'", 3))
+                    checkpointAction = row[0] == "51" && row[1] == "LEKH_PREVIOUS_VERSION_REMOVED" && row[2] == "1";
+                foreach (string[] row in Rows(database, "SELECT `Condition` FROM `LaunchCondition`", 1))
+                    if (row[0] == "NOT RollbackDisabled") rollbackGuard = true;
+                SetupPolicy.ValidateSchedule(sequence, rollbackGuard, removalCheckpoint && checkpointAction);
             }
             finally { Native.MsiCloseHandle(database); }
         }
@@ -320,6 +510,40 @@ namespace Lekh.Setup
         [DllImport("msi.dll")] internal static extern uint MsiViewExecute(uint view, uint record);
         [DllImport("msi.dll")] internal static extern uint MsiViewFetch(uint view, out uint record);
         [DllImport("msi.dll")] internal static extern uint MsiCloseHandle(uint handle);
+        [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiEnumRelatedProductsW")]
+        private static extern uint MsiEnumRelatedProducts(string upgrade, uint reserved, uint index, StringBuilder code);
+        [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiGetProductInfoExW")]
+        private static extern uint MsiGetProductInfoEx(string code, string sid, uint context, string property, StringBuilder value, ref uint length);
+        internal static IEnumerable<string> RelatedProducts()
+        {
+            for (uint index = 0; index < 256; index++)
+            {
+                StringBuilder code = new StringBuilder(39);
+                uint result = MsiEnumRelatedProducts("{" + SetupPolicy.UpgradeCode + "}", 0, index, code);
+                if (result == 259) yield break;
+                Check(result, "Enumerate installed Lekh versions");
+                yield return code.ToString();
+            }
+            throw new InvalidDataException("Unexpectedly large related MSI product family.");
+        }
+        internal static string ProductProperty(string code, uint context, string property)
+        {
+            uint length = 0;
+            uint result = MsiGetProductInfoEx(code, null, context, property, null, ref length);
+            if (result == 1605) return null;
+            if (result != 0 && result != 234) Check(result, "Query installed Lekh " + property);
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                StringBuilder value = new StringBuilder(checked((int)length + 1));
+                uint capacity = (uint)value.Capacity;
+                result = MsiGetProductInfoEx(code, null, context, property, value, ref capacity);
+                if (result == 1605) return null;
+                if (result == 234) { length = capacity; continue; }
+                Check(result, "Read installed Lekh " + property);
+                return value.ToString();
+            }
+            throw new InvalidDataException("Installed Lekh registration changed repeatedly during detection.");
+        }
         internal static void Check(uint result, string operation)
         {
             if (result != 0) throw new InvalidOperationException(operation + " failed (Windows code " + result + ").");

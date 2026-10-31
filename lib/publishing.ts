@@ -1,6 +1,7 @@
 import type MarkdownIt from 'markdown-it';
 import Token from 'markdown-it/lib/token.mjs';
 import type StateBlock from 'markdown-it/lib/rules_block/state_block.mjs';
+import { unescapeAll } from 'markdown-it/lib/common/utils.mjs';
 import { publishingIcon } from './publishing-icons.js';
 
 export type PublishingKind = 'callout' | 'tabs' | 'tab' | 'steps' | 'image' | 'caption' | 'metadata' | 'unsupported' | 'include' | 'zone' | 'selector';
@@ -47,7 +48,7 @@ type Block = {
 };
 const stateLines = new WeakMap<StateBlock, Lines>();
 const directivePattern = /^ {0,3}:::[ \t]*([a-z][\w-]*)(?:[ \t]+(.*?))?[ \t]*$/i;
-const tabPattern = /^ {0,3}#{1,6}[ \t]+\[([^\]\n]+)\]\(#tab\/([^\s)]+)\)[ \t]*$/i;
+const tabPattern = /^ {0,3}#{1,6}[ \t]+\[((?:\\.|[^\]\\\n])+)\]\(#tab\/([^\s)]+)\)[ \t]*$/i;
 const calloutPattern = /^ {0,3}>[ \t]?\[!(NOTE|TIP|IMPORTANT|CAUTION|WARNING)\](?:[ \t]+(.*))?[ \t]*$/i;
 const divisionPattern = /^ {0,3}>[ \t]?\[!div[ \t]+class=(?:"(checklist|nextstepaction)"|'(checklist|nextstepaction)')\](?:[ \t]+(.*))?[ \t]*$/i;
 const includePattern = /^ {0,3}\[!INCLUDE\b/i;
@@ -233,7 +234,7 @@ function docfxTabs(first: string, read: (index: number) => string | undefined, k
   const header = /^( *)(#+)/.exec(first)!;
   const indent = header[1].length;
   const level = header[2].length;
-  const tabs: Tab[] = [{ label: tabPattern.exec(first)![1], from: 1, to: 1 }];
+  const tabs: Tab[] = [{ label: publishingLabel(tabPattern.exec(first)![1]), from: 1, to: 1 }];
   const nested: string[] = [];
   let fence: { character: string; length: number } | undefined;
   let comment = false;
@@ -276,7 +277,7 @@ function docfxTabs(first: string, read: (index: number) => string | undefined, k
     const tab = tabPattern.exec(line);
     if (tab && nextHeading[1].length === indent && nextHeading[2].length === level) {
       tabs.at(-1)!.to = cursor;
-      tabs.push({ label: tab[1], from: cursor + 1, to: cursor + 1 });
+      tabs.push({ label: publishingLabel(tab[1]), from: cursor + 1, to: cursor + 1 });
     } else if (nextHeading[2].length <= level) {
       if (knownExplicit === false) return finish(cursor);
       if (!implicit) {
@@ -338,7 +339,7 @@ function inspect(lines: Lines, start: number, end: number, metadata: boolean): B
       if (!option || options.some(value => value.id === option[2]) || options.length >= 32) {
         return unsupported(stop, 'Selector not rendered: use unique - [Label](#variant/id) options (at most 32). Source retained.');
       }
-      options.push({ label: option[1], id: option[2] });
+      options.push({ label: publishingLabel(option[1]), id: option[2] });
     }
     return options.length ? { kind: 'selector', end: stop, title: attrs.title || 'Content variants', options } :
       unsupported(stop, 'Selector not rendered: no variant options. Source retained.');
@@ -419,8 +420,7 @@ function prefixEnd(first: string, read: (index: number) => string | undefined): 
   }
 }
 
-/** Exact source consumed by a visual-editor atom; ordinary Markdown is left alone. */
-export function publishingBlockAtStart(source: string): { raw: string; kind: string } | null {
+function sourceBlock(source: string): { raw: string; block: Block; lines: Lines } | null {
   const text: string[] = [];
   const starts = [0];
   const read = (index: number): string | undefined => {
@@ -440,7 +440,53 @@ export function publishingBlockAtStart(source: string): { raw: string; kind: str
   const boundary = starts[prefixEnd(first, read)] ?? source.length;
   const lines = makeLines(source.slice(0, boundary));
   const block = inspect(lines, 0, lines.text.length, true);
-  return block ? { raw: rawRange(lines, 0, block.end), kind: block.kind } : null;
+  return block ? { raw: rawRange(lines, 0, block.end), block, lines } : null;
+}
+
+export function publishingLabel(value: string): string {
+  return unescapeAll(value);
+}
+
+export type EditablePublishingBlock = {
+  raw: string;
+  kind: PublishingKind;
+  body?: string;
+  title?: string;
+  variant?: string;
+  variants?: string[];
+  options?: { id: string; label: string }[];
+  attributes?: Record<string, string>;
+  syntax?: 'heading' | 'directive';
+  panels?: { label: string; id: string; level: number; body: string }[];
+};
+
+/** Shared boundaries and validation keep editable blocks consistent with previews/exports. */
+export function editablePublishingBlockAtStart(source: string): EditablePublishingBlock | null {
+  const parsed = sourceBlock(source);
+  if (!parsed) return null;
+  const { raw, block, lines } = parsed;
+  return {
+    raw, kind: block.kind,
+    body: block.kind === 'metadata' ? rawRange(lines, 1, block.end - 1) : block.body,
+    title: block.title, variant: block.variant, variants: block.variants,
+    options: block.options, attributes: block.attributes,
+    ...(block.tabs ? {
+      syntax: tabPattern.test(lines.text[0]) ? 'heading' as const : 'directive' as const,
+      panels: block.tabs.map((tab, index) => {
+        const header = lines.text[tab.from - 1];
+        const match = tabPattern.exec(header);
+        return { label: tab.label, id: match?.[2] ?? `example-${index + 1}`,
+          level: /^ {0,3}(#{1,6})/.exec(header)?.[1].length ?? 1,
+          body: rawRange(lines, tab.from, tab.to) };
+      }),
+    } : {}),
+  };
+}
+
+/** Exact source consumed by a publishing node; ordinary Markdown is left alone. */
+export function publishingBlockAtStart(source: string): { raw: string; kind: string } | null {
+  const parsed = sourceBlock(source);
+  return parsed ? { raw: parsed.raw, kind: parsed.block.kind } : null;
 }
 
 function candidate(line: string): boolean {
@@ -483,6 +529,15 @@ function parseBody(state: StateBlock, source: string, firstLine: number, context
 export function registerPublishing(parser: MarkdownIt): void {
   parser.core.ruler.before('normalize', 'publishing_source', state => {
     state.env[contextKey] = { depth: 0, sequence: 0, original: makeLines(state.src), variantLabels: new Map() } satisfies Context;
+  });
+  parser.core.ruler.after('block', 'publishing_variant_labels', state => {
+    const context = state.env[contextKey] as Context;
+    for (const token of state.tokens) {
+      if (token.type !== 'publishing_zone_open') continue;
+      const meta = token.meta as PublishingMeta;
+      meta.label = meta.variants!.map(id => context.variantLabels.get(id) ??
+        id.replace(/[-_]+/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase())).join(' / ');
+    }
   });
   parser.block.ruler.before('blockquote', 'publishing', (state, start, end, silent) => {
     if (state.sCount[start] - state.blkIndent >= 4) return false;
@@ -535,7 +590,7 @@ export function registerPublishing(parser: MarkdownIt): void {
       push('publishing_metadata', '', 0).content = raw;
     } else if (block.kind === 'selector') {
       meta.title = state.md.utils.unescapeAll(block.title!);
-      meta.options = block.options!.map(option => ({ ...option, label: state.md.utils.unescapeAll(option.label) }));
+      meta.options = block.options!;
       for (const option of meta.options) context.variantLabels.set(option.id, option.label);
       push('publishing_selector', '', 0);
     } else if (block.kind === 'zone') {

@@ -13,7 +13,7 @@ import { themes } from '../lib/themes.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
 import { fileArguments } from '../lib/launch.js';
 import { productName, productTitle, userDataDirectory } from '../lib/branding.js';
-import { preparePublishing } from '../lib/includes.js';
+import { preparePublishing, readAuthorizedInclude } from '../lib/includes.js';
 import { publishingTemplates } from '../lib/publishing-templates.js';
 import type { ContextMenuItem, EditorContext, OpenedFile, Result } from '../src/bridge.js';
 
@@ -97,13 +97,13 @@ if (primaryInstance) {
   });
 }
 
-async function openDocument(file: string): Promise<OpenedFile> {
+async function openDocument(file: string, preloadedContent?: string): Promise<OpenedFile> {
   const existing = [...documents].find(([, document]) => document.path && samePath(document.path, file));
   if (existing) {
     await remember(file);
     return { id: existing[0], path: file, content: existing[1].diskContent ?? '' };
   }
-  const content = await readMarkdown(file);
+  const content = preloadedContent ?? await readMarkdown(file);
   const id = randomUUID();
   documents.set(id, { path: file, diskContent: content });
   await remember(file);
@@ -137,6 +137,8 @@ function showContextMenu(items: MenuItemConstructorOptions[], x: number, y: numb
       checked: item.type === 'checkbox' ? item.checked : undefined,
       shortcut: item.accelerator?.replace(/CommandOrControl|CmdOrCtrl/g, 'Ctrl'),
       submenu: item.submenu ? serialize(item.submenu, enabled) : undefined,
+      icon: publishingTemplates.find(template => template.id === item.id)?.icon,
+      description: publishingTemplates.find(template => template.id === item.id)?.description,
     };
   });
   const model = serialize(native);
@@ -160,10 +162,9 @@ function paragraphItems(): MenuItemConstructorOptions[] {
 function insertItems(): MenuItemConstructorOptions[] {
   return [
     { label: 'Image...', accelerator: 'CmdOrCtrl+Shift+I', click: () => action('image') },
+    { label: 'Alerts', submenu: publishingTemplates.filter(item => item.category === 'alerts').map(item => ({ id: item.id, label: item.label, click: () => action(`insert:${item.id}`) })) },
     { label: 'Publishing blocks', submenu: [
-      { label: 'Alerts', submenu: publishingTemplates.filter(item => item.category === 'alerts').map(item => ({ label: item.label, click: () => action(`insert:${item.id}`) })) },
-      { type: 'separator' },
-      ...publishingTemplates.filter(item => item.category === 'content').map(item => ({ label: item.label, click: () => action(`insert:${item.id}`) })),
+      ...publishingTemplates.filter(item => item.category === 'content').map(item => ({ id: item.id, label: item.label, enabled: item.id !== 'publishing-zone' || Boolean(editorContext.hasVariantSelector), click: () => action(`insert:${item.id}`) })),
     ] },
     { label: 'Footnote (Source)', click: () => action('insert:footnote') },
     { label: 'Link...', accelerator: 'CmdOrCtrl+K', click: () => action('link') },
@@ -338,11 +339,15 @@ function installIPC(): void {
     assertSender(event);
     if (!context || !['visual', 'source'].includes(context.mode) || !Array.isArray(context.active)
       || !context.active.every(item => typeof item === 'string') || !Number.isInteger(context.heading)
-      || context.heading < 0 || context.heading > 6 || typeof context.inTable !== 'boolean') {
+      || context.heading < 0 || context.heading > 6 || typeof context.inTable !== 'boolean'
+      || context.hasVariantSelector !== undefined && typeof context.hasVariantSelector !== 'boolean'
+      || context.formField !== undefined && typeof context.formField !== 'boolean') {
       console.error('Invalid editor context.');
       return;
     }
     editorContext = context;
+    const variantContent = Menu.getApplicationMenu()?.getMenuItemById('publishing-zone');
+    if (variantContent) variantContent.enabled = Boolean(context.hasVariantSelector);
     for (let level = 0; level <= 6; level++) {
       const item = Menu.getApplicationMenu()?.getMenuItemById(`paragraph-${level}`);
       if (item) item.checked = context.heading === level;
@@ -423,6 +428,17 @@ function installIPC(): void {
     const prepared = await preparePublishing(content, document.path, root);
     if ((publishingRoots.get(String(id)) ?? null) !== root) throw new Error('Local include access changed. Refresh the preview.');
     return prepared;
+  });
+  handle('publishing:open-include', async (id: unknown, source: unknown) => {
+    const document = documentFor(id);
+    if (!document.path || typeof source !== 'string' || !source.trim() || /[\r\n]/.test(source)) {
+      throw new Error('Save this document and choose a valid local include path.');
+    }
+    const root = publishingRoots.get(String(id));
+    if (!root) throw new Error('Allow this document’s local project folder before opening an included file.');
+    const included = await readAuthorizedInclude(source, document.path, root);
+    if (publishingRoots.get(String(id)) !== root) throw new Error('Local include access changed. Allow the folder again before opening this file.');
+    return openDocument(included.path, included.content);
   });
   handle('publishing:revoke-includes', async (id: unknown) => {
     documentFor(id);
@@ -551,6 +567,12 @@ function createWindow(): void {
       if (!parameters.dictionarySuggestions.length) items.push({ label: 'No spelling suggestions', enabled: false });
       items.push({ type: 'separator' });
     }
+    if (parameters.isEditable && editorContext.formField) {
+      items.push({ role: 'cut', enabled: parameters.editFlags.canCut }, { role: 'copy', enabled: parameters.editFlags.canCopy },
+        { role: 'paste' }, { role: 'selectAll' });
+      showContextMenu(items, parameters.x, parameters.y);
+      return;
+    }
     if (parameters.isEditable) {
       if (parameters.linkURL) items.push({ label: 'Edit link...', click: () => action('link') }, { type: 'separator' });
       items.push(
@@ -582,6 +604,18 @@ function createWindow(): void {
         ] },
         { label: 'Paragraph', submenu: paragraphItems() },
         { label: 'Insert', submenu: insertItems() },
+        { label: 'View and tools', submenu: [
+          { label: 'Visual + Source', click: () => action('side-by-side') },
+          { label: 'Visual only', click: () => action('visual') },
+          { label: 'Source only', click: () => action('source') },
+          { label: 'Source + Preview', click: () => action('preview') },
+          { label: 'Split / Unsplit', click: () => action('split') },
+          { type: 'separator' },
+          { label: 'Writing assistance', click: () => action('writing-assistance') },
+          { label: 'Allow local includes...', click: () => action('allow-includes') },
+          { label: 'Stop local includes', click: () => action('revoke-includes') },
+          { label: 'Getting started', click: () => action('help') },
+        ] },
         { label: 'Table', submenu: [
           { label: 'Insert table...', click: () => action('table') },
           { type: 'separator' },

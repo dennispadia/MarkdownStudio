@@ -5,6 +5,8 @@ export interface EditorContext {
   active: string[];
   heading: number;
   inTable: boolean;
+  hasVariantSelector?: boolean;
+  formField?: boolean;
 }
 export interface ContextMenuItem {
   id: string;
@@ -14,6 +16,8 @@ export interface ContextMenuItem {
   checked?: boolean;
   shortcut?: string;
   submenu?: ContextMenuItem[];
+  icon?: string;
+  description?: string;
 }
 export interface EditorContextMenu {
   id: string;
@@ -30,6 +34,7 @@ export interface LekhAPI {
   allowPublishingIncludes: (id: string) => Promise<Result<boolean>>;
   revokePublishingIncludes: (id: string) => Promise<Result<void>>;
   preparePublishing: (id: string, content: string) => Promise<Result<{ markdown: string; includes: string[] }>>;
+  openPublishingInclude: (id: string, source: string) => Promise<Result<OpenedFile>>;
   exportDocument: (id: string, content: string, format: 'pdf' | 'docx') => Promise<Result<string | null>>;
   insertImage: () => Promise<Result<string | null>>;
   storeImage: (id: string, source: string, storage: 'embedded' | 'assets') => Promise<Result<string>>;

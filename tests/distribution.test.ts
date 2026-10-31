@@ -8,6 +8,7 @@ const { configurePerUserMsi } = require('../scripts/configure-msi.cjs') as { con
 
 const original = `<Product UpgradeCode="DCBCF7FA-11DA-4F35-8D27-D066EEC6C582">
 <Package Compressed="yes" InstallerVersion="500"/>
+<MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version is installed."/>
 <Property Id="ALLUSERS" Secure="yes" Value="2"/>
 <Directory Id="ProgramFiles64Folder"><Directory Id="APPLICATIONFOLDER"/></Directory>
 <ComponentGroup Directory="APPLICATIONFOLDER">
@@ -64,7 +65,7 @@ test('distribution uses the public npm registry and ships notices without develo
   assert.equal(manifest.name, 'lekh');
   assert.equal(lock.name, manifest.name);
   assert.equal(lock.packages[''].name, manifest.name);
-  assert.equal(manifest.version, '0.8.1');
+  assert.equal(manifest.version, '0.9.0');
   assert.equal(manifest.build.appId, 'com.lekh.desktop');
   assert.equal(manifest.build.productName, 'Lekh - Markdown editor');
   assert.equal(manifest.build.msi.shortcutName, 'Lekh');
@@ -101,6 +102,17 @@ test('distribution uses the public npm registry and ships notices without develo
   for (const name of ['node_modules/', '.tools/', 'release/', 'dist/', 'build/', '.npmrc', '.env']) {
     assert.ok((await readFile(new URL('../.gitignore', import.meta.url), 'utf8')).split(/\r?\n/).includes(name));
   }
+});
+
+test('major upgrades remove old payload inside rollback before new scripts, with a unique removal checkpoint', () => {
+  const actual = configurePerUserMsi(original);
+  assert.match(actual, /<MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"/);
+  assert.match(actual, /<Condition[^>]+>NOT RollbackDisabled<\/Condition>/);
+  assert.match(actual, /<CustomAction Id="LekhPreviousVersionRemoved" Property="LEKH_PREVIOUS_VERSION_REMOVED" Value="1"\/>/);
+  assert.match(actual, /Action="LekhPreviousVersionRemoved" After="RemoveExistingProducts">WIX_UPGRADE_DETECTED AND NOT Installed/);
+  assert.throws(() => configurePerUserMsi(original.replace(/<MajorUpgrade[^>]+\/>/, '')), /MajorUpgrade/);
+  assert.throws(() => configurePerUserMsi(original.replace('<MajorUpgrade ', '<MajorUpgrade Schedule="afterInstallFinalize" ')), /MajorUpgrade/);
+  assert.throws(() => configurePerUserMsi(original.replace('AllowSameVersionUpgrades="yes"', 'AllowSameVersionUpgrades="no"')), /MajorUpgrade/);
 });
 
 test('public release contains only verified offline setup, source and checksums; MSI stays internal', async () => {

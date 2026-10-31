@@ -255,6 +255,21 @@ function Test-SetupPreview([string]$State, [bool]$MotionEnabled) {
         $window = Wait-SetupWindow $preview "Preview $state"
         if ($window.Current.ProcessId -ne $preview.Id) { throw 'Preview window belongs to a different process.' }
         if ($state -eq 'installing') { Test-Story $window -ReducedMotion:(-not $MotionEnabled) }
+        $heading = (Find-Control $window 'Heading').Current.Name
+        $description = (Find-Control $window 'Description').Current.Name
+        if ($state -eq 'upgrade' -and ($heading -notlike '*0.8.1*' -or
+            $description -notlike '*Save your work and close Lekh*' -or
+            (Find-Control $window 'Primary').Current.Name -cne 'Save and close, then update')) {
+            throw 'Upgrade preview must identify 0.8.1 and explicitly ask users to save and close before updating.'
+        }
+        if ($state -eq 'repair' -and ((Find-Control $window 'Primary').Current.Name -cne 'Save and close, then reinstall' -or
+            $heading -notlike "*$($manifest.version)*")) { throw 'Same-version preview must identify the installed version and offer reinstall.' }
+        if ($state -eq 'removing' -and ($description -notlike '*0.8.1*' -or
+            (Find-Control $window 'Stages').Current.Name -notlike '*REMOVE OLD*' -or
+            (Find-Control $window 'Notice').Current.Name -notlike '*new application payload has not started*')) {
+            throw 'Removal preview must state the old version and that new payload has not started.'
+        }
+        if ($state -eq 'rollback' -and $heading -cne 'Rolling back changes.') { throw 'Rollback preview must describe restoration, not successful installation.' }
         Write-Host "PASS: native accessible preview $state."
     } finally {
         if (-not $preview.HasExited) {
@@ -277,7 +292,7 @@ Write-Host "Desktop client-area animation before verification: $originalAnimatio
 try {
     if ($InstallOnHostedRunner) { Set-HostedClientAreaAnimation $true }
     $motionEnabled = [SetupVerificationDesktop]::GetClientAreaAnimation()
-    foreach ($state in @('installing', 'ready', 'open', 'preparing', 'finishing', 'success', 'restart', 'error', 'stopping', 'cancelled')) {
+    foreach ($state in @('installing', 'ready', 'upgrade', 'repair', 'downgrade', 'open', 'preparing', 'removing', 'finishing', 'rollback', 'success', 'restart', 'error', 'stopping', 'cancelled')) {
         Test-SetupPreview $state $motionEnabled
     }
     if ($InstallOnHostedRunner) {
@@ -413,7 +428,8 @@ function Test-HostedInstallation {
                 New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
                 $log = Join-Path $logDirectory 'hosted-uninstall.log'
                 $uninstall = Start-Process -FilePath (Join-Path $env:WINDIR 'System32\msiexec.exe') -ArgumentList @(
-                    '/x', $productCode, '/qn', '/norestart', '/L*v', "`"$log`""
+                    '/x', $productCode, '/qn', '/norestart', 'REBOOT=ReallySuppress',
+                    'MSIRESTARTMANAGERCONTROL=DisableShutdown', 'MSIDISABLERMRESTART=1', '/L*v', "`"$log`""
                 ) -PassThru -Wait
                 try {
                     if ($uninstall.ExitCode -notin @(0, 1605, 1614, 3010)) {

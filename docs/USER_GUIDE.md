@@ -2,7 +2,7 @@
 
 A local-first Windows desktop application for writing Markdown with a friendly visual editor and exporting to Word and PDF.
 
-This guide describes **[Lekh 0.8.1](https://github.com/dennispadia/lekh/releases/tag/v0.8.1)**, including directly editable alerts, document-scoped publishing controls, readable Light/Dark tabs, and offline grammar checking.
+This guide describes **Lekh 0.9.0**, including fully editable Visual publishing blocks, independently placed variant content, separate Alerts/Blocks tools, synchronized scrolling, and offline grammar checking. See the [README](../README.md) for the latest published installer.
 
 ## Open the application
 
@@ -82,13 +82,13 @@ Close the panel to keep writing with underlines, or disable checking to stop the
 
 ### Publishing blocks and reader-friendly documents
 
-**Blocks** has two groups: **Alerts** and **Content blocks**. All tools have an icon and a short description available on hover or keyboard focus.
-The same commands are under **Insert > Publishing blocks**. At narrow widths, Blocks remains available through **More tools**.
+**Alerts** and **Blocks** are separate toolbar menus. All tools have an icon and a description available on hover or keyboard focus.
+The same commands are available from the native Insert menu and right-click **Insert > Alerts / Publishing blocks**. At narrow widths, the original controls move into **More tools** rather than disappearing.
 
 #### Alerts: write directly in Visual
 
 1. Put the caret in a paragraph, or select the paragraphs you want to format.
-2. Choose **Blocks > Alerts > Note, Tip, Important, Caution, or Warning**.
+2. Choose **Alerts > Note, Tip, Important, Caution, or Warning**.
 3. Type directly inside the alert. Use the normal toolbar for rich text, lists, links and code; there is no need to open Source to write its body.
 4. With the caret inside an alert, choose another type to change it without replacing the content.
 5. Press Enter to add a paragraph. Enter again on an empty final paragraph returns to normal writing outside the alert.
@@ -96,7 +96,7 @@ The same commands are under **Insert > Publishing blocks**. At narrow widths, Bl
 Each alert has a semantic icon, text label and colored leading border. Meaning does not depend on color alone.
 Undo/redo includes alert insertion, body edits and type changes. Unchanged non-reference alerts retain their source syntax; edited alerts save as ordinary `> [!TYPE]` Markdown.
 During Visual edits, reference links and images may be written with resolved inline destinations to keep dependencies valid across blocks. Manage shared reference definitions in Source when removing a block that owns them.
-Content rendered from an included file or another protected publishing container stays read-only; open its source to edit that content.
+Supported containers, including tabs and variant bodies around an alert, are editable too. Shared included text belongs to its own file; use its **Open shared file in Visual** button to edit that file.
 
 ![Directly editable alerts in Light](images/alerts-light.png)
 
@@ -104,22 +104,35 @@ Content rendered from an included file or another protected publishing container
 
 #### Tabs and variant selectors
 
-**Content blocks** includes **Tabbed examples, Variant selector, Structured steps, Image with description, Document metadata, and Local include**.
-Select existing content before choosing tabbed examples or a selector to retain that content inside the new block. Without a selection, Lekh inserts an example.
-Tabs switch between examples within one block. Variant selectors switch matching content throughout the current document; they are independent of tabs.
+**Blocks** includes **Tabbed examples, Variant selector, Variant content, Structured steps, Image with description, Document metadata, and Local include**.
+Select existing content before choosing tabs, steps or variant content to retain it inside the new body. A selector inserts only choices, retaining selected prose separately rather than bundling variant bodies.
+
+**Tabbed examples:** select a tab and type/format directly in its body. Edit **Tab name** in that panel to rename it. Every alternative remains editable; **Add tab**, **Remove tab** and normal undo/redo manage examples. **Write after block** places a normal paragraph after the group.
+
+**Variant selector and distributed content:**
+
+1. Insert **Blocks > Variant selector** once. Edit **Selector prompt** and the option-name fields directly in Visual. Renaming a label keeps its stable ID and all matching content.
+2. Put the caret at any other position in the document, or select text to wrap.
+3. Choose **Blocks > Variant content**, select one or more existing options, and insert. This command is disabled until an editable selector exists.
+4. Write and format directly in the new body. Repeat at other locations; content does not have to sit beside the selector.
+5. Inactive content retains a compact card with **Show and edit**. **Applies to...** changes its option assignments; at least one assignment is required.
+6. **Add option** adds a stable new ID. Removing an option is blocked while any variant content still uses it; reassign or remove that content first.
+
+Tabs switch examples within one block. Variant selectors switch matching content throughout the current document; they are independent of tabs.
 Selectors stay inside Visual or the rendered Preview. In Visual + Source, they never span or displace the Source column.
-Source always retains every alternative. In Visual, inactive variant blocks keep a compact authoring placeholder so hidden content is not accidentally mistaken for absent content.
+Source always retains every alternative. In Visual, inactive cards make hidden content visible and directly reachable for editing.
 Read-only previews hide inactive content. Static exports include **all** labeled alternatives.
 
 ![A selector contained within Visual, with readable Dark tabbed examples](images/publishing-split-dark.png)
 
-![The grouped Blocks menu with tool icons](images/publishing-menu-dark.png)
+![Separate Alerts and Blocks tools with icons and independent variant-content insertion](images/publishing-menu-dark.png)
 
 #### Metadata, includes and complex blocks
 
-Complex publishing blocks are protected Visual nodes: hover or focus a block and choose **Edit source** to select its syntax.
-Unrelated Visual edits retain their original Markdown, including unsupported directives. Source remains the way to edit these containers' configuration and contents.
-Metadata is shown as a collapsed view rather than ordinary article text. This is rendering and preservation, not a complete YAML schema validator.
+**Structured steps** have a rich editable body. Use ordinary list/paragraph formatting and **Write after block** to continue outside the container.
+**Image with description** has editable source, alternate text and caption fields. A complex image's long description is rich editable content; **Add long description** creates one for an ordinary described image.
+**Document metadata** is collapsed outside article text. Expand it to edit title/description or **Metadata YAML (all fields)** directly in Visual. Arbitrary keys and comments are retained. Multiline YAML values are edited in that same YAML field, not by flattening them into a simple input. Keep at least one `name: value` field or delete the entire block; delimiter lines are managed separately. Lekh does not evaluate YAML tags or claim complete schema validation.
+Unsupported or over-depth directives remain source-preserving and visibly identified. **Edit block** opens their raw syntax inline within Visual, without switching the document to Source.
 
 For local includes:
 
@@ -127,18 +140,20 @@ For local includes:
 2. Choose **More tools > Allow local includes**, or **View > Allow local includes**.
 3. Select a folder containing this document and the intended included files.
 4. Preview and exports may now resolve bounded local includes inside that folder. Paths escaping it, missing files, cycles and size/depth limits are reported explicitly.
+   Edit an include's name/path directly in its Visual card. **Open shared file in Visual** opens only that authorized Markdown file in its own tab, even if its child includes need fixing. Changes are saved explicitly to the shared file; the parent's directive is not flattened or rewritten. Saving refreshes authorized parent previews.
 5. Choose **Stop local includes** to revoke access, or close the document. Grants are not remembered between sessions.
 
-If publishing labels are defined in a local `zone-pivot-groups.yml`, allow the project folder so available definitions can be used. Otherwise selectors show the discovered variant IDs with an explanation.
+Opening a shared file does not transfer the parent's include/image grant. Allow that new document's project folder separately if it needs sibling assets or further includes.
+If publishing labels are defined in a local `zone-pivot-groups.yml`, allow the project folder so available definitions can be used. **Make these choices editable** creates one explicit Visual selector for this document; it does not modify the external configuration. This also enables independent variant-content insertion. Otherwise selectors show discovered IDs with an explanation.
 Lekh never downloads includes, images or publishing configuration from the internet.
 Features requiring a publishing site's complete build pipeline are not simulated as successful output; unsupported syntax remains identified and preserved.
 
 ### Editor views and formatting
 
-- **Visual + Source:** turn on the switch in the toolbar to edit Visual on the left and Source on the right. Both represent the same document; edits update the other pane. Click the side you want to edit; toolbar formatting follows it. Turning the switch off keeps Visual and retains scroll offsets. The switch supports Space when focused. A two-file pair shares this same switch, which controls only the active document and preserves the other document's mode.
+- **Visual + Source:** turn on the switch to edit Visual on the left and Source on the right. Edits update the other pane, and scrolling is synchronized in both directions by default using content anchors and measured wrapped Source lines, not only the whole-document percentage. Click the side you want to edit; formatting follows it. Turning the switch off keeps Visual and retains offsets. Space operates the focused switch. A two-file pair shares this switch, which controls only the active document; scrolling never drives the other document.
 - **Single-editor views:** **More (...) > Visual only / Source only**, and **View > Visual / source** (Ctrl+/), retain the separate views. These mode changes reset undo history as before; simply showing Source alongside Visual does not recreate the editor. Visual edits can normalize Markdown syntax; use Source for exact syntax and unsupported constructs.
 - **Single-row toolbar:** headings, bold, italic, strikethrough, inline code, all three list types, quotes, links, images, tables, code blocks, horizontal rules, table-of-contents insertion/update, and Mermaid insertion are directly accessible when space permits. Icons expose names and shortcuts on hover. As the window narrows, commands that no longer fit move into **More tools and views (...)**, with readable labels, rather than producing a scrollbar. Widening the window returns them to the toolbar. More also contains additional views and help; arrow keys navigate and Escape returns focus to its button. All commands remain available from the native menus. Save and Export keep their labels.
-- **Compact right-click menu:** right-click in Visual or Source, or press **Shift+F10**, for direct Cut, Copy, Paste, Delete, Bold, Italic, Code, Link, Quote, Numbered list, Bullet list, and Task list buttons. **Copy / Paste As**, **Paragraph**, **Insert**, and **Table** retain their existing choices. The Link button edits a selected link. Spelling suggestions, undo/redo, strikethrough, clear formatting, and image copying remain available where applicable. Clipboard actions preserve the editor selection, and commands follow the clicked side of a split. Arrow keys navigate; Right opens a submenu, Left returns, and Escape closes the menu and restores editing focus. Other text inputs retain their native menu.
+- **Compact right-click menu:** right-click in Visual or Source, or press **Shift+F10**, for direct editing, Formatting, Paragraph, Insert, Table and **View and tools**. **Insert > Alerts / Publishing blocks** exposes the same tools and variant-content gate as the toolbar, with icons/descriptions. View tools include Visual/Source views, Split/Unsplit, writing assistance and local-include permissions. Submenus remain beside their actual parent and keep ancestors open, flipping/clamping at window edges. Right opens, Left/Escape returns a level, and closing restores editing focus. Clipboard actions preserve selection and target the clicked split side. Metadata/name/path inputs retain their native text-input menu rather than formatting the document body.
 - **Mermaid insertion:** place the caret where the diagram belongs and choose **Mermaid diagram** from the toolbar, its More menu, or Insert. In Visual, the diagram is inserted and rendered at that selection without switching modes; in Source, its fenced template uses the Source caret. In a split pair only the active document changes. Undo removes the insertion in one step.
 - **Document outline:** click a heading on the left to navigate. Linked headings show their readable descriptions, not link addresses or Markdown formatting syntax; links in the document remain unchanged.
 - **Links (0.6.2):** in Visual, click a link to edit its **Link text** and **Link address**, then choose **Save changes**. The link toolbar button, **Ctrl+K**, and right-click **Edit link...** also edit an existing link. **Remove link** keeps its text and formatting; Cancel leaves the document unchanged. Changing only the address preserves formatting within the label. Each change can be undone in one step. Use **Ctrl+click** to open a web/email link through the existing confirmation dialog, including in read-only Preview. Generated table-of-contents links still navigate with an ordinary click. Supported addresses are HTTP, HTTPS, `mailto:`, and `#heading` anchors. In Source, Ctrl+K continues to insert Markdown link syntax around the selection.

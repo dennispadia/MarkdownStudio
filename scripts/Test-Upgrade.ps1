@@ -14,15 +14,15 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -or -not [Enviro
 }
 
 # Deliberately bounded to this published lineage; neither asset nor identity is caller-selectable.
-$oldSetupUrl = 'https://github.com/dennispadia/lekh/releases/download/v0.8.0/Lekh-Markdown-editor-Setup-0.8.0-x64.exe'
-$oldSetupHash = '7e1b42622526fdfaa5aecb64d7394254a96f56469151396f019e18a1af3369fd'
-$oldSetupBytes = 197504000L
+$oldSetupUrl = 'https://github.com/dennispadia/lekh/releases/download/v0.8.1/Lekh-Markdown-editor-Setup-0.8.1-x64.exe'
+$oldSetupHash = 'cdbaafa78e98aa4515fdfb7bfe2a7822b59a54ed1547828bd775c3e61fa96128'
+$oldSetupBytes = 197516288L
 $upgradeCode = '{DCBCF7FA-11DA-4F35-8D27-D066EEC6C582}'
 $root = [IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
 $manifest = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json
-if ($manifest.version -cne '0.8.1' -or $manifest.build.productName -cne 'Lekh - Markdown editor' -or
+if ($manifest.version -cne '0.9.0' -or $manifest.build.productName -cne 'Lekh - Markdown editor' -or
     $manifest.build.msi.upgradeCode -cne $upgradeCode.Trim('{}')) {
-    throw 'This check supports only the genuine published 0.8.0 -> 0.8.1 Lekh upgrade.'
+    throw 'This check supports only the genuine published 0.8.1 -> 0.9.0 Lekh upgrade.'
 }
 if (-not $SetupPath) { $SetupPath = Join-Path $root "release\Lekh-Markdown-editor-Setup-$($manifest.version)-x64.exe" }
 $SetupPath = (Resolve-Path -LiteralPath $SetupPath).Path
@@ -47,6 +47,7 @@ $nativeSource = @'
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class UpgradeVerificationInstaller
@@ -64,6 +65,30 @@ public static class UpgradeVerificationInstaller
     private static extern uint MsiEnableLogW(uint mode, string path, uint attributes);
     [DllImport("msi.dll", ExactSpelling = true)]
     private static extern uint MsiSetInternalUI(uint level, IntPtr window);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate int RecordHandler(IntPtr context, uint message, uint record);
+    [DllImport("msi.dll", ExactSpelling = true)]
+    private static extern uint MsiSetExternalUIRecord(RecordHandler handler, uint filter, IntPtr context, out RecordHandler previous);
+    [DllImport("msi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern uint MsiRecordGetStringW(uint record, uint field, StringBuilder value, ref uint length);
+
+    private static string ActionName(uint record)
+    {
+        uint length = 0;
+        uint result = MsiRecordGetStringW(record, 1, null, ref length);
+        if (result != 0 && result != 234) throw new Win32Exception((int)result);
+        StringBuilder value = new StringBuilder(checked((int)length + 1));
+        length = (uint)value.Capacity;
+        result = MsiRecordGetStringW(record, 1, value, ref length);
+        if (result != 0) throw new Win32Exception((int)result);
+        return value.ToString();
+    }
+    private static bool PathExistsExact(string path)
+    {
+        try { File.GetAttributes(path); return true; }
+        catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
+    }
 
     public static string[] RelatedProducts(string upgradeCode)
     {
@@ -97,23 +122,61 @@ public static class UpgradeVerificationInstaller
         }
         throw new InvalidOperationException("MSI property changed repeatedly: " + property);
     }
-    public static uint Execute(string operation, string target, string log)
+    public static uint Execute(string operation, string target, string log, string previousCode, string directory)
     {
-        const string properties = "REBOOT=ReallySuppress MSIRESTARTMANAGERCONTROL=DisableShutdown";
+        const string properties = "REBOOT=ReallySuppress MSIRESTARTMANAGERCONTROL=DisableShutdown MSIDISABLERMRESTART=1";
         uint result = MsiEnableLogW(0x1fff, log, 3); // Append; flush each line for timeout diagnostics.
         if (result != 0) throw new Win32Exception((int)result, "Cannot enable MSI logging.");
         uint previousUI = MsiSetInternalUI(2, IntPtr.Zero); // INSTALLUILEVEL_NONE; never UACONLY.
         if (previousUI == 0) throw new InvalidOperationException("Cannot suppress MSI UI and elevation.");
+        bool removalVerified = false;
+        Exception callbackFailure = null;
+        RecordHandler previousHandler = null;
+        bool registered = false;
+        RecordHandler handler = delegate(IntPtr context, uint message, uint record) {
+            try
+            {
+                if ((message & 0xff000000) != 0x08000000) return 0;
+                string action = ActionName(record);
+                File.AppendAllText(log + ".stages.log", "ACTION " + action + Environment.NewLine);
+                if (action == "LekhPreviousVersionRemoved" && previousCode != null)
+                {
+                    foreach (uint scope in new uint[] { 1, 2, 4 })
+                        if (ProductProperty(previousCode, scope, "ProductName") != null)
+                            throw new InvalidOperationException("Previous exact ProductCode remains registered before new payload.");
+                    if (PathExistsExact(Path.Combine(directory, "Lekh - Markdown editor.exe")) ||
+                        PathExistsExact(Path.Combine(directory, "resources", "app.asar")))
+                        throw new InvalidOperationException("Previous executable/app.asar remains before new payload.");
+                    removalVerified = true;
+                    File.AppendAllText(log + ".stages.log", "PROVEN old registration/executable/app.asar absent before new payload." + Environment.NewLine);
+                    if (operation == "RollbackUpgrade") return 2; // Cancel only after actual old removal, still inside rollback.
+                }
+                return 1;
+            }
+            catch (Exception error) { callbackFailure = error; return 2; }
+        };
         try
         {
-            if (operation == "Install") return MsiInstallProductW(target, properties);
-            if (operation == "Uninstall") return MsiConfigureProductExW(target, 0, 2, properties); // INSTALLSTATE_ABSENT
-            throw new InvalidOperationException("Unsupported native MSI operation.");
+            result = MsiSetExternalUIRecord(handler, 1u << 8, IntPtr.Zero, out previousHandler);
+            if (result != 0) throw new Win32Exception((int)result, "Cannot register upgrade checkpoint verification.");
+            registered = true;
+            if (operation == "Install" || operation == "RollbackUpgrade") result = MsiInstallProductW(target, properties);
+            else if (operation == "Uninstall") result = MsiConfigureProductExW(target, 0, 2, properties); // INSTALLSTATE_ABSENT
+            else throw new InvalidOperationException("Unsupported native MSI operation.");
+            if (callbackFailure != null) throw new InvalidOperationException("Removal checkpoint verification failed.", callbackFailure);
+            if (previousCode != null && !removalVerified) throw new InvalidOperationException("Required real removal checkpoint was never observed.");
+            return result;
         }
         finally
         {
+            if (registered)
+            {
+                RecordHandler ignored;
+                MsiSetExternalUIRecord(previousHandler, 0, IntPtr.Zero, out ignored);
+            }
             MsiSetInternalUI(previousUI, IntPtr.Zero);
             MsiEnableLogW(0, null, 0);
+            GC.KeepAlive(handler);
         }
     }
 }
@@ -176,6 +239,30 @@ function Read-ValidatedMsi([string]$Path, [string]$Version) {
         $upgrades = @(Read-MsiRows $database 'SELECT `UpgradeCode` FROM `Upgrade`' 1)
         if ($upgrades.Count -eq 0 -or @($upgrades | Where-Object { $_[0] -ine $upgradeCode }).Count -gt 0) {
             throw 'MSI upgrade table has an unexpected upgrade identity.'
+        }
+        if ($Version -eq '0.9.0') {
+            $sequence = @{}
+            foreach ($row in (Read-MsiRows $database 'SELECT `Action`, `Sequence` FROM `InstallExecuteSequence`' 2)) { $sequence[$row[0]] = [int]$row[1] }
+            if (-not $sequence.ContainsKey('LekhPreviousVersionRemoved') -or
+                $sequence.RemoveExistingProducts -ne $sequence.InstallInitialize + 1 -or
+                $sequence.LekhPreviousVersionRemoved -ne $sequence.RemoveExistingProducts + 1 -or
+                $sequence.LekhPreviousVersionRemoved -ge $sequence.ProcessComponents -or
+                $sequence.LekhPreviousVersionRemoved -ge $sequence.InstallFiles) { throw 'New MSI lacks transactional remove-old-before-new scheduling.' }
+            foreach ($action in $sequence.Keys) {
+                if ($sequence[$action] -ge $sequence.InstallInitialize -and $sequence[$action] -le $sequence.LekhPreviousVersionRemoved -and
+                    $action -cnotin @('InstallInitialize', 'RemoveExistingProducts', 'LekhPreviousVersionRemoved')) {
+                    throw "Unexpected MSI action before removal verification: $action."
+                }
+            }
+            $checkpoint = @(Read-MsiRows $database 'SELECT `Type`, `Source`, `Target` FROM `CustomAction` WHERE `Action` = ''LekhPreviousVersionRemoved''' 3)
+            $checkpointSequence = @(Read-MsiRows $database 'SELECT `Condition` FROM `InstallExecuteSequence` WHERE `Action` = ''LekhPreviousVersionRemoved''' 1)
+            if ($checkpoint.Count -ne 1 -or $checkpoint[0][0] -cne '51' -or
+                $checkpoint[0][1] -cne 'LEKH_PREVIOUS_VERSION_REMOVED' -or $checkpoint[0][2] -cne '1' -or
+                $checkpointSequence.Count -ne 1 -or $checkpointSequence[0][0] -cne 'WIX_UPGRADE_DETECTED AND NOT Installed') {
+                throw 'New MSI has an unexpected removal checkpoint implementation or condition.'
+            }
+            $guard = @(Read-MsiRows $database 'SELECT `Condition` FROM `LaunchCondition`' 1)
+            if (@($guard | Where-Object { $_[0] -ceq 'NOT RollbackDisabled' }).Count -ne 1) { throw 'New MSI must refuse rollback-disabled installation.' }
         }
         return [pscustomobject]@{ Path = $Path; ProductCode = $properties.ProductCode; Version = $Version }
     } finally {
@@ -298,7 +385,7 @@ function Get-PayloadHashes {
     if ($hashes.Count -lt 2 -or -not $hashes.ContainsKey('resources\app.asar')) { throw 'Incomplete installed payload.' }
     return $hashes
 }
-function Invoke-UpgradeMsi([ValidateSet('Install', 'Repair', 'Uninstall')][string]$Operation, $Product, [string]$Label) {
+function Invoke-UpgradeMsi([ValidateSet('Install', 'Repair', 'Uninstall', 'RollbackUpgrade')][string]$Operation, $Product, [string]$Label) {
     Assert-HostedRunner
     if (-not $cleanRunnerVerified -or -not $ownedProducts.ContainsKey($Product.ProductCode) -or
         $ownedProducts[$Product.ProductCode].Path -cne $Product.Path) { throw 'Refusing unowned MSI operation.' }
@@ -309,14 +396,23 @@ function Invoke-UpgradeMsi([ValidateSet('Install', 'Repair', 'Uninstall')][strin
         # https://learn.microsoft.com/windows/win32/msi/reinstallmode
         $program = Join-Path $env:WINDIR 'System32\msiexec.exe'
         $arguments = @('/fomus', $Product.ProductCode, '/qn', '/norestart',
-            'REBOOT=ReallySuppress', 'MSIRESTARTMANAGERCONTROL=DisableShutdown', '/L*vx', "`"$log`"")
+            'REBOOT=ReallySuppress', 'MSIRESTARTMANAGERCONTROL=DisableShutdown', 'MSIDISABLERMRESTART=1', '/L*vx', "`"$log`"")
     } else {
+        $previousCode = $null
+        if ($Operation -in @('Install', 'RollbackUpgrade') -and $Product.ProductCode -ieq $new.ProductCode -and
+            (Test-Registration $old.ProductCode 2)) {
+            if (-not $ownedProducts.ContainsKey($old.ProductCode)) { throw 'Refusing unowned previous-product verification.' }
+            $previousCode = $old.ProductCode
+        }
+        if ($Operation -eq 'RollbackUpgrade' -and $null -eq $previousCode) { throw 'Rollback proof requires the owned, registered old product.' }
         $request = @{
             Operation = $Operation
-            Target = $(if ($Operation -eq 'Install') { $Product.Path } else { $Product.ProductCode })
+            Target = $(if ($Operation -in @('Install', 'RollbackUpgrade')) { $Product.Path } else { $Product.ProductCode })
             Log = $log
             ExplicitOptIn = $InstallOnHostedRunner.IsPresent
             CleanRunnerVerified = $cleanRunnerVerified
+            PreviousCode = $previousCode
+            Directory = $installDirectory
         } | ConvertTo-Json -Compress
         $request64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($request))
         $native64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($nativeSource))
@@ -326,7 +422,7 @@ function Invoke-UpgradeMsi([ValidateSet('Install', 'Repair', 'Uninstall')][strin
 if (-not `$request.ExplicitOptIn -or -not `$request.CleanRunnerVerified -or
     `$env:GITHUB_ACTIONS -cne 'true' -or `$env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'Refusing unapproved MSI worker.' }
 Add-Type -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$native64')))
-exit [int][UpgradeVerificationInstaller]::Execute(`$request.Operation, `$request.Target, `$request.Log)
+exit [int][UpgradeVerificationInstaller]::Execute(`$request.Operation, `$request.Target, `$request.Log, `$request.PreviousCode, `$request.Directory)
 "@
         $program = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
         $arguments = @('-NoProfile', '-NonInteractive', '-EncodedCommand',
@@ -343,7 +439,10 @@ exit [int][UpgradeVerificationInstaller]::Execute(`$request.Operation, `$request
             if (-not $process.WaitForExit(10000)) { throw "$Label caller could not be stopped; sources retained at $sources." }
             throw "$Label exceeded 240 seconds; owned caller stopped, MSI sources retained at $sources."
         }
-        if ($process.ExitCode -notin @(0, 3010)) {
+        if ($Operation -eq 'RollbackUpgrade' -and $process.ExitCode -ne 1602) {
+            throw "Rollback proof must cancel after verified removal (expected 1602, received $($process.ExitCode)); see $log."
+        }
+        if ($Operation -ne 'RollbackUpgrade' -and $process.ExitCode -notin @(0, 3010)) {
             throw "$Label failed (exit $($process.ExitCode)); see $log and its stderr log."
         }
         if ($process.ExitCode -eq 3010) { Write-Host "$Label requested a restart; restart suppressed, checking registration and bytes without rebooting." }
@@ -352,21 +451,76 @@ exit [int][UpgradeVerificationInstaller]::Execute(`$request.Operation, `$request
     }
 }
 
+function Assert-UpgradeReady {
+    Assert-HostedRunner
+    if (-not $cleanRunnerVerified) { throw 'Refusing UI verification without clean-runner ownership.' }
+    Assert-AppNotRunning
+    Add-Type -AssemblyName UIAutomationClient
+    Add-Type -AssemblyName UIAutomationTypes
+    $setup = Start-Process -FilePath $SetupPath -PassThru
+    $window = $null
+    $failure = $null
+    $closeFailure = $null
+    try {
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        do {
+            $setup.Refresh()
+            if ($setup.HasExited) { throw 'Upgrade setup exited before offering save-and-close guidance.' }
+            if ($setup.MainWindowHandle -ne [IntPtr]::Zero) {
+                $window = [Windows.Automation.AutomationElement]::FromHandle($setup.MainWindowHandle)
+                if ($window.Current.ProcessId -ne $setup.Id) { throw 'Upgrade setup accessibility belongs to another process.' }
+                $controls = @{}
+                foreach ($id in @('Heading', 'Description', 'Primary')) {
+                    $condition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty, $id)
+                    $controls[$id] = $window.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)
+                }
+                if ($null -ne $controls.Heading -and $null -ne $controls.Description -and $null -ne $controls.Primary -and
+                    $controls.Heading.Current.Name -like '*0.8.1*' -and
+                    $controls.Description.Current.Name -like '*Save your work and close Lekh*' -and
+                    $controls.Primary.Current.Name -ceq 'Save and close, then update') {
+                    Write-Host 'PASS: actual new setup detects registered 0.8.1 before installation and asks users to save and close. No Install action invoked.'
+                    break
+                }
+            }
+            Start-Sleep -Milliseconds 100
+        } while ($timer.Elapsed.TotalSeconds -lt 30)
+        if ($timer.Elapsed.TotalSeconds -ge 30) {
+            throw 'Actual new setup did not identify the registered previous version and offer explicit save-and-close guidance.'
+        }
+    } catch {
+        $failure = $_
+    } finally {
+        try {
+            if (-not $setup.HasExited) {
+                if ($null -eq $window) { throw 'Cannot safely close an undiscovered setup window.' }
+                $window.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).Close()
+                if (-not $setup.WaitForExit(15000)) { throw 'Upgrade readiness window did not close; no forced termination is permitted.' }
+            }
+        } catch { $closeFailure = $_ }
+        $setup.Dispose()
+    }
+    if ($null -ne $failure) {
+        if ($null -ne $closeFailure) { $failure.Exception.Data['ReadinessCleanupError'] = $closeFailure.Exception.Message }
+        throw $failure
+    }
+    if ($null -ne $closeFailure) { throw $closeFailure }
+}
+
 New-Item -ItemType Directory -Path $sources -Force | Out-Null
 Start-Transcript -Path (Join-Path $work 'verification.log') | Out-Null
 try {
-    Write-Host 'Scope: pinned public 0.8.0 -> manifest 0.8.1, then genuine repair and exact-product uninstall. No other lineage is covered.'
-    $oldSetup = Join-Path $sources 'Lekh-Markdown-editor-Setup-0.8.0-x64.exe'
+    Write-Host 'Scope: pinned public 0.8.1 -> manifest 0.9.0, cancellation/rollback after real removal, then genuine repair and exact-product uninstall. No other lineage is covered.'
+    $oldSetup = Join-Path $sources 'Lekh-Markdown-editor-Setup-0.8.1-x64.exe'
     Invoke-WebRequest -UseBasicParsing -Uri $oldSetupUrl -OutFile $oldSetup -TimeoutSec 180 -UseDefaultCredentials:$false
     if ((Get-Item -LiteralPath $oldSetup).Length -ne $oldSetupBytes -or
         (Get-FileHash -LiteralPath $oldSetup -Algorithm SHA256).Hash.ToLowerInvariant() -cne $oldSetupHash) {
-        throw 'Published 0.8.0 setup length or pinned SHA-256 mismatch; refusing extraction.'
+        throw 'Published 0.8.1 setup length or pinned SHA-256 mismatch; refusing extraction.'
     }
-    $oldMsi = Join-Path $sources 'old-0.8.0.msi'
-    $newMsi = Join-Path $sources 'new-0.8.1.msi'
+    $oldMsi = Join-Path $sources 'old-0.8.1.msi'
+    $newMsi = Join-Path $sources 'new-0.9.0.msi'
     Expand-EmbeddedMsi $oldSetup $oldMsi
     Expand-EmbeddedMsi $SetupPath $newMsi
-    $old = Read-ValidatedMsi $oldMsi '0.8.0'
+    $old = Read-ValidatedMsi $oldMsi '0.8.1'
     $new = Read-ValidatedMsi $newMsi $manifest.version
     if ($old.ProductCode -ieq $new.ProductCode) { throw 'Major upgrade must have different old and new ProductCodes.' }
     $builtMsi = Join-Path $root "release\Lekh-Markdown-editor-$($manifest.version)-x64.msi"
@@ -388,14 +542,32 @@ try {
     New-Item -ItemType Directory -Path $profileDirectory -Force | Out-Null
     $sentinel = Join-Path $profileDirectory ('upgrade-profile-sentinel-' + [guid]::NewGuid().ToString('N') + '.txt')
     [IO.File]::WriteAllText($sentinel, ('Preserve upgrade profile: ' + [guid]::NewGuid().ToString('N')), [Text.UTF8Encoding]::new($false))
-    [IO.File]::WriteAllText($settings, '{"theme":"light","fontSize":18,"upgradeValidation":"0.8.0-to-0.8.1"}', [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($settings, '{"theme":"light","fontSize":18,"upgradeValidation":"0.8.1-to-0.9.0"}', [Text.UTF8Encoding]::new($false))
     foreach ($path in @($sentinel, $settings)) { $profileHashes[$path] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
     [void]$attemptedProducts.Add($old.ProductCode)
     Invoke-UpgradeMsi 'Install' $old 'old-install'
     Assert-Installed $old
     Assert-Absent $new.ProductCode
     Assert-ProfilePreserved
-    Write-Host "PASS: genuine published 0.8.0 installed and registered as $($old.ProductCode)."
+    Write-Host "PASS: genuine published 0.8.1 installed and registered as $($old.ProductCode)."
+    Assert-UpgradeReady
+    Assert-Installed $old
+    Assert-Absent $new.ProductCode
+
+    $oldPayloadHashes = Get-PayloadHashes
+    [void]$attemptedProducts.Add($new.ProductCode)
+    Invoke-UpgradeMsi 'RollbackUpgrade' $new 'cancel-after-old-removal'
+    Assert-Installed $old
+    Assert-Absent $new.ProductCode
+    Assert-ProfilePreserved
+    $rollbackHashes = Get-PayloadHashes
+    if ($rollbackHashes.Count -ne $oldPayloadHashes.Count) { throw 'Rollback did not restore the old payload file set.' }
+    foreach ($relative in $oldPayloadHashes.Keys) {
+        if (-not $rollbackHashes.ContainsKey($relative) -or $rollbackHashes[$relative] -cne $oldPayloadHashes[$relative]) {
+            throw "Rollback did not restore old payload bytes: $relative"
+        }
+    }
+    Write-Host 'PASS: cancellation after proven old removal restored exact old registration, every old payload byte and seeded profile data.'
 
     # The preceding fresh-setup workflow step already exercises the new EXE's real UIA Install action.
     # Here exercise its embedded MSI through the same MsiInstallProduct API, without uninstalling old first.
@@ -411,7 +583,7 @@ try {
             throw "Upgraded $relative differs from the current packaged application."
         }
     }
-    Write-Host "PASS: 0.8.1 exact registration and current executable/app.asar bytes; old registration removed by the upgrade."
+    Write-Host "PASS: 0.9.0 exact registration and current executable/app.asar bytes; old registration removed before the new payload stage."
     Assert-AppNotRunning
     # Remove only a validated installed application file so repair must actually restore missing payload.
     Remove-Item -LiteralPath (Join-Path $installDirectory 'resources\app.asar') -Force
@@ -459,4 +631,4 @@ if ($null -ne $failure) {
     throw $failure
 }
 if ($cleanupErrors.Count -gt 0) { throw ($cleanupErrors -join "`n") }
-Write-Host 'PASS: bounded genuine 0.8.0 -> 0.8.1 upgrade, repair and exact-product cleanup. No application was launched or forcibly closed.'
+Write-Host 'PASS: bounded genuine 0.8.1 -> 0.9.0 upgrade, removal-before-new, rollback, repair and exact-product cleanup. No application was launched or forcibly closed.'

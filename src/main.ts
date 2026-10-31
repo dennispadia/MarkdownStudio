@@ -24,10 +24,12 @@ import { GrammarHighlights } from './grammar-highlights.js';
 import { WritingAssistance } from './writing-assistance.js';
 import { PublishingHeadings, PublishingNode, setPublishingHeadings } from './publishing-node.js';
 import { forgetPublishingDocument, initializePublishing, publishingHTML, refreshPublishingVariants, revealPublishingElement } from './publishing-view.js';
-import { publishingBlockRanges, publishingCSS } from '../lib/publishing.js';
+import { editablePublishingBlockAtStart, publishingBlockRanges, publishingCSS } from '../lib/publishing.js';
 import { publishingTemplateMarkdown, publishingTemplates } from '../lib/publishing-templates.js';
 import { publishingIcon } from '../lib/publishing-icons.js';
 import { AlertNode } from './alert-node.js';
+import { EditablePublishing, documentVariantOptions, setPublishingEditable } from './editable-publishing.js';
+import { synchronizeDocumentScroll } from './synchronized-scroll.js';
 import './style.css';
 
 let writingAssistance: WritingAssistance | undefined;
@@ -127,7 +129,8 @@ app.innerHTML = `
       ${formatButton('codeblock', 'Code block')}${formatButton('rule', 'Horizontal rule')}
       <span class="divider"></span>
       ${button('insert:toc', 'Insert table of contents', 'contents', 'icon-only')}${button('insert:toc-update', 'Update table of contents', 'refresh', 'icon-only')}${button('insert:mermaid', 'Mermaid diagram', 'diagram', 'icon-only')}
-      <button type="button" data-action="publishing-menu" aria-label="Insert publishing block" title="Insert callouts, tabs, selectors, steps and metadata" aria-haspopup="menu" aria-controls="publishing-menu" aria-expanded="false">${icon('blocks')}<span>Blocks</span></button>
+      <button type="button" data-action="alerts-menu" aria-label="Insert alert" title="Note, Tip, Important, Caution and Warning" aria-haspopup="menu" aria-controls="alerts-menu" aria-expanded="false">${publishingIcon('note')}<span>Alerts</span></button>
+      <button type="button" data-action="publishing-menu" aria-label="Insert publishing block" title="Editable tabs, selectors, variant content, steps and metadata" aria-haspopup="menu" aria-controls="publishing-menu" aria-expanded="false">${icon('blocks')}<span>Blocks</span></button>
       <div class="toolbar-more"><button type="button" data-action="format-menu" aria-label="More tools and views" title="More tools and views" aria-haspopup="menu" aria-controls="format-menu" aria-expanded="false">${icon('more')}</button></div>
       <span class="toolbar-spacer"></span>
       ${button('undo', 'Undo', 'undo', 'icon-only')}${button('redo', 'Redo', 'redo', 'icon-only')}
@@ -149,7 +152,7 @@ app.innerHTML = `
     <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><button type="button" id="writing-toggle" data-action="writing-assistance" aria-controls="writing-panel" aria-expanded="false" title="Offline English grammar checking">Writing assistance</button><span id="save-status" aria-live="polite">Ready to write</span><div class="zoom-controls" role="group" aria-label="Zoom controls"><button type="button" id="zoom-out" data-action="zoom-out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" id="zoom-reset" data-action="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%">100%</button><button type="button" id="zoom-in" data-action="zoom-in" aria-label="Zoom in" title="Zoom in">+</button></div></footer>
   </main>
   <div id="tabs-menu" class="dropdown view-menu" role="menu" aria-label="Open documents" hidden></div>
-  <div id="publishing-menu" class="dropdown view-menu publishing-insert-menu" role="menu" aria-label="Publishing blocks" hidden>${(['alerts', 'content'] as const).map(category => `<div class="publishing-menu-group" role="group" aria-label="${category === 'alerts' ? 'Alerts' : 'Content blocks'}"><div class="publishing-menu-label" role="presentation">${category === 'alerts' ? 'Alerts' : 'Content blocks'}</div>${publishingTemplates.filter(item => item.category === category).map(item => `<button type="button" data-action="insert:${item.id}" class="publishing-menu-${item.color || 'generic'}" title="${item.description}" aria-description="${item.description}">${publishingIcon(item.icon)}<span>${item.label}</span></button>`).join('')}</div>`).join('')}</div>
+  ${(['alerts', 'content'] as const).map(category => `<div id="${category === 'alerts' ? 'alerts-menu' : 'publishing-menu'}" class="dropdown view-menu publishing-insert-menu" role="menu" aria-label="${category === 'alerts' ? 'Alerts' : 'Content blocks'}" hidden>${publishingTemplates.filter(item => item.category === category).map(item => `<button type="button" data-action="insert:${item.id}" class="publishing-menu-${item.color || 'generic'}" title="${item.description}" aria-description="${item.description}">${publishingIcon(item.icon)}<span>${item.label}</span></button>`).join('')}</div>`).join('')}
   <div id="format-menu" class="dropdown view-menu" role="menu" hidden><div id="toolbar-overflow" role="group" aria-label="More editing tools" hidden></div>${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('allow-includes', 'Allow local includes…')}${button('revoke-includes', 'Stop local includes')}${button('writing-assistance', 'Writing assistance')}${button('help', 'Getting started', 'help')}</div>
   <div id="notification" role="status" hidden></div>
   <dialog id="publishing-image-dialog" aria-labelledby="publishing-image-title"><form method="dialog">
@@ -157,6 +160,12 @@ app.innerHTML = `
     <label>Alternate text<input id="publishing-image-alt" required placeholder="Describe the information conveyed by the image" /></label>
     <label>Long description (optional)<textarea id="publishing-image-description" rows="4" placeholder="Explain a diagram or other complex image"></textarea></label>
     <div class="dialog-actions"><button value="insert" class="primary">Insert image</button><button value="cancel" formnovalidate>Cancel</button></div>
+  </form></dialog>
+  <dialog id="variant-content-dialog" aria-labelledby="variant-content-title"><form method="dialog">
+    <h2 id="variant-content-title">Place variant content here</h2>
+    <p>Choose which existing options this content applies to. It can be placed anywhere in the document, separately from its selector.</p>
+    <fieldset id="variant-content-options"><legend>Applies to</legend></fieldset>
+    <div class="dialog-actions"><button value="insert" class="primary">Insert content</button><button value="cancel">Cancel</button></div>
   </form></dialog>
   <dialog id="image-storage-dialog" aria-labelledby="image-storage-title"><form method="dialog">
     <h2 id="image-storage-title">Store this image</h2>
@@ -223,10 +232,11 @@ app.innerHTML = `
     <p><b>Visual</b> works like a word processor. Type <code># </code> for a heading, <code>- </code> for a list, or use the toolbar.</p>
     <p><b>Code blocks</b> have a searchable language selector and Copy button at the bottom-right. Select PowerShell, Python, JSON, or another supported language for syntax colors. Code contents are never reformatted or executed. PDF and Word include the colors, not the controls.</p>
     <p><b>Writing assistance:</b> enable offline English grammar checks from the status bar, More tools, or View menu. Harper runs locally in the background. Review underlined suggestions, apply an undoable correction, or ignore it once or throughout the current document. No text is sent online or changed automatically; suggestions can be imperfect.</p>
-    <p><b>Publishing blocks:</b> callouts, tabbed examples, image directives, steps and metadata render automatically without a platform-specific mode. These protected Visual blocks keep their original syntax; use <b>Edit source</b> to change one. Unsupported directives stay visible rather than disappearing. <b>More tools &gt; Allow local includes</b> lets this saved document read includes only from the project folder you explicitly select, for this session. Exports show all tab alternatives as labeled sections.</p>
+    <p><b>Alerts and Blocks:</b> Alerts has Note, Tip, Important, Caution and Warning. Blocks has editable tabs, selectors, variant content, steps, image descriptions, metadata and local includes. Edit labels and metadata fields directly in Visual; type and format in every rich body. A <b>Variant selector</b> inserts only choices; use <b>Variant content</b> to place content anywhere after adding a selector. Inactive content has <b>Show and edit</b>. Unsupported syntax remains editable in its inline block field. Includes have editable name/path fields; allow the project folder, then open the shared file in Visual to edit its own contents. Exports keep every tab and variant.</p>
+    <p><b>Visual + Source:</b> scrolling is synchronized in both directions by default, using document anchors and wrapped source lines. Paired documents remain independent.</p>
     <p><b>Sidebar</b>: drag its right edge to resize, or focus the edge and use Left/Right (Home/End set limits). Double-click the edge to reset. Width is remembered between launches and limited to leave room for editing. Use the button to the left of Visual/Source or Ctrl+Shift+B to toggle outline/recent files. <b>View &gt; Focus mode</b> or F9 also hides the document header; Escape restores your previous sidebar preference.</p>
     <p><b>Find</b>: click Find or press Ctrl+F to open or close the find bar. Close and Escape also dismiss it; the search and replacement text are retained.</p>
-    <p><b>Right-click</b> for Formatting, Paragraph (Heading 1-6 or normal text), Insert, Copy / Paste As, and spelling suggestions. Choose <b>Table &gt; Insert table</b> or <b>Insert &gt; Table</b> to choose rows and columns. Row/column editing controls become available inside a table.</p>
+    <p><b>Right-click</b> for Formatting, Paragraph (Heading 1-6 or normal text), Insert &gt; Alerts, Insert &gt; Publishing blocks, View and tools, Copy / Paste As, and spelling suggestions. Toolbar tools are also available here. Variant content is enabled only after a selector exists. Nested menus stay next to their parent and support arrows/Escape. Choose <b>Table &gt; Insert table</b> or <b>Insert &gt; Table</b> to choose rows and columns. Row/column editing controls become available inside a table.</p>
     <p><b>Insert</b> includes images, links, tables, code fences, Mermaid, horizontal lines, a marked table of contents, and paragraphs before/after. Use <b>Update table of contents</b> after changing headings. Footnotes, link references, math, and YAML insert editable syntax in <b>Source mode</b>. From Visual mode these go at the end, except YAML at the top. Math and footnotes do not yet have formatted rendering or structured export support; YAML is preserved as document metadata, not article text.</p>
     <p><b>Links:</b> in Visual, click a link to edit its text and address, or right-click and choose <b>Edit link...</b>. The link toolbar button and <b>Ctrl+K</b> also edit the selected link. <b>Remove link</b> keeps its text. <b>Ctrl+click</b> opens a link after confirmation; generated contents links still navigate normally.</p>
     <p><b>Source</b> lets you edit the exact Markdown text. Use it for advanced syntax or HTML the visual editor doesn't support. Visual editing may normalize Markdown syntax; switching Visual/Source modes resets that tab's undo history.</p>
@@ -624,6 +634,15 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
     TableKit.configure({ table: { resizable: false } }),
     TaskList, TaskItem.configure({ nested: true }), ContentsNode,
     AlertNode.configure({ schema: () => created.schema }),
+    EditablePublishing.configure({
+      schema: () => created.schema, documentId: id,
+      reportError: message => notify(message, true),
+      allowIncludes: () => { void run(async () => { activateTab(id); await dispatch('allow-includes'); }); },
+      openInclude: path => { void run(async () => {
+        const opened = unwrap(await window.lekh.openPublishingInclude(id, path));
+        if (opened) { addTab(opened.id, opened.content, opened.path.split(/[\\/]/).at(-1)!, opened.path); switchMode('visual'); }
+      }); },
+    }),
     PublishingNode.configure({
       documentId: id,
       editSource: (raw, position) => { void run(async () => editPublishingSource(id, raw, position)); },
@@ -696,6 +715,7 @@ function createPane(host: HTMLElement, text: HTMLTextAreaElement): { pane: HTMLE
   visualViewport.append(host);
   viewport.append(visualViewport, surface, preview);
   pane.append(header, viewport);
+  synchronizeDocumentScroll(pane, text, visualViewport, () => tabs.find(tab => tab.pane === pane)?.editor ?? editor);
   return { pane, viewport, visualViewport };
 }
 
@@ -1228,7 +1248,32 @@ async function insertPublishingBlock(kind: string): Promise<boolean> {
   }
   const selected = selectionMarkdown();
   if (kind === 'publishing-include' && selected) throw new Error('Place the caret where you want the include. Selected text will not be replaced.');
+  if (kind === 'publishing-selector' && documentVariantOptions(editor).length && mode === 'visual') {
+    const control = visual.querySelector<HTMLInputElement>('[data-lekh-selector] input');
+    if (control) { control.scrollIntoView({ block: 'nearest' }); control.focus(); }
+    return true;
+  }
   let raw = publishingTemplateMarkdown(kind, selected)!;
+  if (kind === 'publishing-zone') {
+    const choices = mode === 'visual' ? documentVariantOptions(editor) : publishingBlockRanges(markdown)
+      .flatMap(block => block.kind === 'selector' ? editablePublishingBlockAtStart(block.raw)?.options ?? [] : []);
+    if (!choices.length) throw new Error('Add a Variant selector first, then place its content anywhere in the document.');
+    const dialog = element<HTMLDialogElement>('variant-content-dialog');
+    const options = element('variant-content-options');
+    options.replaceChildren();
+    const legend = document.createElement('legend'); legend.textContent = 'Applies to'; options.append(legend);
+    for (const [index, choice] of choices.entries()) {
+      const label = document.createElement('label');
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = choice.id; checkbox.checked = index === 0;
+      label.append(checkbox, document.createTextNode(choice.label)); options.append(label);
+    }
+    dialog.returnValue = 'cancel'; dialog.showModal();
+    const choice = await new Promise<string>(resolve => dialog.addEventListener('close', () => resolve(dialog.returnValue), { once: true }));
+    if (choice !== 'insert') return true;
+    const ids = [...options.querySelectorAll<HTMLInputElement>('input:checked')].map(control => control.value);
+    if (!ids.length) throw new Error('Choose at least one existing option for this content.');
+    raw = `:::zone pivot="${ids.join(',')}"\n${selected || 'Write content for this option.'}\n:::zone-end`;
+  }
   if (kind === 'publishing-image') {
     const image = unwrap(await window.lekh.insertImage());
     if (!image) return true;
@@ -1249,11 +1294,15 @@ async function insertPublishingBlock(kind: string): Promise<boolean> {
   }
   const metadata = kind === 'publishing-metadata';
   if (metadata && publishingBlockRanges(markdown).some(block => block.kind === 'metadata' && block.from === 0)) {
-    throw new Error('This document already has metadata. Use Edit source on its metadata block.');
+    switchMode('visual');
+    const block = visual.querySelector<HTMLDetailsElement>('[data-lekh-metadata]');
+    if (block) { block.open = true; block.scrollIntoView({ block: 'nearest' }); block.querySelector<HTMLInputElement>('input')?.focus(); }
+    return true;
   }
   if (mode === 'visual') {
     const chain = editor.chain().focus().command(({ tr }) => { closeHistory(tr); return true; });
-    const content = [{ type: 'lekhPublishing', attrs: { markdown: raw } }, { type: 'paragraph' }];
+    if (!editor.markdown) throw new Error('The Markdown parser is unavailable.');
+    const content = [...(editor.markdown.parse(raw).content ?? []), { type: 'paragraph' }];
     const inserted = metadata ? chain.insertContentAt(0, content).run() : chain.insertContent(content).run();
     if (!inserted) throw new Error('The publishing block could not be inserted at the current selection.');
   } else if (metadata) {
@@ -1399,8 +1448,17 @@ function updateToolbar(): void {
     : source.value.slice(sourceLineStart).match(/^ {0,3}(#{1,6})[ \t]+/)?.[1].length;
   element<HTMLSelectElement>('heading').value = String(level ?? 0);
   element('table-tools').hidden = mode !== 'visual' || !editor.isActive('table');
+  const hasSelector = mode === 'visual' ? documentVariantOptions(editor).length > 0 :
+    publishingBlockRanges(markdown).some(block => block.kind === 'selector');
+  for (const control of document.querySelectorAll<HTMLButtonElement>('[data-action="insert:publishing-zone"]')) {
+    control.disabled = !hasSelector;
+    control.title = hasSelector ? 'Place editable content for an existing option here.' : 'Add a Variant selector before placing variant content.';
+    control.setAttribute('aria-description', control.title);
+  }
   window.lekh.setEditorContext({
     mode, heading: Number(level ?? 0), inTable: mode === 'visual' && editor.isActive('table'),
+    hasVariantSelector: hasSelector,
+    formField: document.activeElement instanceof Element && Boolean(document.activeElement.closest('.publishing-field, .publishing-raw-editor')),
     active: mode === 'visual' ? Object.entries(names).filter(([, name]) => editor.isActive(name)).map(([command]) => command) : [],
   });
 }
@@ -1492,8 +1550,18 @@ async function save(saveAs = false): Promise<boolean> {
   update();
   storeDraft();
   await refreshRecent();
+  refreshPublishingFiles();
   notify(`${documentName} saved`);
   return true;
+}
+
+function refreshPublishingFiles(): void {
+  for (const tab of tabs) {
+    if (!/\[!INCLUDE\b|^zone_pivot_groups\s*:/im.test(tab.markdown)) continue;
+    tab.previewMarkdown = undefined;
+    refreshPreview(tab);
+    window.dispatchEvent(new CustomEvent('lekh-publishing-refresh', { detail: tab.id }));
+  }
 }
 
 let zoomRevision = 0;
@@ -1562,8 +1630,9 @@ async function openPending(): Promise<void> {
 async function runAction(action: string): Promise<void> {
   const id = documentId;
   await run(async () => dispatch(action));
-  if (action.startsWith('insert:callout-') && documentId === id && mode === 'visual' &&
-    !busy && editor.isEditable && !document.querySelector('dialog[open]')) editor.view.focus();
+  if ((action.startsWith('insert:callout-') || action.startsWith('insert:publishing-')) && documentId === id && mode === 'visual' &&
+    !busy && editor.isEditable && !document.querySelector('dialog[open]') &&
+    !(document.activeElement instanceof Element && document.activeElement.closest('.publishing-field'))) editor.view.focus();
 }
 
 async function run(operation: () => Promise<unknown>): Promise<void> {
@@ -1574,9 +1643,10 @@ async function run(operation: () => Promise<unknown>): Promise<void> {
   element<HTMLButtonElement>('theme-toggle').disabled = true;
   for (const tab of tabs) {
     tab.editor.setEditable(false, false);
+    setPublishingEditable(tab.editor, false);
     tab.source.readOnly = true;
   }
-  if (!tabs.length) { editor.setEditable(false, false); source.readOnly = true; }
+  if (!tabs.length) { editor.setEditable(false, false); setPublishingEditable(editor, false); source.readOnly = true; }
   try { await operation(); }
   catch (error) { notify(error instanceof Error ? error.message : String(error), true); }
   finally {
@@ -1585,9 +1655,10 @@ async function run(operation: () => Promise<unknown>): Promise<void> {
     element<HTMLButtonElement>('theme-toggle').disabled = false;
     for (const tab of tabs) {
       tab.editor.setEditable(true, false);
+      setPublishingEditable(tab.editor, true);
       tab.source.readOnly = false;
     }
-    if (!tabs.length) { editor.setEditable(true, false); source.readOnly = false; }
+    if (!tabs.length) { editor.setEditable(true, false); setPublishingEditable(editor, true); source.readOnly = false; }
     if (focusedTab && focusedTab === activeTab && source.hidden && mode === 'visual') {
       const scroll = visualScroll(focusedTab);
       const top = scroll.scrollTop;
@@ -1937,6 +2008,7 @@ function activateEventPane(event: Event): void {
       writingAssistance?.schedule();
     }
   }
+  if (event.type === 'contextmenu' || event.type === 'focusin') updateToolbar();
 }
 element('canvas').addEventListener('pointerdown', activateEventPane, true);
 element('canvas').addEventListener('focusin', activateEventPane, true);
@@ -2199,6 +2271,7 @@ document.addEventListener('contextmenu', event => {
   const target = event.target instanceof HTMLElement ? event.target : null;
   contextTarget = target?.closest<HTMLElement>('#canvas .tiptap, #canvas .document-source') ?? null;
   if (target?.closest('.code-block-controls')) contextTarget = null;
+  if (target?.closest('.publishing-field, .publishing-raw-editor')) contextTarget = null;
   const bounds = contextTarget?.getBoundingClientRect();
   contextPoint = event.clientX || event.clientY ? { x: event.clientX, y: event.clientY }
     : { x: (bounds?.left ?? 0) + 12, y: (bounds?.top ?? 0) + 12 };
@@ -2294,7 +2367,7 @@ document.addEventListener('keydown', event => {
     setFocusMode(false);
   }
 });
-const dropdownIds = ['save-menu', 'export-menu', 'format-menu', 'tabs-menu', 'publishing-menu'];
+const dropdownIds = ['save-menu', 'export-menu', 'format-menu', 'tabs-menu', 'publishing-menu', 'alerts-menu'];
 function closeDropdowns(): void {
   for (const id of dropdownIds) {
     element(id).hidden = true;
@@ -2306,7 +2379,7 @@ function dropdownAnchor(id: string): HTMLElement {
   return control.getClientRects().length ? control : document.querySelector<HTMLElement>('[aria-controls="format-menu"]')!;
 }
 function positionViewMenu(): void {
-  for (const id of ['format-menu', 'tabs-menu', 'publishing-menu']) {
+  for (const id of ['format-menu', 'tabs-menu', 'publishing-menu', 'alerts-menu']) {
     const menu = element(id);
     if (menu.hidden) continue;
     const trigger = dropdownAnchor(id).getBoundingClientRect();

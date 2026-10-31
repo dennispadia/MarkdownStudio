@@ -1,4 +1,5 @@
 import type { ContextMenuItem, EditorContextMenu } from './bridge.js';
+import { publishingIcon } from '../lib/publishing-icons.js';
 
 type ContextIcon = 'cut' | 'copy' | 'paste' | 'delete' | 'bold' | 'italic' | 'code' | 'link' | 'quote' | 'ordered' | 'bullet' | 'task';
 const directActions: [string, string, ContextIcon][] = [
@@ -10,6 +11,7 @@ const directActions: [string, string, ContextIcon][] = [
 export class ContextMenu {
   private readonly root = document.createElement('div');
   private readonly submenus: HTMLElement[] = [];
+  private readonly triggers = new Map<HTMLElement, HTMLButtonElement>();
   private origin: HTMLElement | null = null;
   private execute: (command: string) => void = () => {};
 
@@ -39,6 +41,7 @@ export class ContextMenu {
   show(menu: EditorContextMenu, origin: HTMLElement, execute: (command: string) => void): void {
     this.hide();
     for (const submenu of this.submenus.splice(0)) submenu.remove();
+    this.triggers.clear();
     this.root.replaceChildren();
     this.origin = origin;
     this.execute = execute;
@@ -86,6 +89,8 @@ export class ContextMenu {
     if (item.checked !== undefined) control.setAttribute('aria-checked', String(item.checked));
     control.setAttribute('aria-label', item.label);
     control.title = item.shortcut ? `${item.label} (${item.shortcut})` : item.label;
+    if (item.description) { control.title = item.description; control.setAttribute('aria-description', item.description); }
+    if (item.icon) control.insertAdjacentHTML('beforeend', publishingIcon(item.icon));
     const label = document.createElement('span');
     label.textContent = item.label;
     control.append(label);
@@ -104,14 +109,18 @@ export class ContextMenu {
       arrow.setAttribute('aria-hidden', 'true');
       control.append(arrow);
       this.submenus.push(submenu);
+      this.triggers.set(submenu, control);
       this.root.append(submenu);
       for (const child of item.submenu) this.append(submenu, child);
       const open = (focus = false) => {
-        this.closeSubmenus();
-        submenu.showPopover();
+        const parent = control.closest<HTMLElement>('[role="menu"]')!;
+        const keep = this.ancestors(parent);
+        keep.add(submenu);
+        this.closeSubmenus(keep);
+        if (!submenu.matches(':popover-open')) submenu.showPopover();
         control.setAttribute('aria-expanded', 'true');
         const bounds = control.getBoundingClientRect();
-        this.position(submenu, this.root.getBoundingClientRect().right + 3, bounds.top, true);
+        this.position(submenu, parent.getBoundingClientRect().right + 3, bounds.top, parent);
         if (focus) this.controls(submenu)[0]?.focus({ preventScroll: true });
       };
       control.addEventListener('pointerenter', () => { if (!control.disabled) open(); });
@@ -126,7 +135,7 @@ export class ContextMenu {
         if (event.key !== 'ArrowLeft' && event.key !== 'Escape') return;
         event.preventDefault();
         event.stopPropagation();
-        this.closeSubmenus();
+        this.closeSubmenus(this.ancestors(control.closest<HTMLElement>('[role="menu"]')!));
         control.focus({ preventScroll: true });
       });
     } else {
@@ -140,7 +149,7 @@ export class ContextMenu {
         this.execute(item.id);
       });
       control.addEventListener('pointerenter', () => {
-        if (control.parentElement === this.root || control.closest('.context-tools')) this.closeSubmenus();
+        this.closeSubmenus(this.ancestors(control.closest<HTMLElement>('[role="menu"]')!));
       });
     }
     return control;
@@ -160,16 +169,23 @@ export class ContextMenu {
       .filter(control => control.closest('[role="menu"]') === container);
   }
 
-  private closeSubmenus(): void {
-    for (const submenu of this.submenus) {
-      if (submenu.matches(':popover-open')) submenu.hidePopover();
-    }
-    for (const trigger of this.root.querySelectorAll('[aria-expanded="true"]')) trigger.setAttribute('aria-expanded', 'false');
+  private ancestors(menu: HTMLElement): Set<HTMLElement> {
+    const keep = new Set<HTMLElement>();
+    for (let current: HTMLElement | null = menu; current && current !== this.root;
+      current = this.triggers.get(current)?.closest<HTMLElement>('[role="menu"]') ?? null) keep.add(current);
+    return keep;
   }
 
-  private position(menu: HTMLElement, x: number, y: number, submenu = false): void {
+  private closeSubmenus(keep = new Set<HTMLElement>()): void {
+    for (const submenu of this.submenus) {
+      if (!keep.has(submenu) && submenu.matches(':popover-open')) submenu.hidePopover();
+      this.triggers.get(submenu)?.setAttribute('aria-expanded', String(keep.has(submenu) && submenu.matches(':popover-open')));
+    }
+  }
+
+  private position(menu: HTMLElement, x: number, y: number, parent?: HTMLElement): void {
     const bounds = menu.getBoundingClientRect();
-    if (submenu && x + bounds.width > innerWidth - 8) x = this.root.getBoundingClientRect().left - bounds.width - 3;
+    if (parent && x + bounds.width > innerWidth - 8) x = parent.getBoundingClientRect().left - bounds.width - 3;
     menu.style.left = `${Math.max(8, Math.min(x, innerWidth - bounds.width - 8))}px`;
     menu.style.top = `${Math.max(8, Math.min(y, innerHeight - bounds.height - 8))}px`;
   }

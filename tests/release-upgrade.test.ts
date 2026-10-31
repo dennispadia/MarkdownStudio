@@ -34,11 +34,11 @@ test('real upgrade operations require explicit consent and both exact hosted-run
   assert.doesNotMatch(script, /-Verb\s+RunAs|UACONLY\s*[,)]|AlwaysInstallElevated|DisableMSI|SuppressIces|SuppressValidation|taskkill|Stop-Process\s+-Name/i);
 });
 
-test('the only old installer is the immutable public 0.8.0 asset, verified before extraction', () => {
-  assert.ok(script.includes("$oldSetupUrl = 'https://github.com/dennispadia/lekh/releases/download/v0.8.0/Lekh-Markdown-editor-Setup-0.8.0-x64.exe'"));
-  assert.ok(script.includes("$oldSetupHash = '7e1b42622526fdfaa5aecb64d7394254a96f56469151396f019e18a1af3369fd'"));
-  assert.ok(script.includes('$oldSetupBytes = 197504000L'));
-  assert.ok(script.includes("$manifest.version -cne '0.8.1'"));
+test('the only old installer is the immutable public 0.8.1 asset, verified before extraction', () => {
+  assert.ok(script.includes("$oldSetupUrl = 'https://github.com/dennispadia/lekh/releases/download/v0.8.1/Lekh-Markdown-editor-Setup-0.8.1-x64.exe'"));
+  assert.ok(script.includes("$oldSetupHash = 'cdbaafa78e98aa4515fdfb7bfe2a7822b59a54ed1547828bd775c3e61fa96128'"));
+  assert.ok(script.includes('$oldSetupBytes = 197516288L'));
+  assert.ok(script.includes("$manifest.version -cne '0.9.0'"));
   const execution = script.slice(script.indexOf("\n    Write-Host 'Scope:"));
   inOrder(execution,
     'Invoke-WebRequest -UseBasicParsing -Uri $oldSetupUrl -OutFile $oldSetup -TimeoutSec 180 -UseDefaultCredentials:$false',
@@ -49,7 +49,10 @@ test('the only old installer is the immutable public 0.8.0 asset, verified befor
   assert.doesNotMatch(script, /GITHUB_TOKEN|GH_TOKEN|Authorization|UseDefaultCredentials:\$true|-Credential\b|SkipCertificateCheck/i);
   assert.ok(script.includes('[Reflection.Assembly]::LoadFile($Setup)'));
   assert.ok(script.includes("$assembly.GetManifestResourceStream('Setup.Payload.msi')"));
-  assert.doesNotMatch(script, /EntryPoint\.Invoke|Start-Process -FilePath \$(?:oldSetup|SetupPath)/);
+  assert.doesNotMatch(script, /EntryPoint\.Invoke|Start-Process -FilePath \$oldSetup/);
+  const ready = script.slice(script.indexOf('function Assert-UpgradeReady'), script.indexOf('\nNew-Item -ItemType Directory -Path $sources'));
+  inOrder(ready, 'Assert-HostedRunner', '-not $cleanRunnerVerified', 'Assert-AppNotRunning', 'Start-Process -FilePath $SetupPath');
+  assert.doesNotMatch(ready, /InvokePattern|\.Invoke\(\)|Stop-Process/);
 });
 
 test('both embedded MSIs are validated for distinct identity, version and non-elevated per-user scope', () => {
@@ -69,7 +72,7 @@ test('both embedded MSIs are validated for distinct identity, version and non-el
     "$_[0] -ine $upgradeCode",
   ]) assert.ok(validation.includes(guard), `Missing package guard: ${guard}`);
   const execution = script.slice(script.indexOf("\n    Write-Host 'Scope:"));
-  inOrder(execution, "Read-ValidatedMsi $oldMsi '0.8.0'", 'Read-ValidatedMsi $newMsi $manifest.version',
+  inOrder(execution, "Read-ValidatedMsi $oldMsi '0.8.1'", 'Read-ValidatedMsi $newMsi $manifest.version',
     '$old.ProductCode -ieq $new.ProductCode',
     '$newMsiHash = (Get-FileHash -LiteralPath $newMsi -Algorithm SHA256).Hash',
     '$newMsiHash -cne',
@@ -203,7 +206,7 @@ test('directory guard accepts only empty roots or verified setup residue and rej
   async function logs(path: string) {
     const directory = join(path, 'SetupLogs', logSession);
     await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, 'setup.log'), '2026-10-31T02:00:00.0000000+00:00 Starting Lekh Setup 0.8.1. Current-user, offline installation.\r\n');
+    await writeFile(join(directory, 'setup.log'), '2026-10-31T02:00:00.0000000+00:00 Starting Lekh Setup 0.9.0. Current-user, offline installation.\r\n');
     await writeFile(join(directory, 'windows-installer.log'), 'MSI fixture log; no installer was invoked.\r\n');
     return directory;
   }
@@ -261,7 +264,7 @@ test('directory guard accepts only empty roots or verified setup residue and rej
     await rm(join(renamedLogs, 'windows-installer.log'));
     await writeFile(join(renamedLogs, 'unknown.log'), 'not a setup log');
     const oldLog = await fixture('wrong-log-version', 'unrecognized setup log identity');
-    await writeFile(join(await logs(oldLog.path), 'setup.log'), '2026-10-31T02:00:00.0000000+00:00 Starting Lekh Setup 0.8.0. Current-user, offline installation.\r\n');
+    await writeFile(join(await logs(oldLog.path), 'setup.log'), '2026-10-31T02:00:00.0000000+00:00 Starting Lekh Setup 0.8.1. Current-user, offline installation.\r\n');
 
     const target = await fixture('junction-target');
     await cache(target.path);
@@ -309,7 +312,7 @@ test('directory guard accepts only empty roots or verified setup residue and rej
           [IO.File]::SetAttributes($fixture.hidden, [IO.FileAttributes]::Hidden)
         }
         $failure = ''
-        try { Assert-CleanApplicationDirectory $fixture.path $request.expectedHash '0.8.1' }
+        try { Assert-CleanApplicationDirectory $fixture.path $request.expectedHash '0.9.0' }
         catch { $failure = $_.Exception.Message }
         if ($fixture.error -eq '' -and $failure -ne '') { throw ($fixture.name + ': ' + $failure) }
         if ($fixture.error -ne '' -and $failure -notlike ('*' + $fixture.error + '*')) {
@@ -322,12 +325,35 @@ test('directory guard accepts only empty roots or verified setup residue and rej
       Buffer.from(command, 'utf16le').toString('base64')], {
       input: JSON.stringify({ scriptPath, expectedHash, fixtures }), encoding: 'utf8', timeout: 30_000,
     });
+
     assert.deepEqual(output.trim().split(/\r?\n/), fixtures.map(fixture => fixture.name));
     assert.deepEqual(await readFile(join(valid.path, 'SetupCache', cacheSession, 'Lekh.msi')), cacheBytes,
       'recognizing residue must never delete or alter the repair source');
   } finally {
     await rm(fixtureRoot, { recursive: true, force: true });
   }
+});
+
+test('hosted upgrade proves true removal before payload and cancellation restores every old byte', () => {
+  assert.ok(nativeSource);
+  inOrder(nativeSource, 'action == "LekhPreviousVersionRemoved"', 'ProductProperty(previousCode, scope, "ProductName")',
+    'PathExistsExact(Path.Combine(directory, "Lekh - Markdown editor.exe"))',
+    'PathExistsExact(Path.Combine(directory, "resources", "app.asar"))', 'removalVerified = true',
+    'operation == "RollbackUpgrade") return 2');
+  assert.ok(nativeSource.includes('previousCode != null && !removalVerified'));
+  assert.ok(nativeSource.includes('catch (FileNotFoundException) { return false; }'));
+  assert.ok(nativeSource.includes('catch (DirectoryNotFoundException) { return false; }'));
+  assert.ok(script.includes("$sequence.RemoveExistingProducts -ne $sequence.InstallInitialize + 1"));
+  assert.ok(script.includes("$sequence.LekhPreviousVersionRemoved -ge $sequence.ProcessComponents"));
+  const execution = script.slice(script.indexOf("\n    Write-Host 'Scope:"));
+  inOrder(execution, 'Assert-UpgradeReady', '$oldPayloadHashes = Get-PayloadHashes',
+    "Invoke-UpgradeMsi 'RollbackUpgrade' $new 'cancel-after-old-removal'",
+    'Assert-Installed $old', 'Assert-Absent $new.ProductCode', 'Assert-ProfilePreserved',
+    '$rollbackHashes = Get-PayloadHashes', '$rollbackHashes.Count -ne $oldPayloadHashes.Count',
+    '$rollbackHashes[$relative] -cne $oldPayloadHashes[$relative]',
+    "Invoke-UpgradeMsi 'Install' $new 'new-upgrade'");
+  assert.ok(script.includes("$Operation -eq 'RollbackUpgrade' -and $process.ExitCode -ne 1602"));
+  assert.ok(script.includes('MSIDISABLERMRESTART=1'));
 });
 
 test('Windows packaging requires upgrade verification after fresh setup and before candidate publication', () => {

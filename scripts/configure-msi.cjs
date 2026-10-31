@@ -12,6 +12,21 @@ function configurePerUserMsi(xml) {
     if (xml.split(before).length !== 2) throw new Error(`Unexpected MSI template: expected exactly one ${before}. Review the per-user installer hook before releasing.`);
     xml = xml.replace(before, after);
   }
+  if (xml.split('</Product>').length !== 2) throw new Error('Unexpected MSI template: expected exactly one Product closing tag.');
+  const majorUpgrades = [...xml.matchAll(/<MajorUpgrade\b[^>]*\/>/g)];
+  if (majorUpgrades.length !== 1 || !majorUpgrades[0][0].includes('AllowSameVersionUpgrades="yes"') ||
+      /\bSchedule=/.test(majorUpgrades[0][0])) {
+    throw new Error('Unexpected MSI template: expected exactly one unscheduled same-version MajorUpgrade.');
+  }
+  // Removal must be inside the transaction, before any new-payload execution script is generated.
+  xml = xml.replace(majorUpgrades[0][0], majorUpgrades[0][0].replace('<MajorUpgrade ', '<MajorUpgrade Schedule="afterInstallInitialize" '));
+  xml = xml.replace('</Product>', `<Condition Message="Lekh upgrades require Windows Installer rollback to be enabled.">NOT RollbackDisabled</Condition>
+    <CustomAction Id="LekhPreviousVersionRemoved" Property="LEKH_PREVIOUS_VERSION_REMOVED" Value="1"/>
+    <InstallExecuteSequence>
+      <Custom Action="LekhPreviousVersionRemoved" After="RemoveExistingProducts">WIX_UPGRADE_DETECTED AND NOT Installed</Custom>
+    </InstallExecuteSequence>
+    <UI><ProgressText Action="LekhPreviousVersionRemoved">Checking previous Lekh removal.</ProgressText></UI>
+  </Product>`);
   const upgradeCode = xml.match(/<Product\b[^>]*\bUpgradeCode="([A-Fa-f0-9-]+)"/)?.[1];
   if (!upgradeCode) throw new Error('Unexpected MSI template: missing product upgrade identity.');
   const directories = new Set();

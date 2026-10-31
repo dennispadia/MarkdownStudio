@@ -43,8 +43,8 @@ export const PublishingNode = Node.create<Options>({
   renderMarkdown: node => String(node.attrs?.markdown ?? ''),
   addNodeView() {
     const options = this.options;
-    return ({ node, getPos }) => {
-      const raw = String(node.attrs.markdown);
+    return ({ editor, node, getPos }) => {
+      let raw = String(node.attrs.markdown);
       const dom = document.createElement('section');
       dom.className = 'publishing-block';
       dom.contentEditable = 'false';
@@ -54,17 +54,29 @@ export const PublishingNode = Node.create<Options>({
       controls.className = 'publishing-block-tools';
       const edit = document.createElement('button');
       edit.type = 'button';
-      edit.textContent = 'Edit source';
+      edit.textContent = 'Edit block';
+      const sourceField = document.createElement('textarea');
+      sourceField.className = 'publishing-raw-editor';
+      sourceField.setAttribute('aria-label', 'Unsupported block Markdown');
+      sourceField.value = raw;
+      sourceField.hidden = true;
       edit.addEventListener('click', event => {
         event.preventDefault();
         event.stopPropagation();
+        sourceField.hidden = !sourceField.hidden;
+        if (!sourceField.hidden) sourceField.focus();
+      });
+      sourceField.addEventListener('input', () => {
         const position = getPos();
-        if (typeof position === 'number') options.editSource(raw, position);
+        if (!editor.isEditable || typeof position !== 'number') {
+          sourceField.value = raw; options.reportError('Wait for the current operation to finish before editing this block.'); return;
+        }
+        editor.view.dispatch(editor.state.tr.setNodeMarkup(position, undefined, { markdown: sourceField.value }));
       });
       controls.append(edit);
       const content = document.createElement('div');
       content.className = 'publishing-block-content';
-      dom.append(controls, content);
+      dom.append(controls, content, sourceField);
       let revision = 0;
       let destroyed = false;
       const refresh = async () => {
@@ -96,7 +108,14 @@ export const PublishingNode = Node.create<Options>({
       void refresh();
       return {
         dom,
-        stopEvent: event => event.target instanceof Element && Boolean(event.target.closest('button, summary, a')),
+        update: updated => {
+          if (updated.type !== node.type) return false;
+          raw = String(updated.attrs.markdown);
+          if (document.activeElement !== sourceField) sourceField.value = raw;
+          void refresh();
+          return true;
+        },
+        stopEvent: event => event.target instanceof Element && Boolean(event.target.closest('button, summary, a, textarea')),
         ignoreMutation: () => true,
         destroy: () => { destroyed = true; revision++; window.removeEventListener('lekh-publishing-refresh', updated); },
       };

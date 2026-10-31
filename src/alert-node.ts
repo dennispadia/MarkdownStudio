@@ -1,8 +1,9 @@
-import { Node, type JSONContent, type MarkdownToken, type MarkdownTokenizer } from '@tiptap/core';
+import { Node, type JSONContent, type MarkdownTokenizer } from '@tiptap/core';
 import type { Schema } from '@tiptap/pm/model';
 import { NodeSelection } from '@tiptap/pm/state';
 import { publishingBlockAtStart } from '../lib/publishing.js';
 import { publishingIcon } from '../lib/publishing-icons.js';
+import { containsResolvedReference, inlineDestinations, referenceDefinitions, snapshot, withoutSource } from './publishing-source.js';
 
 export const alertKinds = ['note', 'tip', 'important', 'caution', 'warning'] as const;
 export type AlertKind = typeof alertKinds[number];
@@ -85,74 +86,6 @@ function alertTokenizer(): MarkdownTokenizer {
       }
     },
   };
-}
-
-function withoutSource(node: JSONContent): JSONContent {
-  const result = { ...node };
-  if (node.type === 'lekhAlert' && node.attrs) {
-    const { sourceMarkdown: _source, sourceBaseline: _baseline, sourceHasReferences: _references, ...attrs } = node.attrs;
-    result.attrs = attrs;
-  }
-  if (node.content) result.content = node.content.map(withoutSource);
-  return result;
-}
-
-function containsResolvedReference(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some(containsResolvedReference);
-  if (!value || typeof value !== 'object') return false;
-  const token = value as MarkdownToken;
-  // Marked emits these link/image tokens only after resolving a definition.
-  // Full, collapsed and shortcut references end in "]"; inline links end in ")".
-  if ((token.type === 'link' || token.type === 'image') &&
-    typeof token.raw === 'string' && /^!?\[/.test(token.raw) && token.raw.endsWith(']')) return true;
-  return ['tokens', 'items', 'header', 'rows', 'nestedTokens'].some(key => containsResolvedReference(token[key]));
-}
-
-function referenceDefinitions(value: unknown): string[] {
-  if (Array.isArray(value)) return value.flatMap(referenceDefinitions);
-  if (!value || typeof value !== 'object') return [];
-  const token = value as MarkdownToken;
-  if (token.type === 'lekhAlert') return [];
-  if (token.type === 'def' && typeof token.raw === 'string') return [token.raw];
-  return ['tokens', 'items', 'header', 'rows', 'nestedTokens'].flatMap(key => referenceDefinitions(token[key]));
-}
-
-function inlineDestinations(node: JSONContent): JSONContent {
-  if (node.type === 'lekhAlert' || node.type === 'lekhAlertSource') return node;
-  const destination = (value: unknown) => `<${String(value ?? '').replace(/[\\<>]/g, '\\$&')}>`;
-  const title = (value: unknown) => typeof value === 'string' ? value.replace(/[\\"]/g, '\\$&') : value;
-  return {
-    ...node,
-    ...(node.type === 'image' ? {
-      attrs: {
-        ...node.attrs,
-        src: destination(node.attrs?.src),
-        title: title(node.attrs?.title),
-        alt: String(node.attrs?.alt ?? '').replace(/[\\[\]]/g, '\\$&'),
-      },
-    } : {}),
-    ...(node.marks ? {
-      marks: node.marks.map(mark => mark.type === 'link' ? {
-        ...mark,
-        attrs: { ...mark.attrs, href: destination(mark.attrs?.href), title: title(mark.attrs?.title) },
-      } : mark),
-    } : {}),
-    ...(node.content ? { content: node.content.map(inlineDestinations) } : {}),
-  };
-}
-
-function stableJSON(value: unknown): string {
-  return JSON.stringify(value, (_key, item: unknown) =>
-    item && typeof item === 'object' && !Array.isArray(item)
-      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
-      : item);
-}
-
-function snapshot(node: JSONContent, schema: Schema | null): string {
-  const content = withoutSource(node);
-  // PM adds node AND mark defaults (e.g. link target/rel, image dimensions).
-  // Compare both sides through the same actual schema, never by dropping defaults.
-  return stableJSON(withoutSource(schema ? schema.nodeFromJSON(content).toJSON() : content));
 }
 
 function bodyElement(element: HTMLElement): HTMLElement | undefined {

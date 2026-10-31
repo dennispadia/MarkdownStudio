@@ -1,0 +1,710 @@
+import { Extension, Node, type Editor, type JSONContent, type MarkdownParseHelpers, type MarkdownRendererHelpers, type MarkdownToken } from '@tiptap/core';
+import type { Node as ModelNode, Schema } from '@tiptap/pm/model';
+import { TextSelection } from '@tiptap/pm/state';
+import { closeHistory } from '@tiptap/pm/history';
+import { editablePublishingBlockAtStart, firstPublishingBlock, publishingLabel, type EditablePublishingBlock } from '../lib/publishing.js';
+import { imageDisplayURL } from '../lib/markdown.js';
+import { publishingIcon } from '../lib/publishing-icons.js';
+import { choosePublishingVariant, initializePublishing, publishingHTML, refreshPublishingVariants } from './publishing-view.js';
+import { containsResolvedReference, inlineDestinations, referenceDefinitions, snapshot, withoutSource } from './publishing-source.js';
+
+interface Options {
+  schema: (() => Schema) | null;
+  documentId: string;
+  reportError: (message: string) => void;
+  allowIncludes: () => void;
+  openInclude: (source: string) => void;
+}
+export type VariantOption = { id: string; label: string };
+const defaults: Options = { schema: null, documentId: '', reportError: message => console.error(message), allowIncludes: () => {}, openInclude: () => {} };
+let nextTabGroup = 0;
+const idPattern = /^[a-z0-9][\w-]*$/i;
+const names: Partial<Record<EditablePublishingBlock['kind'], string>> = {
+  zone: 'lekhZone', steps: 'lekhSteps', tabs: 'lekhTabs', selector: 'lekhSelector',
+  metadata: 'lekhMetadata', image: 'lekhImageDescription',
+};
+
+export function setPublishingEditable(editor: Editor, editable: boolean): void {
+  editor.view.dom.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement | HTMLSelectElement>(
+    '.publishing-editable input, .publishing-editable textarea, .publishing-editable button, .publishing-editable select, .publishing-block-tools button, .publishing-raw-editor',
+  ).forEach(control => { control.disabled = !editable; });
+}
+
+export function documentVariantOptions(editor: Editor): VariantOption[] {
+  const options = new Map<string, string>();
+  editor.state.doc.descendants(node => {
+    if (node.type.name === 'lekhSelector') for (const choice of variantOptions(node.attrs.options)) options.set(choice.id, choice.label);
+  });
+  return [...options].map(([id, label]) => ({ id, label }));
+}
+
+function variantOptions(value: unknown): VariantOption[] {
+  if (!Array.isArray(value)) throw new Error('Variant choices must be a list.');
+  return value.map((item: unknown) => {
+    if (!item || typeof item !== 'object' || !('id' in item) || !('label' in item) ||
+      typeof item.id !== 'string' || !idPattern.test(item.id) || typeof item.label !== 'string' || !item.label.trim()) {
+      throw new Error('Variant choices require a stable ID and a nonempty label.');
+    }
+    return { id: item.id, label: item.label };
+  });
+}
+
+function provenance() {
+  return {
+    sourceMarkdown: { default: null, rendered: false, parseHTML: () => null },
+    sourceBaseline: { default: null, rendered: false, parseHTML: () => null },
+    sourceHasReferences: { default: false, rendered: false, parseHTML: () => false },
+    sourceDefinitions: { default: [], rendered: false, parseHTML: () => [] },
+  };
+}
+
+function remember(node: JSONContent, raw: string, tokens: MarkdownToken[] = []): JSONContent {
+  node.attrs = { ...node.attrs, sourceDefinitions: referenceDefinitions(tokens) };
+  node.attrs = { ...node.attrs, sourceMarkdown: raw, sourceBaseline: JSON.stringify(withoutSource(node)),
+    sourceHasReferences: containsResolvedReference(tokens) };
+  return node;
+}
+
+function original(node: JSONContent, schema: Schema | null): string | null {
+  if (node.attrs?.sourceHasReferences || typeof node.attrs?.sourceMarkdown !== 'string' ||
+    typeof node.attrs?.sourceBaseline !== 'string') return null;
+  try {
+    if (snapshot(node, schema) === snapshot(JSON.parse(node.attrs.sourceBaseline) as JSONContent, schema)) {
+      return node.attrs.sourceMarkdown.replace(/\r?\n$/, '');
+    }
+  } catch (error) {
+    console.warn('Invalid publishing provenance was ignored; the editable model will be serialized.', error);
+  }
+  return null;
+}
+
+function body(node: JSONContent, helpers: MarkdownRendererHelpers): string {
+  const rendered = (node.content ?? []).map((child, index) =>
+    helpers.renderChild?.(node.attrs?.sourceHasReferences ? inlineDestinations(child) : child, index) ??
+    helpers.renderChildren([node.attrs?.sourceHasReferences ? inlineDestinations(child) : child])).join('\n\n');
+  const definitions: string[] = Array.isArray(node.attrs?.sourceDefinitions)
+    ? node.attrs.sourceDefinitions.filter((item: unknown): item is string => typeof item === 'string') : [];
+  return [...definitions.map(raw => raw.trimEnd()), rendered].filter(Boolean).join('\n\n');
+}
+
+const quote = (value: unknown) => String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]/g, ' ');
+const label = (value: unknown) => String(value ?? '').replace(/[\r\n]/g, ' ').replace(/&/g, '&amp;').replace(/[\\[\]]/g, '\\$&');
+function includeMarkdown(attrs: Record<string, unknown>): string {
+  const source = String(attrs.source ?? '').replace(/[()<>\s&]/g, character => encodeURIComponent(character));
+  return `[!INCLUDE [${label(attrs.label)}](${source})]`;
+}
+function children(tokens: MarkdownToken[], helpers: MarkdownParseHelpers): JSONContent[] {
+  const content = (helpers.parseBlockChildren ?? helpers.parseChildren)(tokens);
+  return content.length ? content : [helpers.createNode('paragraph', undefined, [])];
+}
+
+type ViewContext = { editor: Editor; getPos: () => number | undefined; node: ModelNode; options: Options };
+function viewContext(editor: Editor, getPos: () => number | undefined, initial: ModelNode, options: Options) {
+  const context: ViewContext = { editor, getPos, node: initial, options };
+  const set = (attrs: Record<string, unknown>) => {
+    const position = getPos();
+    if (!editor.isEditable || typeof position !== 'number' || editor.state.doc.nodeAt(position)?.type !== initial.type) {
+      options.reportError('The editor is busy or this block changed. Retry in the intended document.');
+      return;
+    }
+    editor.view.dispatch(editor.state.tr.setNodeMarkup(position, undefined, { ...context.node.attrs, ...attrs }));
+  };
+  return { context, set };
+}
+
+function field(context: ViewContext, title: string, value: () => string, change: (value: string) => void, multiline = false, required = false) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'publishing-field';
+  const caption = document.createElement('span');
+  caption.textContent = title;
+  const input = multiline ? document.createElement('textarea') : document.createElement('input');
+  input.setAttribute('aria-label', title);
+  input.value = value();
+  input.spellcheck = !/source|path|YAML/i.test(title);
+  if (input instanceof HTMLTextAreaElement) input.rows = 5;
+  wrapper.append(caption, input);
+  input.addEventListener('focus', () => {
+    if (context.editor.isEditable) context.editor.view.dispatch(closeHistory(context.editor.state.tr));
+  });
+  input.addEventListener('input', () => {
+    if (!context.editor.isEditable) { input.value = value(); context.options.reportError('Wait for the current operation to finish before editing this block.'); return; }
+    input.setCustomValidity(required && !input.value.trim() ? `Enter ${title.toLowerCase()}.` : '');
+    if (input.validity.valid) change(input.value);
+  });
+  input.addEventListener('blur', () => {
+    if (!input.validity.valid) { context.options.reportError(input.validationMessage); input.value = value(); input.setCustomValidity(''); }
+    if (context.editor.isEditable) context.editor.view.dispatch(closeHistory(context.editor.state.tr));
+  });
+  input.addEventListener('keydown', event => {
+    if (!(event instanceof KeyboardEvent)) return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault(); event.stopPropagation();
+      if (!context.editor.isEditable) { context.options.reportError('Wait for the current operation to finish before undoing.'); return; }
+      if (event.shiftKey) context.editor.commands.redo(); else context.editor.commands.undo();
+      input.value = value();
+    }
+  });
+  return { wrapper, input, refresh: () => {
+    input.disabled = !context.editor.isEditable;
+    const current = multiline ? value().replace(/\r\n/g, '\n') : value();
+    if (input.value === current || document.activeElement === input && !input.validity.valid) return;
+    const focused = document.activeElement === input;
+    const from = input.selectionStart ?? 0; const to = input.selectionEnd ?? from;
+    input.value = current;
+    if (focused) input.setSelectionRange(Math.min(from, current.length), Math.min(to, current.length));
+  } };
+}
+
+function tool(text: string, action: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = text;
+  button.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); action(); });
+  return button;
+}
+
+function paragraphAfter(context: ViewContext): HTMLButtonElement {
+  return tool('Write after block', () => {
+    const position = context.getPos();
+    if (!context.editor.isEditable || typeof position !== 'number') {
+      context.options.reportError('Wait for the current operation to finish before editing this block.'); return;
+    }
+    const end = position + context.node.nodeSize;
+    const tr = closeHistory(context.editor.state.tr).insert(end, context.editor.schema.nodes.paragraph.create());
+    tr.setSelection(TextSelection.create(tr.doc, end + 1));
+    context.editor.view.dispatch(tr.scrollIntoView());
+    context.editor.view.focus();
+  });
+}
+
+function ignoreControls(dom: HTMLElement, contentDOM?: HTMLElement) {
+  return {
+    stopEvent: (event: Event) => event.target instanceof Element && Boolean(event.target.closest('input, textarea, select, button')),
+    ignoreMutation: (mutation: { type: string; target: globalThis.Node }) => mutation.type !== 'selection' &&
+      (!contentDOM || !contentDOM.contains(mutation.target) || mutation.target === dom ||
+        mutation.type === 'attributes' && mutation.target === contentDOM),
+  };
+}
+
+function container(name: string, kind: 'zone' | 'steps' | 'callout') {
+  return Node.create<Options>({
+    name, group: 'block', content: 'block+', defining: true,
+    addOptions: () => defaults,
+    addAttributes: () => ({ ...provenance(),
+      variants: { default: ['first'], rendered: false, parseHTML: element => (element.getAttribute('data-publishing-zone') ?? 'first').split(','),
+        validate: value => {
+          if (!Array.isArray(value) || !value.length || value.length > 32 || value.some(id => typeof id !== 'string' || !idPattern.test(id)) ||
+            new Set(value).size !== value.length) throw new Error('Variant content requires 1–32 unique existing IDs.');
+        } },
+      variant: { default: 'checklist', rendered: false, parseHTML: element => element.getAttribute('data-lekh-division') ?? 'checklist' },
+      title: { default: '', rendered: false, parseHTML: element => element.getAttribute('data-publishing-title') ?? '' },
+    }),
+    parseHTML: () => [{ tag: `[data-lekh-container="${name}"]`, contentElement: '.publishing-editable-body' }],
+    renderHTML: ({ node }) => ['section', { 'data-lekh-container': name,
+      ...(kind === 'zone' ? { 'data-publishing-zone': node.attrs.variants.join(',') } : {}),
+      ...(kind === 'callout' ? { 'data-lekh-division': node.attrs.variant } : {}),
+    }, ['div', { class: 'publishing-editable-body' }, 0]],
+    parseMarkdown: (token, helpers) => remember(helpers.createNode(name, {
+      variants: token.variants ?? ['first'], variant: token.variant ?? 'checklist', title: token.title ?? '',
+    }, children(token.tokens ?? [], helpers)), token.raw ?? '', token.tokens ?? []),
+    renderMarkdown(node, helpers) {
+      const raw = original(node, this.options.schema?.() ?? null);
+      if (raw !== null) return raw;
+      const content = body(node, helpers);
+      if (kind === 'zone') return `:::zone pivot="${node.attrs?.variants.join(',')}"\n${content}\n:::zone-end`;
+      if (kind === 'steps') return `:::steps\n${content}\n:::steps-end`;
+      return `> [!div class="${quote(node.attrs?.variant)}"]${node.attrs?.title ? ` ${quote(node.attrs.title)}` : ''}\n${content.split(/\r?\n/).map(line => line ? `> ${line}` : '>').join('\n')}`;
+    },
+    addNodeView() {
+      const options = this.options;
+      return ({ editor, node, getPos }) => {
+        const { context, set } = viewContext(editor, getPos, node, options);
+        const dom = document.createElement('section');
+        dom.dataset.lekhContainer = name;
+        dom.dataset.lekhEditableZone = kind === 'zone' ? 'true' : 'false';
+        const header = document.createElement('div');
+        header.contentEditable = 'false';
+        header.className = 'publishing-edit-header';
+        const title = document.createElement('strong');
+        const show = tool('Show and edit', () => {
+          const pane = dom.closest<HTMLElement>('.document-pane');
+          if (pane) choosePublishingVariant(pane, String(context.node.attrs.variants[0]));
+        });
+        const assignments = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = 'Applies to…';
+        const choices = document.createElement('div');
+        assignments.append(summary, choices);
+        header.append(title, ...(kind === 'zone' ? [assignments, show] : []), paragraphAfter(context));
+        const contentDOM = document.createElement('div');
+        contentDOM.className = 'publishing-editable-body';
+        dom.append(header, contentDOM);
+        let signature = '';
+        const refresh = () => {
+          const current = context.node;
+          if (kind === 'zone') {
+            const available = documentVariantOptions(editor);
+            const ids: string[] = current.attrs.variants;
+            dom.className = 'publishing-zone publishing-editable';
+            dom.dataset.publishingZone = ids.join(',');
+            title.textContent = `Variant content · ${ids.map(id => available.find(option => option.id === id)?.label ?? id).join(' / ')}`;
+            const next = JSON.stringify([available, ids]);
+            if (signature !== next) {
+              signature = next;
+              choices.replaceChildren();
+              for (const option of [...available, ...ids.filter(id => !available.some(option => option.id === id)).map(id => ({ id, label: id }))]) {
+                const choice = document.createElement('label');
+                const check = document.createElement('input');
+                check.type = 'checkbox'; check.checked = ids.includes(option.id); check.disabled = !editor.isEditable;
+                check.addEventListener('change', () => {
+                  const variants = check.checked ? [...context.node.attrs.variants, option.id] : context.node.attrs.variants.filter((id: string) => id !== option.id);
+                  if (!variants.length) { check.checked = true; options.reportError('Variant content must apply to at least one option.'); return; }
+                  set({ variants });
+                });
+                choice.append(check, document.createTextNode(option.label)); choices.append(choice);
+              }
+            }
+          } else if (kind === 'steps') {
+            dom.className = 'publishing-steps publishing-editable'; title.textContent = 'Structured steps';
+          } else {
+            dom.className = `publishing-callout publishing-callout-${current.attrs.variant} publishing-editable`;
+            title.textContent = current.attrs.title || (current.attrs.variant === 'checklist' ? 'Checklist' : 'Next step');
+          }
+          header.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = !editor.isEditable; });
+        };
+        editor.on('update', refresh);
+        refresh();
+        return { dom, contentDOM, ...ignoreControls(dom, contentDOM),
+          update: updated => { if (updated.type !== node.type) return false; context.node = updated; refresh(); return true; },
+          destroy: () => editor.off('update', refresh),
+        };
+      };
+    },
+  });
+}
+
+const TabNode = Node.create<Options>({
+  name: 'lekhTab', content: 'block+', defining: true, addOptions: () => defaults,
+  addAttributes: () => ({ ...provenance(),
+    label: { default: 'Example', rendered: false, parseHTML: element => element.getAttribute('data-tab-label') ?? 'Example' },
+    id: { default: 'example', rendered: false, parseHTML: element => element.getAttribute('data-publishing-panel') ?? 'example' },
+    level: { default: 1, rendered: false, parseHTML: element => Number(element.getAttribute('data-tab-level') ?? 1) },
+  }),
+  parseHTML: () => [{ tag: '[data-lekh-tab]', contentElement: '.publishing-editable-body' }],
+  renderHTML: ({ node }) => ['section', { 'data-lekh-tab': '', 'data-tab-label': node.attrs.label, 'data-publishing-panel': node.attrs.id, 'data-tab-level': node.attrs.level },
+    ['div', { class: 'publishing-editable-body' }, 0]],
+  renderMarkdown: (node, helpers) => body(node, helpers),
+  addNodeView() {
+    const options = this.options;
+    return ({ editor, node, getPos }) => {
+      const { context, set } = viewContext(editor, getPos, node, options);
+      const dom = document.createElement('section');
+      dom.className = 'publishing-tab-panel'; dom.dataset.lekhTab = '';
+      const heading = field(context, 'Tab name', () => String(context.node.attrs.label), value => set({ label: value }), false, true);
+      heading.wrapper.contentEditable = 'false';
+      const contentDOM = document.createElement('div'); contentDOM.className = 'publishing-editable-body';
+      dom.append(heading.wrapper, contentDOM);
+      const refresh = () => {
+        const position = getPos();
+        dom.dataset.publishingPanel = String(typeof position === 'number' ? editor.state.doc.resolve(position).index() : 0);
+        dom.dataset.publishingPanelId = String(context.node.attrs.id);
+        dom.dataset.tabLabel = String(context.node.attrs.label); heading.refresh();
+      };
+      refresh();
+      return { dom, contentDOM, ...ignoreControls(dom, contentDOM),
+        update: updated => { if (updated.type !== node.type) return false; context.node = updated; refresh(); return true; } };
+    };
+  },
+});
+
+const TabsNode = Node.create<Options>({
+  name: 'lekhTabs', group: 'block', content: 'lekhTab+', defining: true, isolating: true,
+  addOptions: () => defaults, addAttributes: () => ({ ...provenance(), syntax: { default: 'heading', rendered: false, parseHTML: element => element.getAttribute('data-tabs-syntax') ?? 'heading' } }),
+  parseHTML: () => [{ tag: '[data-lekh-tabs]', contentElement: '.publishing-editable-panels' }],
+  renderHTML: ({ node }) => ['section', { 'data-lekh-tabs': '', class: 'publishing-tabs', 'data-tabs-syntax': node.attrs.syntax }, ['div', { class: 'publishing-editable-panels' }, 0]],
+  parseMarkdown: (token, helpers) => remember(helpers.createNode('lekhTabs', { syntax: token.syntax },
+    (token.panels as MarkdownToken[]).map(panel => remember(helpers.createNode('lekhTab', {
+      label: panel.label, id: panel.id, level: panel.level,
+    }, children(panel.tokens ?? [], helpers)), '', panel.tokens ?? []))), token.raw ?? '', token.panels as MarkdownToken[]),
+  renderMarkdown(node, helpers) {
+    const raw = original(node, this.options.schema?.() ?? null);
+    if (raw !== null) return raw;
+    const panels = (node.content ?? []).map(panel => {
+      const content = body(panel, helpers);
+      return node.attrs?.syntax === 'directive' ? `:::tab ${String(panel.attrs?.label).replace(/[\r\n]/g, ' ')}\n${content}\n:::tab-end`
+        : `${'#'.repeat(Math.min(6, Math.max(1, Number(panel.attrs?.level))))} [${label(panel.attrs?.label)}](#tab/${panel.attrs?.id})\n\n${content}`;
+    }).join('\n\n');
+    return node.attrs?.syntax === 'directive' ? `:::tabs\n${panels}\n:::tabs-end` : `${panels}\n\n---`;
+  },
+  addNodeView() {
+    const options = this.options;
+    return ({ editor, node, getPos }) => {
+      const { context } = viewContext(editor, getPos, node, options);
+      const dom = document.createElement('section'); dom.className = 'publishing-tabs publishing-editable'; dom.dataset.lekhTabs = ''; dom.dataset.publishingTabs = '';
+      const header = document.createElement('div'); header.contentEditable = 'false';
+      const tabs = document.createElement('div'); tabs.className = 'publishing-tablist'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Content tabs');
+      const tools = document.createElement('div'); tools.className = 'publishing-edit-tools';
+      const contentDOM = document.createElement('div'); contentDOM.className = 'publishing-editable-panels';
+      const groupId = `lekh-editable-tabs-${++nextTabGroup}`;
+      let selected = String(node.firstChild!.attrs.id);
+      const select = (id: string) => {
+        selected = id;
+        dom.dataset.activeTab = id;
+        for (const button of tabs.querySelectorAll<HTMLButtonElement>('[data-publishing-tab]')) {
+          button.setAttribute('aria-selected', String(button.dataset.tabId === id)); button.tabIndex = button.dataset.tabId === id ? 0 : -1;
+        }
+        for (const [index, panel] of Array.from(contentDOM.children).entries()) if (panel instanceof HTMLElement) {
+          panel.hidden = panel.dataset.publishingPanelId !== id;
+          panel.id = `${groupId}-panel-${index}`;
+          panel.setAttribute('role', 'tabpanel');
+          panel.setAttribute('aria-labelledby', `${groupId}-tab-${index}`);
+        }
+      };
+      const add = tool('Add tab', () => {
+        const position = getPos();
+        if (!editor.isEditable || typeof position !== 'number') { options.reportError('Wait for the current operation to finish.'); return; }
+        if (context.node.childCount >= 32) { options.reportError('A tab group can contain at most 32 examples.'); return; }
+        let next = 1;
+        const ids = new Set<string>(); context.node.forEach(child => ids.add(String(child.attrs.id)));
+        while (ids.has(`example-${next}`)) next++;
+        selected = `example-${next}`;
+        const panel = editor.schema.nodes.lekhTab.create({ id: selected, label: `Example ${next}` }, editor.schema.nodes.paragraph.create());
+        editor.view.dispatch(closeHistory(editor.state.tr).insert(position + context.node.nodeSize - 1, panel));
+      });
+      const remove = tool('Remove tab', () => {
+        const position = getPos();
+        if (!editor.isEditable || typeof position !== 'number') { options.reportError('Wait for the current operation to finish.'); return; }
+        if (context.node.childCount === 1) { options.reportError('Keep at least one tab, or delete the entire group.'); return; }
+        let offset = position + 1;
+        context.node.forEach(panel => { if (panel.attrs.id === selected) editor.view.dispatch(closeHistory(editor.state.tr).delete(offset, offset + panel.nodeSize)); offset += panel.nodeSize; });
+      });
+      tools.append(add, remove, paragraphAfter(context)); header.append(tabs, tools); dom.append(header, contentDOM);
+      let signature = '';
+      const refresh = () => {
+        const panels: { id: string; label: string }[] = [];
+        context.node.forEach(panel => panels.push({ id: String(panel.attrs.id), label: String(panel.attrs.label) }));
+        if (!panels.some(panel => panel.id === selected)) selected = panels[0].id;
+        const next = JSON.stringify(panels);
+        if (signature !== next) {
+          signature = next; tabs.replaceChildren();
+          for (const [index, panel] of panels.entries()) {
+            const button = tool(panel.label, () => select(panel.id));
+            button.dataset.publishingTab = String(index); button.dataset.tabId = panel.id; button.setAttribute('role', 'tab');
+            button.id = `${groupId}-tab-${index}`; button.setAttribute('aria-controls', `${groupId}-panel-${index}`);
+            button.addEventListener('keydown', event => {
+              const next = event.key === 'Home' ? 0 : event.key === 'End' ? panels.length - 1 :
+                event.key === 'ArrowRight' ? (index + 1) % panels.length : event.key === 'ArrowLeft' ? (index + panels.length - 1) % panels.length : null;
+              if (next !== null) { event.preventDefault(); select(panels[next].id); tabs.querySelectorAll<HTMLButtonElement>('button')[next].focus(); }
+            });
+            tabs.append(button);
+          }
+        }
+        tools.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = !editor.isEditable; });
+        queueMicrotask(() => { if (dom.isConnected) select(selected); });
+      };
+      refresh();
+      return { dom, contentDOM, ...ignoreControls(dom, contentDOM),
+        update: updated => { if (updated.type !== node.type) return false; context.node = updated; refresh(); return true; } };
+    };
+  },
+});
+
+const SelectorNode = Node.create<Options>({
+  name: 'lekhSelector', group: 'block', atom: true, addOptions: () => defaults,
+  addAttributes: () => ({ ...provenance(),
+    title: { default: 'Choose an option', rendered: false, parseHTML: element => element.getAttribute('data-selector-title') ?? 'Choose an option' },
+    options: { default: [{ id: 'first', label: 'First option' }, { id: 'second', label: 'Second option' }], rendered: false,
+      parseHTML: element => JSON.parse(element.getAttribute('data-selector-options') ?? '[]'),
+      validate: value => { const choices = variantOptions(value); if (!choices.length || choices.length > 32 || new Set(choices.map(item => item.id)).size !== choices.length) throw new Error('Use 1–32 unique variant choices.'); } },
+  }),
+  parseHTML: () => [{ tag: '[data-lekh-selector]' }],
+  renderHTML: ({ node }) => ['section', { 'data-lekh-selector': '', 'data-selector-title': node.attrs.title, 'data-selector-options': JSON.stringify(node.attrs.options) }],
+  parseMarkdown: (token, helpers) => remember(helpers.createNode('lekhSelector', { title: token.title, options: token.options }), token.raw ?? ''),
+  renderMarkdown(node) {
+    return original(node, this.options.schema?.() ?? null) ?? `:::selector title="${quote(node.attrs?.title)}"\n${variantOptions(node.attrs?.options).map(option => `- [${label(option.label)}](#variant/${option.id})`).join('\n')}\n:::selector-end`;
+  },
+  addNodeView() {
+    const options = this.options;
+    return ({ editor, node, getPos }) => {
+      const { context, set } = viewContext(editor, getPos, node, options);
+      const dom = document.createElement('section'); dom.className = 'publishing-selector publishing-editable'; dom.dataset.lekhSelector = ''; dom.dataset.publishingSelector = 'editable'; dom.contentEditable = 'false'; dom.setAttribute('role', 'group');
+      const title = field(context, 'Selector prompt', () => String(context.node.attrs.title), value => set({ title: value }), false, true);
+      const controls = document.createElement('div'); controls.className = 'publishing-variant-options';
+      const labels = document.createElement('div'); labels.className = 'publishing-choice-fields';
+      const add = tool('Add option', () => {
+        const existing = documentVariantOptions(editor);
+        if (context.node.attrs.options.length >= 32) { options.reportError('A selector can contain at most 32 options.'); return; }
+        let next = 1; while (existing.some(option => option.id === `option-${next}`)) next++;
+        set({ options: [...context.node.attrs.options, { id: `option-${next}`, label: `Option ${next}` }] });
+      });
+      dom.append(title.wrapper, controls, labels, add, paragraphAfter(context));
+      let idsSignature = ''; let fields: ReturnType<typeof field>[] = [];
+      const refresh = () => {
+        dom.setAttribute('aria-label', String(context.node.attrs.title));
+        title.refresh();
+        const choices = variantOptions(context.node.attrs.options);
+        const signature = choices.map(choice => choice.id).join(',');
+        if (signature !== idsSignature) {
+          idsSignature = signature; fields = []; labels.replaceChildren();
+          for (const choice of choices) {
+            const name = field(context, `Option name (${choice.id})`, () => variantOptions(context.node.attrs.options).find(option => option.id === choice.id)!.label,
+              value => set({ options: variantOptions(context.node.attrs.options).map(option => option.id === choice.id ? { ...option, label: value } : option) }), false, true);
+            const remove = tool('Remove', () => {
+              let used = false;
+              editor.state.doc.descendants(node => { if (node.type.name === 'lekhZone' && node.attrs.variants.includes(choice.id)) used = true; });
+              if (used) { options.reportError('Reassign or remove the content for this option before removing it.'); return; }
+              if (context.node.attrs.options.length === 1) { options.reportError('Keep at least one selector option.'); return; }
+              set({ options: variantOptions(context.node.attrs.options).filter(option => option.id !== choice.id) });
+            });
+            name.wrapper.append(remove); fields.push(name); labels.append(name.wrapper);
+          }
+        }
+        controls.replaceChildren();
+        for (const choice of choices) {
+          const button = tool(choice.label, () => { const pane = dom.closest<HTMLElement>('.document-pane'); if (pane) choosePublishingVariant(pane, choice.id); });
+          button.dataset.publishingVariant = choice.id; button.dataset.publishingChoice = choice.id; button.dataset.publishingChoiceReady = 'true'; controls.append(button);
+        }
+        fields.forEach(field => field.refresh());
+        dom.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = !editor.isEditable; });
+        queueMicrotask(() => { const pane = dom.closest<HTMLElement>('.document-pane'); if (pane) refreshPublishingVariants(pane); });
+      };
+      refresh();
+      return { dom, ...ignoreControls(dom),
+        update: updated => { if (updated.type !== node.type) return false; context.node = updated; refresh(); return true; } };
+    };
+  },
+});
+
+function metadataValue(yaml: string, key: string): string {
+  const value = new RegExp(`^${key}:[ \\t]*(.*)$`, 'm').exec(yaml)?.[1] ?? '';
+  const doubleQuoted = /^("(?:\\.|[^"\\])*")\s*(?:#.*)?$/.exec(value);
+  if (doubleQuoted) { try { return JSON.parse(doubleQuoted[1]) as string; } catch { return value; } }
+  const singleQuoted = /^'((?:[^']|'')*)'\s*(?:#.*)?$/.exec(value);
+  return singleQuoted ? singleQuoted[1].replace(/''/g, "'") : value.replace(/\s+#.*$/, '').trim();
+}
+export function updateMetadataValue(yaml: string, key: 'title' | 'description', value: string): string {
+  const pattern = new RegExp(`^${key}:[^\\r\\n]*`, 'm');
+  const line = `${key}: ${JSON.stringify(value)}`;
+  const current = pattern.exec(yaml)?.[0];
+  if (current && /:\s*[|>]/.test(current)) throw new Error('This metadata field uses a multiline YAML value. Edit it in the metadata YAML field below.');
+  let comment = '';
+  let quoted = '';
+  for (let index = (current?.indexOf(':') ?? -1) + 1; current && index < current.length; index++) {
+    const char = current[index];
+    if (quoted) {
+      if (char === '\\' && quoted === '"') index++;
+      else if (char === quoted) {
+        if (quoted === "'" && current[index + 1] === "'") index++;
+        else quoted = '';
+      }
+    } else if (char === '"' || char === "'") quoted = char;
+    else if (char === '#' && /\s/.test(current[index - 1] ?? '')) { comment = ` ${current.slice(index)}`; break; }
+  }
+  const newline = yaml.includes('\r\n') ? '\r\n' : '\n';
+  return current ? yaml.replace(pattern, () => line + comment) : `${yaml.trimEnd()}${newline}${line}${newline}`;
+}
+
+const MetadataNode = Node.create<Options>({
+  name: 'lekhMetadata', group: 'block', atom: true, addOptions: () => defaults,
+  addAttributes: () => ({ ...provenance(), yaml: { default: '', rendered: false, parseHTML: element => element.textContent ?? '' } }),
+  parseHTML: () => [{ tag: '[data-lekh-metadata]' }],
+  renderHTML: ({ node }) => ['pre', { 'data-lekh-metadata': '' }, String(node.attrs.yaml)],
+  parseMarkdown: (token, helpers) => remember(helpers.createNode('lekhMetadata', { yaml: token.body ?? '' }), token.raw ?? ''),
+  renderMarkdown(node) { return original(node, this.options.schema?.() ?? null) ?? `---\n${String(node.attrs?.yaml).trimEnd()}\n---`; },
+  addNodeView() {
+    const options = this.options;
+    return ({ editor, node, getPos }) => {
+      const { context, set } = viewContext(editor, getPos, node, options);
+      const dom = document.createElement('section'); dom.className = 'publishing-metadata-block publishing-editable'; dom.contentEditable = 'false';
+      const details = document.createElement('details'); details.className = 'publishing-metadata'; details.dataset.lekhMetadata = '';
+      const summary = document.createElement('summary'); summary.textContent = 'Document metadata';
+      const fields = (['title', 'description'] as const).map(key => {
+        const input = field(context, key === 'title' ? 'Document title' : 'Document description',
+          () => metadataValue(String(context.node.attrs.yaml), key), value => {
+            try { set({ yaml: updateMetadataValue(String(context.node.attrs.yaml), key, value) }); }
+            catch (error) { input.input.setCustomValidity(error instanceof Error ? error.message : String(error)); }
+          });
+        return input;
+      });
+      const yaml = field(context, 'Metadata YAML (all fields)', () => String(context.node.attrs.yaml), value => {
+        const first = value.split(/\r?\n/).find(line => line.trim() && !line.trimStart().startsWith('#')) ?? '';
+        const error = /^(?:---|\.\.\.)[ \t]*$/m.test(value) ? 'Metadata delimiter lines belong outside the YAML fields.' :
+          !/^(?:[\w.-]+|"[^"]+"|'[^']+')[ \t]*:/.test(first) ? 'Keep at least one name: value metadata field, or delete the metadata block.' : '';
+        yaml.input.setCustomValidity(error);
+        if (!error) set({ yaml: value });
+      }, true);
+      details.append(summary, ...fields.map(field => field.wrapper), yaml.wrapper, paragraphAfter(context));
+      const configured = document.createElement('div');
+      const customize = tool('Make these choices editable', () => {
+        const position = getPos();
+        if (!editor.isEditable || typeof position !== 'number' || !editor.markdown) { options.reportError('Wait for the current operation to finish.'); return; }
+        if (documentVariantOptions(editor).length) { options.reportError('This document already has an editable selector. Edit its choices directly.'); return; }
+        const title = configured.querySelector<HTMLElement>('.publishing-selector-title')?.textContent ?? 'Choose an option';
+        const choices = [...configured.querySelectorAll<HTMLElement>('[data-publishing-variant]')].map(control => ({ id: control.dataset.publishingVariant!, label: control.textContent ?? '' }));
+        if (!choices.length) { options.reportError('Allow the project folder to load the configured choices first.'); return; }
+        const raw = `:::selector title="${quote(title)}"\n${choices.map(option => `- [${label(option.label)}](#variant/${option.id})`).join('\n')}\n:::selector-end`;
+        editor.commands.insertContentAt(position + context.node.nodeSize, editor.markdown.parse(raw).content ?? []);
+      });
+      customize.hidden = true;
+      dom.append(details, configured, customize);
+      let revision = 0; let destroyed = false; let lastConfiguration = '';
+      const refreshConfiguration = async (force = false) => {
+        const yaml = String(context.node.attrs.yaml);
+        const signature = `${yaml}\u0000${documentVariantOptions(editor).length > 0}`;
+        if (!force && signature === lastConfiguration) return;
+        lastConfiguration = signature;
+        const current = ++revision;
+        if (!/^zone_pivot_groups\s*:/m.test(yaml) || documentVariantOptions(editor).length) { configured.replaceChildren(); customize.hidden = true; return; }
+        try {
+          const html = await publishingHTML(`---\n${yaml}\n---`, options.documentId);
+          if (destroyed || current !== revision) return;
+          const template = document.createElement('template'); template.innerHTML = html;
+          const selector = template.content.querySelector<HTMLElement>('[data-publishing-selector]');
+          configured.replaceChildren();
+          if (selector) configured.append(selector);
+          customize.hidden = !selector;
+          initializePublishing(configured, options.reportError);
+        } catch (error) {
+          if (!destroyed && current === revision) { configured.textContent = `Configured variants could not be loaded: ${String(error)}`; options.reportError(configured.textContent); }
+        }
+      };
+      const refreshed = (event: Event) => { if (event instanceof CustomEvent && event.detail === options.documentId) void refreshConfiguration(true); };
+      const documentUpdated = () => { void refreshConfiguration(); };
+      window.addEventListener('lekh-publishing-refresh', refreshed);
+      editor.on('update', documentUpdated);
+      void refreshConfiguration();
+      return { dom, ...ignoreControls(dom),
+        update: updated => { if (updated.type !== node.type) return false; context.node = updated; [...fields, yaml].forEach(field => field.refresh()); void refreshConfiguration(); return true; },
+        destroy: () => { destroyed = true; revision++; editor.off('update', documentUpdated); window.removeEventListener('lekh-publishing-refresh', refreshed); } };
+    };
+  },
+});
+
+const IncludeNode = Node.create<Options>({
+  name: 'lekhInclude', group: 'block', atom: true, addOptions: () => defaults,
+  addAttributes: () => ({ ...provenance(), label: { default: 'Shared content', rendered: false, parseHTML: element => element.getAttribute('data-include-label') ?? 'Shared content' },
+    source: { default: './includes/shared.md', rendered: false, parseHTML: element => element.getAttribute('data-include-source') ?? '' } }),
+  parseHTML: () => [{ tag: '[data-lekh-include]' }],
+  renderHTML: ({ node }) => ['section', { 'data-lekh-include': '', 'data-include-label': node.attrs.label, 'data-include-source': node.attrs.source }],
+  parseMarkdown: (token, helpers) => remember(helpers.createNode('lekhInclude', { label: token.label, source: token.source }), token.raw ?? ''),
+  renderMarkdown(node) { return original(node, this.options.schema?.() ?? null) ?? includeMarkdown(node.attrs ?? {}); },
+  addNodeView() {
+    const options = this.options;
+    return ({ editor, node, getPos }) => {
+      const { context, set } = viewContext(editor, getPos, node, options);
+      const dom = document.createElement('section'); dom.className = 'publishing-include publishing-editable'; dom.dataset.lekhInclude = ''; dom.contentEditable = 'false';
+      const title = document.createElement('strong'); title.textContent = 'Local include';
+      const name = field(context, 'Include name', () => String(context.node.attrs.label), value => set({ label: value }), false, true);
+      const source = field(context, 'Include path', () => String(context.node.attrs.source), value => set({ source: value }), false, true);
+      const hint = document.createElement('p'); hint.className = 'publishing-field-hint'; hint.textContent = 'The path is editable here. Shared text belongs to its own file; allow its project folder, then open that file in Visual to edit it.';
+      const preview = document.createElement('div'); preview.className = 'publishing-include-preview';
+      let revision = 0; let destroyed = false; let timer: ReturnType<typeof setTimeout> | undefined;
+      const refreshPreview = async () => {
+        const current = ++revision;
+        try {
+          const html = await publishingHTML(includeMarkdown(context.node.attrs), options.documentId);
+          if (!destroyed && current === revision) { preview.innerHTML = html; preview.classList.remove('publishing-error'); }
+        } catch (error) {
+          if (!destroyed && current === revision) { preview.textContent = `Include preview unavailable: ${String(error)}`; preview.classList.add('publishing-error'); }
+        }
+      };
+      const refreshed = (event: Event) => { if (event instanceof CustomEvent && event.detail === options.documentId) void refreshPreview(); };
+      window.addEventListener('lekh-publishing-refresh', refreshed);
+      dom.append(title, name.wrapper, source.wrapper, hint, tool('Allow project folder…', options.allowIncludes),
+        tool('Open shared file in Visual', () => options.openInclude(String(context.node.attrs.source))), preview, paragraphAfter(context));
+      void refreshPreview();
+      return { dom, ...ignoreControls(dom),
+        update: updated => {
+          if (updated.type !== node.type) return false;
+          context.node = updated; name.refresh(); source.refresh(); revision++;
+          clearTimeout(timer); timer = setTimeout(() => { void refreshPreview(); }, 300);
+          return true;
+        },
+        destroy: () => { destroyed = true; revision++; clearTimeout(timer); window.removeEventListener('lekh-publishing-refresh', refreshed); } };
+    };
+  },
+});
+
+const ImageDescriptionNode = Node.create<Options>({
+  name: 'lekhImageDescription', group: 'block', content: 'block*', defining: true, addOptions: () => defaults,
+  addAttributes: () => ({ ...provenance(),
+    source: { default: '', rendered: false, parseHTML: element => element.getAttribute('data-image-source') ?? '' },
+    alt: { default: '', rendered: false, parseHTML: element => element.getAttribute('data-image-alt') ?? '' },
+    caption: { default: '', rendered: false, parseHTML: element => element.getAttribute('data-image-caption') ?? '' },
+    imageType: { default: 'content', rendered: false, parseHTML: element => element.getAttribute('data-image-type') ?? 'content' },
+    border: { default: '', rendered: false },
+  }),
+  parseHTML: () => [{ tag: '[data-lekh-described-image]', contentElement: '.publishing-editable-body' }],
+  renderHTML: ({ node }) => ['figure', { 'data-lekh-described-image': '', 'data-image-source': node.attrs.source, 'data-image-alt': node.attrs.alt, 'data-image-caption': node.attrs.caption, 'data-image-type': node.attrs.imageType },
+    ['div', { class: 'publishing-editable-body' }, 0]],
+  parseMarkdown: (token, helpers) => remember(helpers.createNode('lekhImageDescription', {
+    source: token.attributes.source, alt: token.attributes['alt-text'], caption: token.attributes.caption ?? '',
+    imageType: token.attributes.type ?? 'content', border: token.attributes.border ?? '',
+  }, token.tokens?.length ? children(token.tokens, helpers) : []), token.raw ?? '', token.tokens ?? []),
+  renderMarkdown(node, helpers) {
+    const raw = original(node, this.options.schema?.() ?? null);
+    if (raw !== null) return raw;
+    const opening = `:::image type="${quote(node.attrs?.imageType)}" source="${quote(node.attrs?.source)}" alt-text="${quote(node.attrs?.alt)}"${node.attrs?.caption ? ` caption="${quote(node.attrs.caption)}"` : ''}${node.attrs?.border ? ` border="${quote(node.attrs.border)}"` : ''}:::`;
+    return node.attrs?.imageType === 'complex' ? `${opening}\n${body(node, helpers)}\n:::image-end` : opening;
+  },
+  addNodeView() {
+    const options = this.options;
+    return ({ editor, node, getPos }) => {
+      const { context, set } = viewContext(editor, getPos, node, options);
+      const dom = document.createElement('figure'); dom.className = 'publishing-image publishing-editable'; dom.dataset.lekhDescribedImage = '';
+      const form = document.createElement('div'); form.contentEditable = 'false';
+      const image = document.createElement('img');
+      const fields = [['source', 'Image source'], ['alt', 'Alternate text'], ['caption', 'Image caption']] as const;
+      const inputs = fields.map(([key, title]) => field(context, title, () => String(context.node.attrs[key]), value => set({ [key]: value }), false, key === 'source'));
+      const description = tool('Add long description', () => {
+        const position = getPos();
+        if (!editor.isEditable || typeof position !== 'number') { options.reportError('Wait for the current operation to finish.'); return; }
+        const tr = editor.state.tr.setNodeMarkup(position, undefined, { ...context.node.attrs, imageType: 'complex' });
+        if (!context.node.content.size) tr.insert(position + 1, editor.schema.nodes.paragraph.create());
+        tr.setSelection(TextSelection.near(tr.doc.resolve(position + 1)));
+        editor.view.dispatch(closeHistory(tr)); editor.view.focus();
+      });
+      form.append(image, ...inputs.map(field => field.wrapper), description, paragraphAfter(context));
+      const contentDOM = document.createElement('div'); contentDOM.className = 'publishing-editable-body'; dom.append(form, contentDOM);
+      const refresh = () => {
+        image.src = imageDisplayURL(String(context.node.attrs.source), options.documentId); image.alt = String(context.node.attrs.alt);
+        contentDOM.hidden = context.node.attrs.imageType !== 'complex'; description.hidden = context.node.attrs.imageType === 'complex'; inputs.forEach(field => field.refresh());
+      };
+      refresh();
+      return { dom, contentDOM, ...ignoreControls(dom, contentDOM),
+        update: updated => { if (updated.type !== node.type) return false; context.node = updated; refresh(); return true; } };
+    };
+  },
+});
+
+export const EditablePublishing = Extension.create<Options>({
+  name: 'editablePublishing', addOptions: () => defaults,
+  addExtensions() {
+    const tokenizer = Node.create({
+      // Marked prepends registrations; register after the opaque fallback.
+      name: 'lekhPublishingTokenizer', group: 'block', atom: true, priority: 90,
+      renderHTML: () => ['div'],
+      markdownTokenizer: (() => {
+        let depth = 0;
+        return { name: 'lekhPublishingTokenizer', level: 'block' as const, start: firstPublishingBlock,
+          tokenize: (source: string, _tokens: MarkdownToken[], lexer: { blockTokens: (source: string) => MarkdownToken[] }) => {
+            const block = editablePublishingBlockAtStart(source);
+            if (!block || block.kind === 'unsupported' || block.kind === 'callout' && !['checklist', 'nextstepaction'].includes(block.variant ?? '')) return undefined;
+            if (depth >= 12) return undefined;
+            const include = block.kind === 'include' ? /^ {0,3}\[!INCLUDE[ \t]+\[((?:\\.|[^\]\\])+)\]\(([^\r\n]*)\)\][ \t]*(?:\r?\n|$)/i.exec(block.raw) : null;
+            if (block.kind === 'include' && !include) return undefined;
+            const type = block.kind === 'include' ? 'lekhInclude' : block.kind === 'callout' ? 'lekhDivision' : names[block.kind];
+            if (!type) return undefined;
+            depth++;
+            try {
+              return { ...block, type, ...(include ? { label: publishingLabel(include[1]), source: publishingLabel(include[2].replace(/^<(.*)>$/, '$1')).replace(/\\ /g, ' ') } : {}),
+                ...(block.body !== undefined && block.kind !== 'metadata' ? { tokens: lexer.blockTokens(block.body) } : {}),
+                ...(block.panels ? { panels: block.panels.map(panel => ({ ...panel, type: 'lekhTab', tokens: lexer.blockTokens(panel.body) })) } : {}) };
+            } finally { depth--; }
+          } };
+      })(),
+    });
+    return [tokenizer, container('lekhZone', 'zone'), container('lekhSteps', 'steps'), container('lekhDivision', 'callout'),
+      TabsNode, TabNode, SelectorNode, MetadataNode, IncludeNode, ImageDescriptionNode].map(extension => extension.configure(this.options));
+  },
+});

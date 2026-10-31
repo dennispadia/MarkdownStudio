@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('lekh', {
   allowPublishingIncludes: (id) => ipcRenderer.invoke('publishing:allow-includes', id),
   revokePublishingIncludes: (id) => ipcRenderer.invoke('publishing:revoke-includes', id),
   preparePublishing: (id, content) => ipcRenderer.invoke('publishing:prepare', id, content),
+  openPublishingInclude: (id, source) => ipcRenderer.invoke('publishing:open-include', id, source),
   exportDocument: (id, content, format) => ipcRenderer.invoke('document:export', id, content, format),
   insertImage: () => ipcRenderer.invoke('document:image'),
   storeImage: (id, source, storage) => ipcRenderer.invoke('document:store-image', id, source, storage),
