@@ -2608,6 +2608,30 @@ try {
   await menuAction('close-tab');
   console.log('PASS: selectors/labels, independently placed variant bodies, all tab alternatives/names, metadata, steps, image descriptions and include fields edit directly in Visual, save/reopen and export faithfully; variant-content insertion is gated by existing choices');
 
+  await action('new'); await action('source');
+  const divisionTitle = 'Follow-up "quoted" \\ path';
+  await sourceEdit(`> [!div class="nextstepaction"] ${divisionTitle}\n> Clipboard division body.\n\n:::image type="content" source="data:image/png;base64,${testPNG(1,1).toString('base64')}" alt-text="Clipboard image" border="false":::\n`);
+  await action('visual');
+  const clipboardAttributes = await ui(`(() => {
+    const target=document.querySelector('.tiptap'),editor=target.editor;
+    editor.commands.selectAll();editor.commands.focus();
+    const transfer=new DataTransfer();
+    target.dispatchEvent(new ClipboardEvent('cut',{clipboardData:transfer,bubbles:true,cancelable:true}));
+    const html=transfer.getData('text/html');
+    if(!html)throw new Error('Normal cut did not serialize rich clipboard HTML.');
+    if(editor.state.doc.textContent)throw new Error('Normal cut did not remove the selection.');
+    target.dispatchEvent(new ClipboardEvent('paste',{clipboardData:transfer,bubbles:true,cancelable:true}));
+    const records=[];editor.state.doc.descendants(node=>{if(node.type.name==='lekhDivision'||node.type.name==='lekhImageDescription')records.push({type:node.type.name,title:node.attrs.title,border:node.attrs.border})});
+    return records;
+  })()`);
+  assert.equal(clipboardAttributes.find(node=>node.type==='lekhDivision').title, divisionTitle, 'Normal cut/paste retains custom division titles');
+  assert.equal(clipboardAttributes.find(node=>node.type==='lekhImageDescription').border, 'false', 'Normal cut/paste retains explicit image-border settings');
+  await action('source');
+  assert.ok((await ui("document.querySelector('#source-editor').value")).includes(`> [!div class="nextstepaction"] ${divisionTitle}\n`));
+  assert.ok((await ui("document.querySelector('#source-editor').value")).includes('border="false"'));
+  await main.evaluate('smokeChoice=1'); await menuAction('close-tab');
+  console.log('PASS: normal complete-block HTML cut/paste retains division titles and image borders, and division titles survive body editing without escaping drift');
+
   if (process.env.LEKH_PUBLIC_SCREENSHOTS === '1') {
     const images = path.join(root, 'docs', 'images');
     const alertsDemo = path.join(temporary, 'Writing with alerts.md');

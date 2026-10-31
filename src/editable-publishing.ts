@@ -202,7 +202,7 @@ function container(name: string, kind: 'zone' | 'steps' | 'callout') {
     parseHTML: () => [{ tag: `[data-lekh-container="${name}"]`, contentElement: '.publishing-editable-body' }],
     renderHTML: ({ node }) => ['section', { 'data-lekh-container': name,
       ...(kind === 'zone' ? { 'data-publishing-zone': node.attrs.variants.join(',') } : {}),
-      ...(kind === 'callout' ? { 'data-lekh-division': node.attrs.variant } : {}),
+      ...(kind === 'callout' ? { 'data-lekh-division': node.attrs.variant, 'data-publishing-title': node.attrs.title } : {}),
     }, ['div', { class: 'publishing-editable-body' }, 0]],
     parseMarkdown: (token, helpers) => remember(helpers.createNode(name, {
       variants: token.variants ?? ['first'], variant: token.variant ?? 'checklist', title: token.title ?? '',
@@ -213,7 +213,7 @@ function container(name: string, kind: 'zone' | 'steps' | 'callout') {
       const content = body(node, helpers);
       if (kind === 'zone') return `:::zone pivot="${node.attrs?.variants.join(',')}"\n${content}\n:::zone-end`;
       if (kind === 'steps') return `:::steps\n${content}\n:::steps-end`;
-      return `> [!div class="${quote(node.attrs?.variant)}"]${node.attrs?.title ? ` ${quote(node.attrs.title)}` : ''}\n${content.split(/\r?\n/).map(line => line ? `> ${line}` : '>').join('\n')}`;
+      return `> [!div class="${quote(node.attrs?.variant)}"]${node.attrs?.title ? ` ${String(node.attrs.title).replace(/[\r\n]+/g, ' ')}` : ''}\n${content.split(/\r?\n/).map(line => line ? `> ${line}` : '>').join('\n')}`;
     },
     addNodeView() {
       const options = this.options;
@@ -632,10 +632,10 @@ const ImageDescriptionNode = Node.create<Options>({
     alt: { default: '', rendered: false, parseHTML: element => element.getAttribute('data-image-alt') ?? '' },
     caption: { default: '', rendered: false, parseHTML: element => element.getAttribute('data-image-caption') ?? '' },
     imageType: { default: 'content', rendered: false, parseHTML: element => element.getAttribute('data-image-type') ?? 'content' },
-    border: { default: '', rendered: false },
+    border: { default: '', rendered: false, parseHTML: element => element.getAttribute('data-image-border') ?? '' },
   }),
   parseHTML: () => [{ tag: '[data-lekh-described-image]', contentElement: '.publishing-editable-body' }],
-  renderHTML: ({ node }) => ['figure', { 'data-lekh-described-image': '', 'data-image-source': node.attrs.source, 'data-image-alt': node.attrs.alt, 'data-image-caption': node.attrs.caption, 'data-image-type': node.attrs.imageType },
+  renderHTML: ({ node }) => ['figure', { 'data-lekh-described-image': '', 'data-image-source': node.attrs.source, 'data-image-alt': node.attrs.alt, 'data-image-caption': node.attrs.caption, 'data-image-type': node.attrs.imageType, 'data-image-border': node.attrs.border },
     ['div', { class: 'publishing-editable-body' }, 0]],
   parseMarkdown: (token, helpers) => remember(helpers.createNode('lekhImageDescription', {
     source: token.attributes.source, alt: token.attributes['alt-text'], caption: token.attributes.caption ?? '',

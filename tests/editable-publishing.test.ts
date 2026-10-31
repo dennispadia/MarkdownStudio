@@ -208,3 +208,14 @@ test('unsupported/deep syntax is retained rather than silently flattened', () =>
   assert.equal(manager.serialize(parse(raw).toJSON()), raw);
   assert.equal(editablePublishingBlockAtStart('```text\n:::zone pivot="a"\n```'), null);
 });
+
+test('division body edits preserve an unquoted title without progressively escaping it', () => {
+  const { parse, manager } = fixture();
+  const title = 'Custom "title" \\ here';
+  let doc = parse(`> [!div class="nextstepaction"] ${title}\n> Body text.`);
+  for (let cycle = 0; cycle < 3; cycle++) {
+    doc = parse(manager.serialize(changeText(doc, 'Body text.').toJSON()));
+    assert.equal(doc.firstChild!.attrs.title, title);
+    assert.ok(manager.serialize(doc.toJSON()).startsWith(`> [!div class="nextstepaction"] ${title}\n`));
+  }
+});
