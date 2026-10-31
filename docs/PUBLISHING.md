@@ -15,7 +15,7 @@ GitHub's browser uploader does not apply `.gitignore` for you. Do not drag the e
 
 ## Create release downloads
 
-The repository is `dennispadia/lekh`. This checkout is **0.8.0 development, not published**. The unchanged [0.7.1 stable release](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) remains downloadable. Do not label its binaries as 0.8.0 or claim they use this checkout's new identities.
+The repository is `dennispadia/lekh`. **[Lekh 0.8.0](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)** is published with the offline grammar engine and universal publishing blocks. Its EXE, source ZIP and checksums were independently downloaded and verified; earlier releases remain unchanged.
 
 Development 0.8.0 defines Lekh as an independent product: npm package `lekh`, application ID `com.lekh.desktop`, fresh `%APPDATA%\Lekh` profile, and `%LOCALAPPDATA%\lekh` application directory. The executable is `Lekh - Markdown editor.exe`. The independent MSI upgrade code is `DCBCF7FA-11DA-4F35-8D27-D066EEC6C582`; keep it stable for future Lekh upgrades and consistent with installer policy and verification tests. No migration aliases or automatic removal of another product are included.
 
@@ -36,7 +36,7 @@ npm.cmd run release:checksums
 
 For later releases, increment `version` using `npm version <version> --no-git-tag-version`, keep the lockfile synchronized, and update the changelog.
 
-**Validation and release status:** only **0.7.1** is currently published; that release's validation is not evidence that development 0.8.0 has passed packaging or desktop validation. Before publishing, verify fresh installation, future Lekh-to-Lekh upgrade/repair behavior, uninstall/profile preservation, embedded payload identity, and the complete extracted-app desktop suite. Never rewrite Git history or replace existing published release binaries, source archives, or checksums. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning until trusted signing is implemented and verified.
+**Validation and release status:** **0.8.0** passed the official Windows build, full extracted-app desktop suite, offline grammar/publishing checks, native setup engine/previews, and fresh per-user installation/registration/uninstallation with profile preservation on a GitHub-hosted runner. The public EXE also passed local non-installing payload/story/preview checks. Genuine older-version upgrade and repair scenarios remain unverified; validate that matrix before claiming it is covered. Never rewrite Git history or replace existing published release binaries, source archives, or checksums. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning until trusted signing is implemented and verified.
 
 On GitHub:
 
@@ -59,7 +59,7 @@ The workflow has read-only repository permissions and **does not automatically c
 
 Alternatively, run **Actions > Publish verified release > Run workflow** and enter the run ID of a successful **Windows build** on `main`. This manually triggered publisher verifies the build's identity, artifact digest and file checksums, then attaches the setup EXE, source ZIP and checksums to a Release tagged with the built version. Only its publishing job has repository write permission. It refuses to overwrite a published release or reuse a draft targeting another build.
 
-Publish new versions as new releases. Preserve existing tags and published assets unchanged, including stable 0.7.1. Update current download links only after independently verifying the new release and its checksums.
+Publish new versions as new releases. Preserve existing tags and published assets unchanged, including earlier releases. Update current download links only after independently verifying the new release and its checksums.
 
 Review the screenshots and source archive before making the repository public. No remote, account credentials, or GitHub token is embedded in this project.
 
@@ -82,7 +82,7 @@ The planned no-cost route is [SignPath Foundation's open-source program](https:/
 - Restrict signing to the approved repository, reviewed commits, product name/version, and artifact paths. Require maintainer approval for each release as specified by the provider.
 - Verify the final MSI and its extracted application executable have valid, trusted Authenticode signatures with the approved publisher identity. A signature merely being present is insufficient. Verify the timestamp and trust chain, and rerun installer/payload and desktop validation on the final signed artifacts.
 - Update the publisher to reject unsigned, invalidly signed, or unexpected-publisher artifacts before enabling publication. Its current digest/checksum checks do not replace signature validation.
-- Generate checksums **after** signing. Publish the exact verified setup EXE containing the signed internal MSI, matching source ZIP, and checksums under a new version. Never replace existing published assets, including stable 0.7.1. Update README download links only after the new release is verified live.
+- Generate checksums **after** signing. Publish the exact verified setup EXE containing the signed internal MSI, matching source ZIP, and checksums under a new version. Never replace existing published assets. Update README download links only after the new release is verified live.
 
 ### Warnings and limitations
 

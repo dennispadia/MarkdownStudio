@@ -1,6 +1,6 @@
 # Building and validating Lekh
 
-This checkout is **0.8.0 development, not published**. The unchanged [0.7.1 stable release](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) is a separate downloadable build; fresh identities below apply only to this checkout and future verified releases.
+This checkout describes **[Lekh 0.8.0](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)**. Its verified offline EXE is available from Releases; the commands below reproduce a local build. Earlier published assets remain unchanged.
 
 ## Requirements
 

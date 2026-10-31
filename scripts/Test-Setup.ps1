@@ -110,7 +110,7 @@ function Wait-Until([scriptblock]$Probe, [int]$TimeoutSeconds = 15, [string]$Mes
     throw $Message
 }
 function Wait-SetupWindow($Process, [string]$Label, [int]$TimeoutSeconds = 30) {
-    $diagnostic = @{ Handle = '0'; Heading = '<missing>'; Primary = '<missing>'; ProviderError = '<none>' }
+    $diagnostic = @{ Handle = '0'; Owner = '<missing>'; Heading = '<missing>'; Primary = '<missing>'; ProviderError = '<none>' }
     try {
         return Wait-Until {
             $Process.Refresh()
@@ -123,7 +123,11 @@ function Wait-SetupWindow($Process, [string]$Label, [int]$TimeoutSeconds = 30) {
             try {
                 # Rebind each poll: an HWND can precede WPF's provider, or be replaced during startup.
                 $candidate = [Windows.Automation.AutomationElement]::FromHandle($handle)
-                if ($candidate.Current.ProcessId -ne $Process.Id) { throw "$Label window belongs to a different process." }
+                $diagnostic.Owner = [string]$candidate.Current.ProcessId
+                if ($candidate.Current.ProcessId -ne $Process.Id) {
+                    $diagnostic.ProviderError = "Window provider reports process $($diagnostic.Owner), not $($Process.Id); waiting for the owned window."
+                    return $null
+                }
                 $heading = Find-Control $candidate 'Heading'
                 $primary = Find-Control $candidate 'Primary'
                 if ($null -ne $heading) { $diagnostic.Heading = $heading.Current.Name }
@@ -139,7 +143,7 @@ function Wait-SetupWindow($Process, [string]$Label, [int]$TimeoutSeconds = 30) {
             return $null
         } $TimeoutSeconds "$Label did not expose Heading and Primary accessibility within $TimeoutSeconds seconds."
     } catch {
-        throw "$($_.Exception.Message) Window readiness diagnostic: pid=$($Process.Id); handle=$($diagnostic.Handle); heading='$($diagnostic.Heading)'; primary='$($diagnostic.Primary)'; lastProviderError='$($diagnostic.ProviderError)'."
+        throw "$($_.Exception.Message) Window readiness diagnostic: pid=$($Process.Id); handle=$($diagnostic.Handle); owner=$($diagnostic.Owner); heading='$($diagnostic.Heading)'; primary='$($diagnostic.Primary)'; lastProviderError='$($diagnostic.ProviderError)'."
     }
 }
 function Read-StoryText($Control) {
@@ -185,11 +189,12 @@ function Test-Story($Window, [switch]$ReducedMotion) {
         $written = Find-Control $Window 'StoryWritten' -Raw
         $accessible = Find-Control $Window 'StoryAccessible' -Raw
         $storyCount = Find-Control $Window 'StoryCount'
+        $storyTitle = Find-Control $Window 'StoryTitle'
         if ($null -eq $written -or $null -eq $accessible) { throw 'Installing preview must expose StoryWritten and StoryAccessible in the raw UI Automation tree.' }
-        [void](Wait-Until { (Get-StoryPage $Window $storyCount) -eq 1 } 10 'Story did not begin at page 1.')
+        [void](Wait-Until { (Get-StoryPage $Window $storyCount) -eq 1 } 45 'Story did not cycle to page 1 after its controls became accessible.')
         $complete = $accessible.Current.Name.Trim()
         if ([string]::IsNullOrWhiteSpace($complete)) { throw 'StoryAccessible.Name must expose the exact complete paragraph without the title.' }
-        if (-not (Find-Control $Window 'StoryTitle').Current.Name.Trim().EndsWith($complete, [StringComparison]::Ordinal)) {
+        if (-not $storyTitle.Current.Name.Trim().EndsWith($complete, [StringComparison]::Ordinal)) {
             throw 'The screen-reader title does not contain the complete story paragraph.'
         }
         if ($ReducedMotion) {

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0 — development, not published
+## 0.8.0
 
 - Add universal publication-quality rendering with protected, source-preserving blocks, collapsed metadata, colored callouts, tabbed examples, document-wide variant selectors, structured steps, and described image directives. No platform-specific editor mode is required.
 - Add **Blocks** toolbar shortcuts and matching Insert-menu commands. Formatting selected content into a callout, tab or variant preserves that content.
@@ -20,4 +20,4 @@
 - Invite GitHub issues for bugs, enhancements, and requests without guaranteeing response times, resolutions, or maintenance. Retain the MIT warranty disclaimer.
 - Update first-party attribution and current documentation; remove obsolete screenshots and compatibility narratives.
 
-The current published stable release remains **[0.7.1](https://github.com/dennispadia/lekh/releases/tag/v0.7.1)**. Its binaries, source archive, and checksums are unchanged. Development changes above do not describe the identities of that existing binary and have not been published as a new release.
+Published as **[Lekh 0.8.0](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)** with an offline Windows EXE, matching source ZIP and checksums. The release includes the grammar engine and publishing improvements above; earlier published assets remain unchanged.

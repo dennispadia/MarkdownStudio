@@ -2,11 +2,11 @@
 
 A local-first Windows desktop application for writing Markdown with a friendly visual editor and exporting to Word and PDF.
 
-**Version note:** this guide describes development version **0.8.0**, which has not been published. The [current stable 0.7.1 release](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) remains unchanged and does not have the fresh identities described here.
+This guide describes **[Lekh 0.8.0](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)**, including offline grammar checking and universal publishing blocks.
 
 ## Open the application
 
-For a published installer, use the stable link in the [README](../README.md#install-on-windows). To use this development version, build from source. A verified Lekh setup EXE built from this checkout embeds its offline MSI engine; choose **Install Lekh**, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without requesting administrator access. Save and close any installed Lekh first; setup does not force-close the editor. The origin story supports Pause/Resume and Previous/Next, respects Windows' animation preference, and never delays installation.
+Download the verified installer using the link in the [README](../README.md#install-on-windows). The Lekh setup EXE embeds its offline MSI engine; choose **Install Lekh**, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without requesting administrator access. Save and close any installed Lekh first; setup does not force-close the editor. The origin story supports Pause/Resume and Previous/Next, respects Windows' animation preference, and never delays installation.
 
 For a source checkout, double-click **Launch.cmd** in the project root. The developer build is **release\win-unpacked\Lekh - Markdown editor.exe**; keep that entire folder together.
 

@@ -253,18 +253,22 @@ test('native window readiness polls fresh roots for required controls rather tha
   assert.ok(readiness.includes('$Process.HasExited'));
   assert.ok(readiness.includes('$handle = $Process.MainWindowHandle'));
   assert.ok(readiness.includes('$candidate = [Windows.Automation.AutomationElement]::FromHandle($handle)'));
+  assert.match(readiness, /if \(\$candidate\.Current\.ProcessId -ne \$Process\.Id\) \{[^}]*return \$null\s*\}/,
+    'a transient foreign provider must be retried, never accepted or interacted with');
   assert.ok(readiness.includes("Find-Control $candidate 'Heading'"));
   assert.ok(readiness.includes("Find-Control $candidate 'Primary'"));
   assert.ok(readiness.includes('-not [string]::IsNullOrWhiteSpace($heading.Current.Name) -and $null -ne $primary'));
   assert.ok(readiness.indexOf('return $candidate') > readiness.indexOf("Find-Control $candidate 'Primary'"));
   assert.ok(readiness.includes('catch [Windows.Automation.ElementNotAvailableException]'));
   assert.ok(readiness.includes('Window readiness diagnostic:'));
-  for (const field of ['pid=', 'handle=', 'heading=', 'primary=', 'lastProviderError=']) assert.ok(readiness.includes(field));
+  for (const field of ['pid=', 'handle=', 'owner=', 'heading=', 'primary=', 'lastProviderError=']) assert.ok(readiness.includes(field));
   assert.doesNotMatch(readiness, /Start-Sleep/, 'readiness must use the existing bounded predicate loop, not a startup delay');
   assert.ok(verify.includes('$window = Wait-SetupWindow $preview "Preview $state"'));
   assert.ok(verify.includes("$window = Wait-SetupWindow $setup 'Hosted setup'"));
   const story = verify.slice(verify.indexOf('function Test-Story'), verify.indexOf('function Test-SetupPreview'));
   assert.ok(story.includes("$storyCount = Find-Control $Window 'StoryCount'"));
+  assert.ok(story.includes("$storyTitle = Find-Control $Window 'StoryTitle'"));
+  assert.ok(story.includes("45 'Story did not cycle to page 1 after its controls became accessible.'"));
   assert.doesNotMatch(story, /Get-StoryPage \$Window\)/,
     'reuse the materialized count peer so tree-discovery latency cannot consume the observed page hold');
   assert.ok(story.includes('Get-StoryPage $Window $storyCount'));

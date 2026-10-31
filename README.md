@@ -4,11 +4,11 @@
 
 **Lekh: Markdown editor** is a calm, local-first Windows Markdown editor with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**Development version: 0.8.0 — not yet published.** This checkout establishes Lekh as an independent product with its own application, installer, and settings identities. No settings, recovery data, or installation identities are imported from another product.
+**Version 0.8.0** is published with offline English grammar checks and universal publishing blocks. Lekh has its own application, installer, and settings identities. No settings, recovery data, or installation identities are imported from another product.
 
-**[Current stable download: Lekh 0.7.1 for Windows x64 (.exe)](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-Markdown-editor-Setup-0.7.1-x64.exe)** · [Stable release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) · [User guide](docs/USER_GUIDE.md)
+**[Download Lekh 0.8.0 for Windows x64 (.exe)](https://github.com/dennispadia/lekh/releases/download/v0.8.0/Lekh-Markdown-editor-Setup-0.8.0-x64.exe)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.8.0) · [User guide](docs/USER_GUIDE.md)
 
-The published 0.7.1 assets remain unchanged. The fresh identities described here apply to the **0.8.0 development checkout**, not to the existing stable binary. No 0.8.0 installer is available from the stable link.
+The public EXE, source ZIP, and checksums were independently downloaded and verified. Earlier published assets remain unchanged.
 
 Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue](https://github.com/dennispadia/lekh/issues)** for bugs, enhancements, and requests. There is no guaranteed response time, resolution, or future maintenance commitment. See [SUPPORT.md](SUPPORT.md).
 
@@ -32,7 +32,7 @@ Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue]
 
 Switching between Visual and Source resets that tab's undo history; switching tabs preserves it. Source + Preview uses the Source history.
 
-### Richer exports in development 0.8.0
+### Richer exports in 0.8.0
 
 - **Explicit typography:** Segoe UI Heading 1–6 sizes, weights, spacing, and colors are defined by Lekh rather than a document consumer's default heading styles. Bold, italic, and strikethrough are preserved; hyperlinks are colored and underlined.
 - **Navigation:** Word exports include heading bookmarks and clickable internal heading links, including table-of-contents links. PDFs include document bookmarks and tagged accessibility.
@@ -65,7 +65,7 @@ The following captures show the Lekh interface with sample documents, not person
 
 Requires **Windows 10/11 x64 and .NET Framework 4.8 or newer**, normally included in Windows. Other operating systems and architectures are not packaged or tested.
 
-For a published installer, use the **[stable 0.7.1 release](https://github.com/dennispadia/lekh/releases/tag/v0.7.1)**. Its EXE, [checksums](https://github.com/dennispadia/lekh/releases/download/v0.7.1/SHA256SUMS.txt), and source ZIP remain unchanged. This source checkout is development 0.8.0 and requires building locally.
+Use the **[0.8.0 release](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)** and compare the download with its [checksums](https://github.com/dennispadia/lekh/releases/download/v0.8.0/SHA256SUMS.txt). The offline EXE includes the application and its grammar engine; recipients do not need to build from source.
 
 For a verified installer built from this checkout:
 
@@ -75,7 +75,7 @@ For a verified installer built from this checkout:
 
 The offline setup embeds the runtime and internal MSI; recipients do not need Node.js, npm, Word, Pandoc, or an account. Installation does not wait for the accessible, reduced-motion-aware origin story.
 
-### Independent development identities
+### Standalone application identities
 
 - Application ID: `com.lekh.desktop`; npm package: `lekh`.
 - Application files: `%LOCALAPPDATA%\lekh`; executable: `Lekh - Markdown editor.exe`.
