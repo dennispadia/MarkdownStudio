@@ -1,6 +1,6 @@
 # Building and validating Lekh
 
-This checkout describes **[Lekh 0.8.0](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)**. Its verified offline EXE is available from Releases; the commands below reproduce a local build. Earlier published assets remain unchanged.
+This checkout describes **[Lekh 0.8.1](https://github.com/dennispadia/lekh/releases/tag/v0.8.1)**. Its verified offline EXE is available from Releases; the commands below reproduce a local build. Earlier published assets remain unchanged.
 
 ## Requirements
 
@@ -42,7 +42,9 @@ Close running copies before rebuilding. Do not run two packaging/build commands 
 
 `verify:msi` performs **administrative extraction**, not a product installation. It does not register/unregister the app or create user shortcuts. Test real installation, upgrade, repair, and uninstall in a disposable Windows VM before a wider release.
 
-The official workflow additionally runs `verify:setup -- -InstallOnHostedRunner` only on a clean GitHub-hosted runner. That opt-in path performs a real fresh installation through the setup UI, verifies the exact current-user product name/version/cache through Windows Installer APIs, then uninstalls only that exact product and checks the recovery-profile sentinel remains. It also exercises both animation preferences and restores the runner's original preference in `finally`. Default local verification neither installs/uninstalls nor changes your Windows animation setting; reduced-motion mode remains static. Genuine old-version upgrade and repair coverage is still pending.
+The official workflow additionally runs `verify:setup -- -InstallOnHostedRunner` only on a clean GitHub-hosted runner. That opt-in path performs a real fresh installation through the setup UI, verifies the exact current-user product name/version/cache through Windows Installer APIs, then uninstalls only that exact product and checks the recovery-profile sentinel remains. It also exercises both animation preferences and restores the runner's original preference in `finally`. Default local verification neither installs/uninstalls nor changes your Windows animation setting; reduced-motion mode remains static.
+
+The [successful 0.8.1 official build](https://github.com/dennispadia/lekh/actions/runs/41187571071) also ran `scripts/Test-Upgrade.ps1` with its explicit hosted-runner gate. It checksum-verifies the genuine published 0.8.0 EXE, installs that version, upgrades to 0.8.1, and verifies the old registration is removed and the current installed payload matches the build. It deliberately removes `app.asar`, performs a real Windows Installer repair, and verifies restoration plus byte-identical seeded profile settings and a recovery sentinel through upgrade, repair, and uninstall. It refuses existing application files, foreign registrations, running apps, reparse points, or unrecognized residue; only verified setup cache/log residue from the preceding fresh-install check is allowed. No application is launched or forcibly closed. This is coverage for **0.8.0 -> 0.8.1 only**, not other version lineages.
 
 The intended public download is the premium **EXE**, not the internal MSI. Run `package:msi`, `verify:msi`, `build:setup`, and `verify:setup` in that order. Setup is offline, non-elevating, and uses Windows Installer with Lekh's independent upgrade identity. No Electron editor code is loaded into the setup UI. The application executable is `Lekh - Markdown editor.exe`.
 

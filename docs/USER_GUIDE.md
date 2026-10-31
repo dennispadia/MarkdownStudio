@@ -2,7 +2,7 @@
 
 A local-first Windows desktop application for writing Markdown with a friendly visual editor and exporting to Word and PDF.
 
-This guide describes **[Lekh 0.8.0](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)**, including offline grammar checking and universal publishing blocks.
+This guide describes **[Lekh 0.8.1](https://github.com/dennispadia/lekh/releases/tag/v0.8.1)**, including directly editable alerts, document-scoped publishing controls, readable Light/Dark tabs, and offline grammar checking.
 
 ## Open the application
 
@@ -10,7 +10,9 @@ Download the verified installer using the link in the [README](../README.md#inst
 
 For a source checkout, double-click **Launch.cmd** in the project root. The developer build is **release\win-unpacked\Lekh - Markdown editor.exe**; keep that entire folder together.
 
-Lekh uses a fresh standalone `%APPDATA%\Lekh` profile for preferences, recent files, Chromium storage, and recovery drafts. Application files install to `%LOCALAPPDATA%\lekh`. **Existing drafts and preferences are not automatically imported; saved Markdown files can be opened normally.** It does not import another product's profile, use migration aliases, or uninstall another product. Its independent MSI upgrade code stays stable for future Lekh releases. Close Lekh before upgrading and choose it explicitly for `.md` file associations if desired.
+Lekh uses a standalone `%APPDATA%\Lekh` profile for preferences, recent files, Chromium storage, and recovery drafts. Application files install to `%LOCALAPPDATA%\lekh`. **An existing Lekh profile is retained during upgrades; saved Markdown files can be opened normally.** It does not import another product's profile, use migration aliases, or uninstall another product. Its independent MSI upgrade code stays stable for future Lekh releases. Close Lekh before upgrading and choose it explicitly for `.md` file associations if desired.
+
+The 0.8.1 release passed a genuine published 0.8.0 upgrade and repair test on a clean Windows runner, including byte-identical preservation of seeded profile settings and a recovery sentinel through upgrade, repair, and uninstall. Other upgrade paths have not been verified. See [build and validation details](BUILDING.md#build-outputs).
 
 No Microsoft Word, Pandoc, account, or internet connection is required to edit or export documents after setup. Images hosted on websites are deliberately not downloaded.
 

@@ -10,6 +10,8 @@
 - Update feature documentation and application screenshots. Welcome questions, bugs and enhancement requests through GitHub issues.
 - Add guarded hosted validation for a genuine 0.8.0 upgrade and repair, with profile and installed-payload checks before publishing.
 
+Published as **[Lekh 0.8.1](https://github.com/dennispadia/lekh/releases/tag/v0.8.1)** with independently verified offline Windows EXE, source ZIP and checksums. Fresh installation and the genuine 0.8.0 -> 0.8.1 upgrade, repair and profile-preserving uninstall passed the official Windows build. Earlier published assets remain unchanged.
+
 ## 0.8.0
 
 - Add universal publication-quality rendering with protected, source-preserving blocks, collapsed metadata, colored callouts, tabbed examples, document-wide variant selectors, structured steps, and described image directives. No platform-specific editor mode is required.

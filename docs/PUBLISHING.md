@@ -15,9 +15,9 @@ GitHub's browser uploader does not apply `.gitignore` for you. Do not drag the e
 
 ## Create release downloads
 
-The repository is `dennispadia/lekh`. **[Lekh 0.8.0](https://github.com/dennispadia/lekh/releases/tag/v0.8.0)** is published with the offline grammar engine and universal publishing blocks. Its EXE, source ZIP and checksums were independently downloaded and verified; earlier releases remain unchanged.
+The repository is `dennispadia/lekh`. **[Lekh 0.8.1](https://github.com/dennispadia/lekh/releases/tag/v0.8.1)** is published with directly editable alerts, refined publishing tools, document-scoped variant controls, readable Dark tabs, and the offline grammar engine. Its EXE, source ZIP and checksums were independently downloaded and verified; earlier releases remain unchanged.
 
-Development 0.8.0 defines Lekh as an independent product: npm package `lekh`, application ID `com.lekh.desktop`, fresh `%APPDATA%\Lekh` profile, and `%LOCALAPPDATA%\lekh` application directory. The executable is `Lekh - Markdown editor.exe`. The independent MSI upgrade code is `DCBCF7FA-11DA-4F35-8D27-D066EEC6C582`; keep it stable for future Lekh upgrades and consistent with installer policy and verification tests. No migration aliases or automatic removal of another product are included.
+Lekh's independent identities are npm package `lekh`, application ID `com.lekh.desktop`, `%APPDATA%\Lekh` profile, and `%LOCALAPPDATA%\lekh` application directory. The executable is `Lekh - Markdown editor.exe`. The independent MSI upgrade code is `DCBCF7FA-11DA-4F35-8D27-D066EEC6C582`; keep it stable for future Lekh upgrades and consistent with installer policy and verification tests. Existing Lekh profiles are retained during upgrades. No migration aliases or automatic removal of another product are included.
 
 Publish an installer only after packaging and verification both succeed. Local Windows policy may block validation even when the hosted workflow succeeds; see [installer validation and policy restrictions](BUILDING.md#installer-validation-status-and-policy-restrictions).
 
@@ -36,12 +36,12 @@ npm.cmd run release:checksums
 
 For later releases, increment `version` using `npm version <version> --no-git-tag-version`, keep the lockfile synchronized, and update the changelog.
 
-**Validation and release status:** **0.8.0** passed the official Windows build, full extracted-app desktop suite, offline grammar/publishing checks, native setup engine/previews, and fresh per-user installation/registration/uninstallation with profile preservation on a GitHub-hosted runner. The public EXE also passed local non-installing payload/story/preview checks. Genuine older-version upgrade and repair scenarios remain unverified; validate that matrix before claiming it is covered. Never rewrite Git history or replace existing published release binaries, source archives, or checksums. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning until trusted signing is implemented and verified.
+**Validation and release status:** **0.8.1** passed the [official Windows build](https://github.com/dennispadia/lekh/actions/runs/41187571071), full extracted-app desktop suite, offline grammar/publishing checks, native setup engine/previews, and fresh per-user installation/registration/uninstallation with profile preservation on a GitHub-hosted runner. The hosted upgrade test installed the genuine published **0.8.0**, upgraded to **0.8.1**, removed the old registration, restored a deliberately missing application payload through real Windows Installer repair, and preserved seeded profile settings and a recovery sentinel through upgrade, repair, and uninstall. Other upgrade paths remain unverified. The independently downloaded public EXE also passed local non-installing payload/story checks and all ten native previews. Never rewrite Git history or replace existing published release binaries, source archives, or checksums. Neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning until trusted signing is implemented and verified.
 
 On GitHub:
 
 1. Open the repository's **Releases > Draft a new release**.
-2. Create a tag matching the verified version, such as `v0.8.0`, targeting the reviewed commit only when ready to publish.
+2. Create a tag matching the verified version, such as `v0.8.1`, targeting the reviewed commit only when ready to publish.
 3. Add a description of the release, tested scenarios, known limitations, the unsigned-installer warning, and a link for questions, bugs, and enhancement requests.
 4. Attach these files from `release`:
    - `Lekh-Markdown-editor-Setup-<version>-x64.exe`
