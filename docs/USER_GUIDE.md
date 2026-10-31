@@ -127,12 +127,18 @@ Read-only previews hide inactive content. Static exports include **all** labeled
 
 ![Separate Alerts and Blocks tools with icons and independent variant-content insertion](images/publishing-menu-dark.png)
 
+![Right-click publishing tools stay anchored beside their parent menu](images/context-publishing-dark.png)
+
+![Edit tab names, rich example bodies and structured procedures directly in Visual](images/publishing-editing-dark.png)
+
 #### Metadata, includes and complex blocks
 
 **Structured steps** have a rich editable body. Use ordinary list/paragraph formatting and **Write after block** to continue outside the container.
 **Image with description** has editable source, alternate text and caption fields. A complex image's long description is rich editable content; **Add long description** creates one for an ordinary described image.
 **Document metadata** is collapsed outside article text. Expand it to edit title/description or **Metadata YAML (all fields)** directly in Visual. Arbitrary keys and comments are retained. Multiline YAML values are edited in that same YAML field, not by flattening them into a simple input. Keep at least one `name: value` field or delete the entire block; delimiter lines are managed separately. Lekh does not evaluate YAML tags or claim complete schema validation.
 Unsupported or over-depth directives remain source-preserving and visibly identified. **Edit block** opens their raw syntax inline within Visual, without switching the document to Source.
+
+![Edit metadata fields and arbitrary YAML directly in the Visual document](images/publishing-fields-dark.png)
 
 For local includes:
 

@@ -2520,6 +2520,10 @@ try {
   assert.ok(Math.min(Math.abs(flyout.left-flyout.parentRight-3),Math.abs(flyout.right-flyout.parentLeft+3))<3, 'Flyout attaches to its actual parent, not the root');
   assert.ok(Math.abs(flyout.top-Math.max(8,Math.min(flyout.rowTop,flyout.viewHeight-flyout.height-8)))<3);
   assert.ok(flyout.icons, 'Right-click publishing tools share toolbar icons and descriptions');
+  if (process.env.LEKH_PUBLIC_SCREENSHOTS === '1') {
+    const capture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+    await writeFile(path.join(root, 'docs', 'images', 'context-publishing-dark.png'), Buffer.from(capture.data, 'base64'));
+  }
   await ui("document.querySelector('#editor-context-menu').hidePopover()");
   assert.equal(await ui("document.querySelector('#publishing-menu [data-action=\"insert:publishing-zone\"]').disabled"), true, 'Variant content requires an existing selector');
   await caretIn('Place the first variant here.');
@@ -2632,6 +2636,17 @@ try {
     await ui("document.querySelector('#notification').hidden=true; document.activeElement?.blur()");
     const splitCapture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
     await writeFile(path.join(images, 'publishing-split-dark.png'), Buffer.from(splitCapture.data, 'base64'));
+    const fieldDemo = path.join(temporary, 'Editable publishing fields.md');
+    await writeFile(fieldDemo, '---\ntitle: A richer publishing workflow\ndescription: Edit metadata, examples and procedures in Visual.\nkeywords: [writing, publishing]\n---\n\n# Write once. Publish well.\n\n# [Quick example](#tab/quick)\n\nEdit this example directly, including **rich formatting**.\n\n# [Detailed example](#tab/detailed)\n\nEvery alternative remains editable and is retained in exports.\n\n---\n\n:::steps\n1. Give the document a clear title and description.\n2. Write examples and instructions directly in Visual.\n3. Export every alternative without rebuilding the formatting.\n:::steps-end\n');
+    await main.evaluate(`smokeOpenPath=${JSON.stringify(fieldDemo)}`);
+    await action('open'); await action('visual');
+    await ui("document.querySelector('[data-lekh-metadata]').open=true;document.querySelector('#notification').hidden=true;document.activeElement?.blur()");
+    const fieldsCapture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+    await writeFile(path.join(images, 'publishing-fields-dark.png'), Buffer.from(fieldsCapture.data, 'base64'));
+    await ui("document.querySelector('[data-lekh-metadata]').open=false;document.querySelector('[data-lekh-tabs] [data-publishing-tab=\"1\"]').click()");
+    const contentCapture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+    await writeFile(path.join(images, 'publishing-editing-dark.png'), Buffer.from(contentCapture.data, 'base64'));
+    await menuAction('close-tab');
     await main.evaluate('smokeChoice=1');
     await menuAction('close-tab');
     await menuAction('close-tab');
