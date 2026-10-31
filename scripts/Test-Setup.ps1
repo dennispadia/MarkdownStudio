@@ -254,6 +254,7 @@ function Test-SetupPreview([string]$State, [bool]$MotionEnabled) {
     try {
         $window = Wait-SetupWindow $preview "Preview $state"
         if ($window.Current.ProcessId -ne $preview.Id) { throw 'Preview window belongs to a different process.' }
+        if ($window.Current.ItemStatus -cne $state) { throw "Preview $state does not expose its actual native state through UI Automation." }
         if ($state -eq 'installing') { Test-Story $window -ReducedMotion:(-not $MotionEnabled) }
         $heading = (Find-Control $window 'Heading').Current.Name
         $description = (Find-Control $window 'Description').Current.Name
@@ -323,6 +324,82 @@ function Test-ExactMsiRegistration([string]$ProductCode, [uint32]$Context) {
     # ProductName is available for both advertised and installed instances.
     return $null -ne [SetupVerificationInstaller]::GetProductProperty($ProductCode, $Context, 'ProductName')
 }
+function Read-HostedSetupStatus($Window) {
+    $status = [ordered]@{
+        State = $Window.Current.ItemStatus
+        Heading = ''
+        Description = ''
+        Details = ''
+    }
+    foreach ($field in @('Heading', 'Description')) {
+        $control = Find-Control $Window $field
+        if ($null -ne $control) { $status[$field] = [string]$control.Current.Name }
+    }
+    if ($status.State -cin @('error', 'cancelled', 'restart', 'open', 'detection-error', 'downgrade')) {
+        $detail = Find-Control $Window 'DetailText' -Raw
+        $pattern = $null
+        if ($null -ne $detail -and $detail.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
+            $status.Details = [string]$pattern.Current.Value
+        }
+    }
+    return [pscustomobject]$status
+}
+function Test-HostedSetupProgress($Status) {
+    if ($Status.State -ceq 'success') {
+        if ($Status.Heading.Replace([char]0x2019, [char]0x27) -cne "You're ready to write.") {
+            throw "Native success state has an unexpected accessible heading: $($Status.Heading)."
+        }
+        return $true
+    }
+    if ($Status.State -cin @('error', 'cancelled', 'restart', 'open', 'detection-error', 'downgrade')) {
+        throw "Hosted setup entered native state '$($Status.State)': $($Status.Heading) $($Status.Description)`n$($Status.Details)"
+    }
+    return $false
+}
+function Test-HostedSetupLogOwner([string]$Header, [string]$Owner, [int]$ProcessId, [string]$Version) {
+    return $Header -cmatch ('^\S+ Starting Lekh Setup ' + [regex]::Escape($Version) + '\. Current-user, offline installation\.$') -and
+        $Owner -cmatch ('^\S+ Setup process ' + $ProcessId + '\.$')
+}
+function Save-HostedSetupDiagnostics($Process, $Status, [string]$Destination) {
+    if (-not $InstallOnHostedRunner -or $env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
+        throw 'Setup log capture is allowed only during opted-in GitHub-hosted verification.'
+    }
+    # Reuse the existing failure artifact path; do not sweep or upload unrelated user/setup sessions.
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $Destination 'setup-status.log'), ($Status | ConvertTo-Json -Depth 3),
+        [Text.UTF8Encoding]::new($false))
+    $source = Join-Path $env:LOCALAPPDATA 'Lekh\SetupLogs'
+    if (-not (Test-Path -LiteralPath $source -PathType Container)) {
+        Write-Host 'No setup log directory was created; see setup-status.log.'
+        return
+    }
+    $rootEntry = Get-Item -LiteralPath $source -Force
+    if (($rootEntry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Refusing linked setup log directory.' }
+    $captured = 0
+    foreach ($session in @(Get-ChildItem -LiteralPath $source -Directory -Force)) {
+        if (($session.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            $session.Name -cnotmatch '^\d{8}-\d{6}-[0-9a-f]{32}$') { continue }
+        $setupLog = Join-Path $session.FullName 'setup.log'
+        if (-not (Test-Path -LiteralPath $setupLog -PathType Leaf)) { continue }
+        $entry = Get-Item -LiteralPath $setupLog -Force
+        if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Refusing linked setup log file.' }
+        $header = @(Get-Content -LiteralPath $setupLog -TotalCount 2)
+        if ($header.Count -ne 2 -or -not (Test-HostedSetupLogOwner $header[0] $header[1] $Process.Id $manifest.version)) { continue }
+        $owned = Join-Path $Destination $session.Name
+        New-Item -ItemType Directory -Path $owned -Force | Out-Null
+        foreach ($name in @('setup.log', 'windows-installer.log')) {
+            $path = Join-Path $session.FullName $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
+            $entry = Get-Item -LiteralPath $path -Force
+            if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Refusing linked installer diagnostic file.' }
+            Copy-Item -LiteralPath $path -Destination (Join-Path $owned $name)
+            Write-Host "Owned $name tail:"
+            Get-Content -LiteralPath $path -Tail 30 | ForEach-Object { Write-Host $_ }
+        }
+        $captured++
+    }
+    Write-Host "Captured $captured owned setup session(s) at $Destination."
+}
 function Test-HostedInstallation {
     if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
         throw 'Refusing installation outside a GitHub-hosted Actions runner.'
@@ -335,6 +412,8 @@ function Test-HostedInstallation {
     $attempted = $false
     $sentinel = $null
     $failure = $null
+    $status = [pscustomobject]@{ State = ''; Heading = ''; Description = ''; Details = '' }
+    $diagnosticDirectory = Join-Path $root ('build\setup\upgrade\fresh-setup-' + [guid]::NewGuid().ToString('N'))
     $cleanupErrors = [Collections.Generic.List[string]]::new()
     try {
         $installer = New-Object -ComObject WindowsInstaller.Installer
@@ -382,8 +461,16 @@ function Test-HostedInstallation {
         $invoke.Invoke()
         [void](Wait-Until {
             if ($setup.HasExited) { throw 'Hosted setup exited before its success heading appeared.' }
-            $heading = Find-Control $window 'Heading'
-            return $null -ne $heading -and $heading.Current.Name.Replace([char]0x2019, [char]0x27) -ceq "You're ready to write."
+            $setup.Refresh()
+            $candidate = [Windows.Automation.AutomationElement]::FromHandle($setup.MainWindowHandle)
+            if ($candidate.Current.ProcessId -ne $setup.Id) { throw 'Hosted setup progress provider belongs to another process.' }
+            $window = $candidate
+            $current = Read-HostedSetupStatus $candidate
+            $status.State = $current.State
+            $status.Heading = $current.Heading
+            $status.Description = $current.Description
+            $status.Details = $current.Details
+            return Test-HostedSetupProgress $status
         } 240 'Hosted setup never reached the ready-to-write success heading.')
         if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Installed executable is missing: $executable" }
         $registration = @{}
@@ -421,6 +508,10 @@ function Test-HostedInstallation {
                 $setupExited = $setup.HasExited
                 $cleanupErrors.Add("Closing hosted setup: $_")
             }
+        }
+        if ($attempted -and $null -ne $failure) {
+            try { Save-HostedSetupDiagnostics $setup $status $diagnosticDirectory }
+            catch { $failure.Exception.Data['SetupDiagnosticCaptureError'] = $_.Exception.Message; Write-Warning "Setup diagnostic capture failed: $_" }
         }
         if ($attempted -and $setupExited) {
             try {

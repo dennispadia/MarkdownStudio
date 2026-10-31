@@ -233,6 +233,7 @@ namespace Lekh.Setup
         private void Render(string next, int? percent)
         {
             state = next;
+            AutomationProperties.SetItemStatus(Window, next);
             string title, body, label = "SETTING UP", action = null, secondaryAction = "Cancel", note = null;
             switch (next)
             {
@@ -437,6 +438,7 @@ namespace Lekh.Setup
                     log = new StreamWriter(new FileStream(Path.Combine(logDirectory, "setup.log"), FileMode.CreateNew, FileAccess.Write, FileShare.Read));
                 }
                 WriteLog("Starting Lekh Setup " + BuildInfo.Version + ". Current-user, offline installation.");
+                WriteLog("Setup process " + Process.GetCurrentProcess().Id + ".");
                 engine = new NativeEngine(OnUpdate, WriteLog, previousProduct);
                 uint result = await Task.Run(() =>
                 {

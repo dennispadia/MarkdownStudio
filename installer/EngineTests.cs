@@ -238,6 +238,8 @@ namespace Lekh.Setup
             foreach (string state in new[] { "upgrade", "repair", "downgrade", "removing", "rollback" })
             {
                 SetupWindow preview = new SetupWindow(state);
+                Check(System.Windows.Automation.AutomationProperties.GetItemStatus(preview.Window) == state,
+                    "Automation exposes the real native setup state, not a heading guess.");
                 string heading = ((TextBlock)preview.Window.FindName("Heading")).Text;
                 string body = ((TextBlock)preview.Window.FindName("Description")).Text;
                 Button primary = (Button)preview.Window.FindName("Primary");

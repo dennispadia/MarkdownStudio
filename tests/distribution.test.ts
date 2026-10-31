@@ -220,7 +220,8 @@ test('real setup installation is explicitly opted in on a clean hosted runner an
   assert.ok(hosted.includes('refusing to replace or uninstall an existing application'));
   assert.ok(hosted.includes('[Windows.Automation.InvokePattern]::Pattern'));
   assert.ok(hosted.includes('$invoke.Invoke()'));
-  assert.ok(hosted.includes("You're ready to write."));
+  assert.ok(verify.includes("You're ready to write."));
+  assert.ok(hosted.includes('return Test-HostedSetupProgress $status'));
   assert.ok(hosted.includes("'Lekh - Markdown editor.exe'"));
   assert.ok(hosted.includes("foreach ($property in @('InstalledProductName', 'VersionString', 'LocalPackage'))"));
   assert.ok(hosted.includes('[SetupVerificationInstaller]::GetProductProperty($productCode, 2, $property)'));

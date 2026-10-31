@@ -8,6 +8,75 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
+test('hosted setup fails immediately with native terminal-state details and still requires the real success heading', {
+  skip: process.platform !== 'win32',
+}, async () => {
+  const scriptPath = join(root, 'scripts', 'Test-Setup.ps1');
+  const command = `
+    $ErrorActionPreference = 'Stop'
+    $ProgressPreference = 'SilentlyContinue'
+    $request = [Console]::In.ReadToEnd() | ConvertFrom-Json
+    $tokens = $null; $errors = $null
+    $ast = [Management.Automation.Language.Parser]::ParseFile($request.path, [ref]$tokens, [ref]$errors)
+    if ($errors.Count -gt 0) { throw ($errors | Out-String) }
+    foreach ($name in @('Test-HostedSetupProgress', 'Test-HostedSetupLogOwner')) {
+      $function = $ast.Find({ param($node)
+        $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+      }, $true)
+      if ($null -eq $function) { throw ('Missing pure diagnostic helper ' + $name) }
+      . ([scriptblock]::Create($function.Extent.Text))
+    }
+    foreach ($state in @('preparing', 'removing', 'installing', 'finishing', 'stopping', 'rollback')) {
+      $status = [pscustomobject]@{ State = $state; Heading = 'Working'; Description = ''; Details = '' }
+      if (Test-HostedSetupProgress $status) { throw ('Nonterminal state falsely passed: ' + $state) }
+    }
+    foreach ($state in @('error', 'cancelled', 'restart', 'open', 'detection-error', 'downgrade')) {
+      $status = [pscustomobject]@{ State = $state; Heading = 'Failure heading'; Description = 'Exact failure description'; Details = 'Windows Installer code 1603; native failure.' }
+      $failure = ''
+      try { [void](Test-HostedSetupProgress $status) } catch { $failure = $_.Exception.Message }
+      if (-not $failure.Contains($state) -or -not $failure.Contains($status.Description) -or -not $failure.Contains($status.Details)) {
+        throw ('Missing native terminal-state diagnostics: ' + $state)
+      }
+    }
+    $status = [pscustomobject]@{ State = 'success'; Heading = "You're ready to write."; Description = ''; Details = '' }
+    if (-not (Test-HostedSetupProgress $status)) { throw 'Real success state/heading rejected.' }
+    $status.Heading = 'Installing'
+    $failure = ''
+    try { [void](Test-HostedSetupProgress $status) } catch { $failure = $_.Exception.Message }
+    if (-not $failure.Contains('unexpected accessible heading')) { throw 'Success heading guard was weakened.' }
+    $header = '2026-10-31T18:00:00Z Starting Lekh Setup 0.9.0. Current-user, offline installation.'
+    $owner = '2026-10-31T18:00:00Z Setup process 1234.'
+    if (-not (Test-HostedSetupLogOwner $header $owner 1234 '0.9.0')) { throw 'Exact owned log rejected.' }
+    if (Test-HostedSetupLogOwner $header $owner 5678 '0.9.0') { throw 'Another process log accepted.' }
+    if (Test-HostedSetupLogOwner $header $owner 1234 '0.8.1') { throw 'Another version log accepted.' }
+    if (Test-HostedSetupLogOwner $header ($owner + ' Unexpected suffix') 1234 '0.9.0') { throw 'Malformed ownership line accepted.' }
+    Write-Output 'PASS: native-state failure details, strict success heading, exact version/process log ownership; no product operations.'
+  `;
+  const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+    Buffer.from(command, 'utf16le').toString('base64')], {
+    encoding: 'utf8', timeout: 30_000, input: JSON.stringify({ path: scriptPath }),
+  });
+  assert.match(output, /PASS: native-state failure details, strict success heading/);
+});
+
+test('fresh setup diagnostics use the existing hosted artifact and never collect another setup session', async () => {
+  const [script, setup] = await Promise.all([
+    readFile(join(root, 'scripts', 'Test-Setup.ps1'), 'utf8'),
+    readFile(join(root, 'installer', 'Setup.cs'), 'utf8'),
+  ]);
+  assert.ok(setup.includes('AutomationProperties.SetItemStatus(Window, next)'));
+  assert.ok(setup.includes('WriteLog("Setup process " + Process.GetCurrentProcess().Id + ".")'));
+  assert.ok(script.includes("'build\\setup\\upgrade\\fresh-setup-'"));
+  const capture = script.slice(script.indexOf('function Save-HostedSetupDiagnostics'), script.indexOf('function Test-HostedInstallation'));
+  assert.ok(capture.includes("-not $InstallOnHostedRunner -or $env:GITHUB_ACTIONS -cne 'true'"));
+  assert.ok(capture.includes("[IO.FileAttributes]::ReparsePoint"));
+  assert.ok(capture.includes('Test-HostedSetupLogOwner $header[0] $header[1] $Process.Id $manifest.version'));
+  assert.ok(capture.includes("@('setup.log', 'windows-installer.log')"));
+  assert.doesNotMatch(capture, /-Recurse|Remove-Item|MsiInstallProduct|MsiConfigureProduct|Start-Process|Stop-Process/);
+  assert.ok(script.includes("if ($attempted -and $null -ne $failure)"));
+  assert.ok(script.includes("if ($attempted -and $setupExited)"));
+});
+
 test('native upgrade detection, truthful removal/install stages, same-version maintenance, cancellation and previews', {
   skip: process.platform !== 'win32',
 }, async () => {
