@@ -15,7 +15,7 @@ GitHub's browser uploader does not apply `.gitignore` for you. Do not drag the e
 
 ## Create release downloads
 
-The repository is now `dennispadia/lekh`. Published version 0.7.0 is a branding-only migration. Previous Markdown Studio releases and their downloadable assets have been retired; Git tags and source history are retained. The new executable is `Lekh - Markdown editor.exe`; existing Windows associations and pinned shortcuts may need to be reselected. The MSI upgrade identity and existing settings/recovery profile are retained. The animated premium Setup.exe remains separate, unfinished work and is not included in this rebrand.
+The repository is `dennispadia/lekh`. Version 0.7.1 adds the native offline premium EXE installer to the branding introduced in 0.7.0, without changing editor features. Previous Markdown Studio releases and their downloadable assets have been retired; Git tags and source history are retained. The application executable is `Lekh - Markdown editor.exe`; existing Windows associations and pinned shortcuts may need to be reselected. The internal MSI upgrade identity and existing settings/recovery profile are retained.
 
 Publish an installer only after packaging and verification both succeed. Local Windows policy may block validation even when the hosted workflow succeeds; see [installer validation and policy restrictions](BUILDING.md#installer-validation-status-and-policy-restrictions).
 
@@ -26,21 +26,23 @@ npm.cmd ci --registry=https://registry.npmjs.org
 npm.cmd test
 npm.cmd run package:msi
 npm.cmd run verify:msi
+npm.cmd run build:setup
+npm.cmd run verify:setup
 npm.cmd run package:source
 npm.cmd run release:checksums
 ```
 
 For later releases, increment `version` using `npm version <version> --no-git-tag-version`, keep the lockfile synchronized, and update the changelog.
 
-**Current release status:** version **Lekh 0.7.0** ships the approved bilingual Segoe UI Light wordmark and refined quill while retaining one shared active-document Visual + Source switch, browser-style toolbar overflow, shrinking tabs with an all-documents dropdown, and Mermaid insertion at the current Visual caret with single-step undo. It retains the single-row editing toolbar, visible Split control, compact context menu, readable outline labels, five recent files, synchronized status-bar zoom controls, filename-specific save confirmations, minimalist workspace, editable Visual + Source, collapsed action rail, blank Untitled startup, Visual link editing, Explorer opening, and earlier writing features. Installer-speed and early running-app prompt improvements remain separate pending work. It remains unsigned; no trusted signing provider is configured. Successful Windows CI verifies the installer and extracted application, including actual toolbar/overflow Mermaid insertion, preserved dual view, compact-tab keyboard navigation, direct context actions, Source/Visual and split-pane targeting, keyboard menu access, viewport bounds, two-way editing, focus/undo routing, and real startup and second-process file launches. **Publish verified release** verifies build identity and checksums before publishing. Neither workflow signs artifacts or enforces Authenticode signatures. The public 0.7.0 MSI and clean source ZIP were independently downloaded and matched both the published checksums and GitHub asset digests; the archive version and descriptive executable/MSI names were also verified. Keep the unsigned-software warning in release notes until trusted signing is implemented and verified.
+**Validation and release status:** the premium EXE is version **0.7.1**; 0.7.0 remains the published download until the new build and release verification finish. All editor features and storage identities are retained. The Windows build checks the internal MSI and full extracted-application desktop suite, compiles the EXE, runs native engine/story tests, verifies its embedded payload, and exercises safe native setup previews. Actual installation tests are explicitly gated to a clean GitHub-hosted runner; they install through the real setup UI and verify per-user registration, uninstall, and preservation of the separate recovery profile. Genuine old-version upgrades and repair still need a disposable-VM test matrix. Keep these distinctions in release notes. The publisher verifies build identity, artifact digest, and exact public checksums before release; neither workflow signs artifacts or enforces Authenticode signatures. Keep the unsigned-software warning until trusted signing is implemented and verified.
 
 On GitHub:
 
 1. Open the repository's **Releases > Draft a new release**.
-2. Create a tag matching the version, such as `v0.7.0`, targeting the reviewed commit.
+2. Create a tag matching the version, such as `v0.7.1`, targeting the reviewed commit.
 3. Add a description of the release, known limitations, the unsigned-installer warning, and the no-support policy.
 4. Attach these files from `release`:
-   - `Lekh-Markdown-editor-<version>-x64.msi`
+   - `Lekh-Markdown-editor-Setup-<version>-x64.exe`
    - `Lekh-<version>-source.zip`
    - `SHA256SUMS.txt`
 5. Publish the release when satisfied.
@@ -49,11 +51,13 @@ On GitHub:
 
 ## GitHub Actions
 
-The included Windows workflow runs on pushes to `main` and on manual dispatch. It restores locked dependencies from the public npm registry, runs unit tests, builds/verifies the MSI, and creates source/checksum artifacts.
+The included Windows workflow runs on pushes to `main` and on manual dispatch. It restores locked dependencies from the public npm registry, runs unit tests, builds/verifies the internal MSI and native setup EXE, and creates source/checksum artifacts. Public artifacts contain only the setup EXE, source ZIP, and checksum list, not the internal MSI.
 
 The workflow has read-only repository permissions and **does not automatically create releases or upload binaries to a public Release**. Download its build artifacts and publish reviewed release assets manually. GitHub may require you to enable Actions in a new repository or fork; Actions availability, limits and billing are controlled by GitHub.
 
-Alternatively, run **Actions > Publish verified release > Run workflow** and enter the run ID of a successful **Windows build** on `main`. This manually triggered publisher verifies the build's identity, artifact digest and file checksums, then attaches the MSI, source ZIP and checksums to a Release tagged with the built version. Only its publishing job has repository write permission. It refuses to overwrite a published release or reuse a draft targeting another build.
+Alternatively, run **Actions > Publish verified release > Run workflow** and enter the run ID of a successful **Windows build** on `main`. This manually triggered publisher verifies the build's identity, artifact digest and file checksums, then attaches the setup EXE, source ZIP and checksums to a Release tagged with the built version. Only its publishing job has repository write permission. It refuses to overwrite a published release or reuse a draft targeting another build.
+
+To retire an older MSI download, first publish and independently verify the replacement EXE and source checksums. Then delete only the superseded release's MSI asset and replace that old release's checksum list with checksums for its remaining assets. Update its release notes to link to the replacement. Preserve tags, source ZIPs, and immutable published binaries; do not leave checksums or current documentation pointing at deleted assets.
 
 Review the screenshots and source archive before making the repository public. No remote, account credentials, or GitHub token is embedded in this project.
 

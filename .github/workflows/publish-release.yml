@@ -72,7 +72,7 @@ jobs:
             const repo = context.repo;
             const version = process.env.RELEASE_VERSION;
             const tag = `v${version}`;
-            const names = [`Lekh-Markdown-editor-${version}-x64.msi`, `Lekh-${version}-source.zip`, 'SHA256SUMS.txt'];
+            const names = [`Lekh-Markdown-editor-Setup-${version}-x64.exe`, `Lekh-${version}-source.zip`, 'SHA256SUMS.txt'];
             const entries = fs.readdirSync('release-assets').sort();
             if (JSON.stringify(entries) !== JSON.stringify([...names].sort())) throw new Error('Unexpected artifact files.');
             const hashes = new Map();
@@ -93,9 +93,9 @@ jobs:
             if (release && !release.draft) throw new Error('Release is already published; refusing to replace assets.');
             if (release && release.target_commitish !== process.env.RELEASE_SHA) throw new Error('Draft targets a different build.');
             if (!release) {
-              const body = `Windows x64, per-user installer. No Node.js, Word or Pandoc required.\n\n` +
+              const body = `Windows x64, offline native setup with an embedded per-user installer. No Node.js, Word or Pandoc required.\n\n` +
                 `**Unsigned software:** Windows may warn about or block installation. Verify SHA256SUMS.txt and follow your organization's policies; do not disable security protections.\n\n` +
-                `[Verified build and complete extracted-app desktop tests](${process.env.BUILD_URL}). Real install/upgrade/repair/uninstall in a disposable VM have not been tested.\n\n` +
+                `[Verified build, offline setup engine/payload, animated native previews, complete extracted-app desktop tests, and fresh per-user install/uninstall on a GitHub-hosted Windows runner](${process.env.BUILD_URL}). Genuine old-version upgrade and repair have not yet been verified.\n\n` +
                 `Shared as-is under MIT, with no support or promised maintenance. Independent forks and AI-assisted customization are welcome.`;
               ({ data: release } = await github.rest.repos.createRelease({
                 ...repo, tag_name: tag, target_commitish: process.env.RELEASE_SHA,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1
+
+- Add a real offline native EXE setup with the approved enlarged quill, Segoe UI Light bilingual Lekh wordmark, and Graphite + Teal styling.
+- Animate three chapters about the Sanskrit name and Lekh's writing philosophy. Advance two seconds after each chapter finishes writing and loop 1/3, 2/3, 3/3; include pause/resume, manual navigation, complete accessible text, and Windows reduced-motion support. Installation never waits for the story.
+- Embed and verify the existing per-user MSI engine, retaining the original upgrade identity, application filename, settings/recovery profile, and every editor feature. Keep explicit save-and-close handling, cancellation/rollback, native stage progress, local diagnostics, and no forced restart.
+- Publish `Lekh-Markdown-editor-Setup-0.7.1-x64.exe` instead of a separate public MSI, with a clean source ZIP and checksums. Retain the successful setup payload locally for offline Windows Installer repair.
+
+The setup, application, and internal MSI remain unsigned. Native engine/story tests, safe preview automation, and extracted-app regression tests are separate from real install/upgrade/repair/uninstall coverage; consult the release's verified build for the checks actually run.
+
 ## 0.7.0
 
 - Rebrand Markdown Studio as Lekh: Markdown editor, using the mixed-case Lekh wordmark with smaller Sanskrit लेख, Windows Segoe UI Light, and the refined quill in Graphite + Teal.

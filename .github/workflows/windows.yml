@@ -30,16 +30,26 @@ jobs:
         run: npm run package:msi
       - name: Verify installer and extracted desktop application
         run: npm run verify:msi
+      - name: Build offline native setup
+        run: npm run build:setup
+      - name: Verify setup engine, previews and hosted install/uninstall
+        run: npm run verify:setup -- -InstallOnHostedRunner
       - name: Create clean source archive
         run: npm run package:source
       - name: Create SHA-256 checksums
         run: npm run release:checksums
+      - name: Read verified release version
+        id: release
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Unsupported release version.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
       - name: Upload reviewed-download candidates
         uses: actions/upload-artifact@v4
         with:
           name: lekh-windows-x64
           if-no-files-found: error
           path: |
-            release/*.msi
-            release/*-source.zip
+            release/Lekh-Markdown-editor-Setup-${{ steps.release.outputs.version }}-x64.exe
+            release/Lekh-${{ steps.release.outputs.version }}-source.zip
             release/SHA256SUMS.txt

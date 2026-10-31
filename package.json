@@ -1,6 +1,6 @@
 {
   "name": "markdown-studio",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "description": "A friendly, local-first Markdown desktop editor for Windows",
   "author": "Lekh contributors",
@@ -20,6 +20,8 @@
     "package": "npm run build && electron-builder --win dir --x64",
     "package:msi": "npm run build && electron-builder --win msi --x64",
     "verify:msi": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Test-Msi.ps1",
+    "build:setup": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Build-Setup.ps1",
+    "verify:setup": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Test-Setup.ps1",
     "package:source": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Export-Source.ps1",
     "release:checksums": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\Write-Checksums.ps1"
   },

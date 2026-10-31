@@ -4,6 +4,7 @@
 
 - Windows 10/11 x64.
 - Node.js >=22.15.0 and npm. The setup script and CI use Node 22.22.0.
+- Windows .NET Framework 4.x with WPF and its framework C# compiler (included on supported Windows versions). No separate .NET SDK or runtime download is required for setup.
 - Internet access for the first dependency, Electron runtime, and WiX tool downloads.
 
 WiX is fetched by electron-builder; you do not need to install Word, Pandoc, or WiX manually. First builds can take several minutes. Windows corporate policy can restrict downloads or installer execution.
@@ -32,10 +33,20 @@ Close running copies before rebuilding. Do not run two packaging/build commands 
 | `npm run package` | Developer app in `release\win-unpacked\Lekh - Markdown editor.exe` |
 | `npm run package:msi` | Self-contained `release\Lekh-Markdown-editor-<version>-x64.msi` and unpacked app |
 | `npm run verify:msi` | Checks MSI properties, per-user/limited scope, shortcuts, cabinet and upgrades; extracts its payload and runs the complete desktop suite against it |
+| `npm run build:setup` | Compiles the native WPF `release\Lekh-Markdown-editor-Setup-<version>-x64.exe`, embedding the previously built MSI and its SHA-256 identity |
+| `npm run verify:setup` | Native engine/story self-tests, embedded payload verification, and isolated UI Automation previews; does not install or uninstall the app locally |
 | `npm run package:source` | Clean, allowlisted source ZIP, excluding tools, dependencies, output, and private configuration |
-| `npm run release:checksums` | SHA-256 checksum list for the MSI and source ZIP |
+| `npm run release:checksums` | SHA-256 checksum list for the public setup EXE and source ZIP |
 
 `verify:msi` performs **administrative extraction**, not a product installation. It does not register/unregister the app or create user shortcuts. Test real installation, upgrade, repair, and uninstall in a disposable Windows VM before a wider release.
+
+The public download is the premium **EXE**, not the internal MSI. Run `package:msi`, `verify:msi`, `build:setup`, and `verify:setup` in that order. Setup is offline, non-elevating, and uses the existing Windows Installer engine and upgrade identity. No Electron editor code is loaded into the setup UI. The application executable remains `Lekh - Markdown editor.exe`.
+
+The three origin-story chapters type beside a moving quill and advance two seconds after the final text element, looping 1/3, 2/3, 3/3. Previous/Next and Pause/Resume are keyboard-accessible. Windows' animation preference disables typing and autoplay; minimizing or hiding setup stops animation, and completion keeps the current chapter. Complete story text is available through the chapter's accessibility name immediately. Installation is never delayed for the story.
+
+Setup asks you to save and close an already-running installed Lekh or Markdown Studio. It does not terminate processes or restart Windows. Cancellation requests Windows Installer rollback, and setup stays open until the native operation finishes. Stage percentages come from Windows Installer (which may reset or reverse during rollback), not a simulated overall timer. Errors expose native codes and local logs under `%LOCALAPPDATA%\Lekh\SetupLogs`.
+
+A successful installation retains its verified internal MSI under `%LOCALAPPDATA%\Lekh\SetupCache` as Windows Installer's offline repair source. Failed or cancelled attempts remove their extracted payload. This cache is not a second public download; do not remove it while the product is installed if you need offline repair. Windows Settings continues to manage uninstall. Logs/cache and the editor's existing `%APPDATA%\Markdown Studio` preferences/recovery profile are separate from Markdown documents.
 
 The desktop suite launches the application with a Markdown path, then starts real
 secondary processes against an isolated profile. It checks startup loading,
@@ -76,6 +87,7 @@ They are written to `docs\images\lekh-light.png` and `docs\images\lekh-dark-spli
 | `lib` | Markdown helpers, exports, highlighting, themes, tables and pairing model |
 | `assets` | Original quill SVG artwork and generated Windows icons |
 | `scripts` | Desktop validation, icon generation, MSI configuration/verification and source packaging |
+| `installer` | Offline native WPF setup, Windows Installer engine, origin-story state machine, and native self-tests |
 | `tests` | Unit and distribution configuration tests |
 | `.github/workflows` | Windows CI and downloadable build artifacts; no automatic public release |
 

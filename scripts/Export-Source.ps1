@@ -5,12 +5,12 @@ $release = Join-Path $root 'release'
 New-Item -ItemType Directory -Path $release -Force | Out-Null
 $output = Join-Path $release "Lekh-$($manifest.version)-source.zip"
 $files = @('.gitignore', '.gitattributes', '.editorconfig', 'package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'index.html', 'diagram-export.html', 'Launch.cmd', 'Setup.ps1', 'README.md', 'LICENSE', 'SUPPORT.md', 'CONTRIBUTING.md', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md')
-$folders = @('.github', 'assets', 'docs', 'electron', 'lib', 'scripts', 'src', 'tests')
+$folders = @('.github', 'assets', 'docs', 'electron', 'installer', 'lib', 'scripts', 'src', 'tests')
 foreach ($folder in $folders) {
     $base = Join-Path $root $folder
     if (-not (Test-Path -LiteralPath $base -PathType Container)) { throw "Required source folder is missing: $folder" }
     foreach ($file in (Get-ChildItem -LiteralPath $base -Recurse -File -Force)) {
-        if ($file.Extension -notin @('.ts', '.css', '.json', '.html', '.svg', '.png', '.ico', '.mjs', '.cjs', '.ps1', '.md', '.yml', '.yaml', '.cmd')) { throw "Review unexpected source file before exporting: $($file.FullName)" }
+        if ($file.Extension -notin @('.ts', '.css', '.json', '.html', '.svg', '.png', '.ico', '.mjs', '.cjs', '.ps1', '.md', '.yml', '.yaml', '.cmd', '.cs', '.xaml', '.manifest')) { throw "Review unexpected source file before exporting: $($file.FullName)" }
         $files += $file.FullName.Substring($root.Length + 1)
     }
 }
