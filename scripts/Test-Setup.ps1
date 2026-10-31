@@ -24,6 +24,7 @@ Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class SetupVerificationDesktop
 {
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
@@ -43,6 +44,35 @@ public static class SetupVerificationDesktop
     {
         if (!WriteParameter(0x1043, 0, new IntPtr(enabled ? 1 : 0), 2))
             throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+}
+public static class SetupVerificationInstaller
+{
+    [DllImport("msi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern uint MsiGetProductInfoExW(string productCode, string userSid,
+        uint context, string property, StringBuilder value, ref uint length);
+    public static string GetProductProperty(string productCode, uint context, string property)
+    {
+        uint length = 0;
+        // A NULL SID scopes per-user queries to the current user; machine queries also require NULL.
+        uint result = MsiGetProductInfoExW(productCode, null, context, property, null, ref length);
+        if (result == 1605) return null; // ERROR_UNKNOWN_PRODUCT is the only absence result.
+        if (result != 0 && result != 234)
+            throw new Win32Exception((int)result, "MsiGetProductInfoExW " + property +
+                " failed for " + productCode + " in context " + context + " (error " + result + ").");
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            StringBuilder value = new StringBuilder(checked((int)length + 1));
+            uint capacity = (uint)value.Capacity;
+            result = MsiGetProductInfoExW(productCode, null, context, property, value, ref capacity);
+            if (result == 1605) return null;
+            if (result == 234) { length = capacity; continue; } // ERROR_MORE_DATA excludes the terminator.
+            if (result != 0)
+                throw new Win32Exception((int)result, "MsiGetProductInfoExW " + property +
+                    " failed for " + productCode + " in context " + context + " (error " + result + ").");
+            return value.ToString();
+        }
+        throw new InvalidOperationException("Windows Installer property changed repeatedly while reading " + property + ".");
     }
 }
 '@
@@ -245,6 +275,10 @@ function Read-MsiProperty($Database, [string]$Name) {
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view)
     }
 }
+function Test-ExactMsiRegistration([string]$ProductCode, [uint32]$Context) {
+    # ProductName is available for both advertised and installed instances.
+    return $null -ne [SetupVerificationInstaller]::GetProductProperty($ProductCode, $Context, 'ProductName')
+}
 function Test-HostedInstallation {
     if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
         throw 'Refusing installation outside a GitHub-hosted Actions runner.'
@@ -269,23 +303,21 @@ function Test-HostedInstallation {
             (Read-MsiProperty $database 'ProductVersion') -notin @($manifest.version, "$($manifest.version).0") -or
             (Read-MsiProperty $database 'UpgradeCode').Trim('{}') -ne 'E2FD477D-ED35-561D-8A35-B75851090FE9' -or
             (Read-MsiProperty $database 'MSIINSTALLPERUSER') -ne '1' -or
+            (Read-MsiProperty $database 'ARPSYSTEMCOMPONENT') -eq '1' -or
             -not [string]::IsNullOrEmpty((Read-MsiProperty $database 'ALLUSERS'))) {
-            throw 'Hosted installation requires the expected versioned, per-user MSI with the original upgrade identity.'
+            throw 'Hosted installation requires the expected versioned, Apps-visible per-user MSI with the original upgrade identity.'
         }
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
         $database = $null
         $installDirectory = Join-Path $env:LOCALAPPDATA 'markdown-studio'
         $executable = Join-Path $installDirectory 'Lekh - Markdown editor.exe'
-        $registryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$productCode"
-        $registryPaths = @($registryPath,
-            "HKCU:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$productCode",
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$productCode",
-            "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$productCode")
-        if ((Test-Path -LiteralPath $installDirectory) -or $installer.ProductState($productCode) -ne -1) {
+        if (Test-Path -LiteralPath $installDirectory) {
             throw 'Hosted installation requires a clean runner; refusing to replace or uninstall an existing application.'
         }
-        foreach ($path in $registryPaths) {
-            if (Test-Path -LiteralPath $path) { throw 'Existing product registration found; refusing destructive verification.' }
+        foreach ($context in @(1, 2, 4)) {
+            if (Test-ExactMsiRegistration $productCode $context) {
+                throw "Existing exact product registration in context $context; refusing destructive verification."
+            }
         }
         $profileDirectory = Join-Path $env:APPDATA 'Markdown Studio'
         New-Item -ItemType Directory -Path $profileDirectory -Force | Out-Null
@@ -316,17 +348,25 @@ function Test-HostedInstallation {
             return $null -ne $heading -and $heading.Current.Name.Replace([char]0x2019, [char]0x27) -ceq "You're ready to write."
         } 240 'Hosted setup never reached the ready-to-write success heading.')
         if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Installed executable is missing: $executable" }
-        if (-not (Test-Path -LiteralPath $registryPath)) { throw 'Installed product is missing its exact per-user Apps registry entry.' }
-        $registration = Get-ItemProperty -LiteralPath $registryPath
-        if ($registration.DisplayName -cne $manifest.build.productName -or
-            $registration.DisplayVersion -notin @($manifest.version, "$($manifest.version).0") -or
-            $registration.WindowsInstaller -ne 1 -or $installer.ProductState($productCode) -ne 5) {
-            throw 'Installed Apps identity, version or Windows Installer registration is incorrect.'
+        $registration = @{}
+        foreach ($property in @('InstalledProductName', 'VersionString', 'LocalPackage')) {
+            $registration[$property] = [SetupVerificationInstaller]::GetProductProperty($productCode, 2, $property)
+        }
+        if ($registration.InstalledProductName -cne $manifest.build.productName -or
+            $registration.VersionString -notin @($manifest.version, "$($manifest.version).0") -or
+            [string]::IsNullOrWhiteSpace($registration.LocalPackage) -or
+            -not (Test-Path -LiteralPath $registration.LocalPackage -PathType Leaf)) {
+            throw 'Exact current-user USERUNMANAGED (context 2) Windows Installer name, version or cached package registration is incorrect.'
+        }
+        foreach ($context in @(1, 4)) {
+            if (Test-ExactMsiRegistration $productCode $context) {
+                throw "Installed product unexpectedly registered in context $context instead of only current-user USERUNMANAGED."
+            }
         }
         if (-not (Test-Path -LiteralPath $sentinel -PathType Leaf) -or [IO.File]::ReadAllText($sentinel) -cne $sentinelContent) {
             throw 'Installing modified or removed the user profile sentinel.'
         }
-        Write-Host "PASS: hosted Primary Invoke installed $productCode per-user without launching the application."
+        Write-Host "PASS: hosted Primary Invoke installed $productCode; Windows Installer confirms current-user USERUNMANAGED context 2, InstalledProductName, VersionString and LocalPackage; MSI is Apps-visible. Application was not launched."
     } catch {
         $failure = $_
     } finally {
@@ -357,13 +397,15 @@ function Test-HostedInstallation {
                         throw "Exact-product uninstall failed (exit $($uninstall.ExitCode)); see $log."
                     }
                 } finally { $uninstall.Dispose() }
-                if ((Test-Path -LiteralPath $executable) -or $installer.ProductState($productCode) -ne -1) {
-                    throw 'Exact-product uninstall left the application executable or installed product behind.'
+                if (Test-Path -LiteralPath $executable) {
+                    throw 'Exact-product uninstall left the application executable behind.'
                 }
-                foreach ($path in $registryPaths) {
-                    if (Test-Path -LiteralPath $path) { throw 'Exact-product uninstall left an Apps registry entry behind.' }
+                foreach ($context in @(1, 2, 4)) {
+                    if (Test-ExactMsiRegistration $productCode $context) {
+                        throw "Exact-product uninstall left Windows Installer registration in context $context."
+                    }
                 }
-                Write-Host "PASS: hosted exact-product uninstall removed $productCode and its executable/Apps registration."
+                Write-Host "PASS: hosted exact-product uninstall removed $productCode and its executable; Windows Installer confirms no current-user or machine registration."
             } catch { $cleanupErrors.Add("Uninstall verification: $_") }
         }
         if ($null -ne $sentinel) {

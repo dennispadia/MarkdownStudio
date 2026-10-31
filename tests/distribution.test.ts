@@ -207,7 +207,14 @@ test('real setup installation is explicitly opted in on a clean hosted runner an
   assert.ok(hosted.includes('$invoke.Invoke()'));
   assert.ok(hosted.includes("You're ready to write."));
   assert.ok(hosted.includes("'Lekh - Markdown editor.exe'"));
-  assert.ok(hosted.includes('HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$productCode'));
+  assert.ok(hosted.includes("foreach ($property in @('InstalledProductName', 'VersionString', 'LocalPackage'))"));
+  assert.ok(hosted.includes('[SetupVerificationInstaller]::GetProductProperty($productCode, 2, $property)'));
+  assert.ok(hosted.includes('(Read-MsiProperty $database \'ARPSYSTEMCOMPONENT\') -eq \'1\''));
+  assert.ok(hosted.includes('Test-Path -LiteralPath $registration.LocalPackage -PathType Leaf'));
+  assert.ok(hosted.includes('foreach ($context in @(1, 2, 4))'));
+  assert.ok(hosted.includes('Test-ExactMsiRegistration $productCode $context'));
+  assert.doesNotMatch(verify, /HKCU:|HKLM:|Get-ItemProperty|\$registryPath|ProductState\(/,
+    'registration verification must not assume a registry location or installation context');
   assert.ok(hosted.includes("Join-Path $env:APPDATA 'Markdown Studio'"));
   assert.ok(hosted.includes("'/x', $productCode, '/qn', '/norestart'"));
   assert.ok(hosted.includes('if ($attempted -and $setupExited)'));
@@ -215,6 +222,23 @@ test('real setup installation is explicitly opted in on a clean hosted runner an
   assert.ok(hosted.includes('if ($InstallOnHostedRunner) {\n    Test-HostedInstallation') ||
     hosted.includes('if ($InstallOnHostedRunner) {\r\n    Test-HostedInstallation'));
   assert.ok(workflow.includes('run: npm run verify:setup -- -InstallOnHostedRunner'));
+});
+
+test('Windows Installer registration uses exact current-user API queries and handles native errors safely', async () => {
+  const verify = await readFile(new URL('../scripts/Test-Setup.ps1', import.meta.url), 'utf8');
+  assert.ok(verify.includes('[DllImport("msi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]'));
+  assert.ok(verify.includes('MsiGetProductInfoExW(productCode, null, context, property, null, ref length)'));
+  assert.ok(verify.includes('MsiGetProductInfoExW(productCode, null, context, property, value, ref capacity)'));
+  assert.ok(verify.includes('if (result == 1605) return null;'), 'only ERROR_UNKNOWN_PRODUCT means absent');
+  assert.ok(verify.includes('if (result == 234) { length = capacity; continue; }'));
+  assert.ok(verify.includes('new StringBuilder(checked((int)length + 1))'));
+  assert.ok(verify.includes('throw new Win32Exception((int)result'));
+  assert.ok(verify.includes("GetProductProperty($ProductCode, $Context, 'ProductName')"),
+    'preflight and post-uninstall absence checks must detect advertised as well as installed instances');
+  const cleanup = verify.slice(verify.indexOf('if ($attempted -and $setupExited)'));
+  assert.ok(cleanup.includes('foreach ($context in @(1, 2, 4))'));
+  assert.ok(cleanup.includes('Test-ExactMsiRegistration $productCode $context'),
+    'uninstall must remove exact Windows Installer registration, not just its executable');
 });
 
 test('motion verification respects local preferences and restores both hosted animation test modes', async () => {
