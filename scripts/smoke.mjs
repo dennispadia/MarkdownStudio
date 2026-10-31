@@ -2250,7 +2250,11 @@ try {
   await waitFor(async () => (await main.evaluate('smokeElectron.clipboard.readText()')) === 'printf "identity"\n', 'rich-block raw code copy');
   await main.evaluate(`smokeOpenPath=${JSON.stringify(publishingRoot)}`);
   await action('allow-includes');
-  await waitFor(async () => ui("document.querySelector('.publishing-document-selector')?.getAttribute('aria-label') === 'Choose an approach' && document.querySelector('.tiptap').textContent.includes('Shared included prose.') && [...document.querySelectorAll('.publishing-block img')].some(image=>image.complete && image.naturalWidth===1)"), 'authorized includes, rebased images and local publishing labels');
+  await waitFor(async () => ui("document.querySelector('.visual-surface [data-publishing-selector]')?.getAttribute('aria-label') === 'Choose an approach' && document.querySelector('.tiptap').textContent.includes('Shared included prose.') && [...document.querySelectorAll('.publishing-block img')].some(image=>image.complete && image.naturalWidth===1)"), 'authorized includes, rebased images and local publishing labels');
+  await action('side-by-side');
+  assert.ok(await ui("(() => {const selector=document.querySelector('.visual-surface [data-publishing-selector]').getBoundingClientRect();const source=document.querySelector('.source-surface').getBoundingClientRect();return selector.right <= source.left+1 && selector.left >= document.querySelector('.visual-surface').getBoundingClientRect().left})()"), 'The selector belongs to Visual, never the Source column');
+  assert.equal(await ui("document.querySelector('.document-pane > .publishing-document-selector')"), null);
+  await action('side-by-side');
   await ui("document.querySelector('[data-publishing-choice=\"second\"]').click()");
   assert.equal(await ui("document.querySelector('[data-publishing-zone=\"first\"]').hidden"), true);
   assert.equal(await ui("document.querySelector('[data-publishing-zone=\"second\"]').hidden"), false);
@@ -2309,7 +2313,10 @@ try {
   await action('source');
   await sourceEdit('# Root\n\n## Setup\n\nFirst section.\n\n> [!NOTE]\n> ## Setup\n>\n> Second section.\n\n[Go first](#setup)\n\n[Go second](#setup-1)\n');
   await action('visual');
-  await waitFor(async () => ui("document.querySelector('.publishing-callout h2')?.id === 'setup-1' && document.querySelector('.tiptap > h2')?.id === 'setup'"), 'document-wide duplicate heading anchors');
+  await waitFor(async () => ui("document.querySelector('.publishing-callout h2')?.id === 'setup-1' && document.querySelector('.tiptap > h2')?.id === 'setup'"), 'document-wide duplicate heading anchors').catch(async error => {
+    console.error('Heading diagnostic:', JSON.stringify(await ui("({headings:[...document.querySelectorAll('.tiptap h1,.tiptap h2')].map(h=>({text:h.textContent,id:h.id})),model:document.querySelector('.tiptap').editor.getJSON()})")));
+    throw error;
+  });
   await ui("window.smokePublishingScroll=[]; document.querySelectorAll('.tiptap h2').forEach(h=>h.scrollIntoView=()=>window.smokePublishingScroll.push(h.id)); document.querySelector('.tiptap a[href=\"#setup\"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}))");
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'first duplicate heading navigation');
   await ui("document.querySelector('.tiptap a[href=\"#setup-1\"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}))");
@@ -2326,7 +2333,7 @@ try {
     await main.evaluate(`smokeOpenPath=${JSON.stringify(process.env.LEKH_PUBLISHING_ROOT)}`);
     await action('allow-includes');
     await action('visual');
-    await waitFor(async () => ui("document.querySelector('.publishing-document-selector')?.getAttribute('aria-label') === 'Choose your Pacemaker Fencing Solution' && document.querySelectorAll('[data-publishing-tabs]').length >= 2"), 'actual reference selectors, includes and implicitly terminated tab groups', 90000);
+    await waitFor(async () => ui("document.querySelector('.visual-surface [data-publishing-selector]')?.getAttribute('aria-label') === 'Choose your Pacemaker Fencing Solution' && document.querySelectorAll('[data-publishing-tabs]').length >= 2"), 'actual reference selectors, includes and implicitly terminated tab groups', 90000);
     await ui("document.querySelector('[data-publishing-choice=\"azure-fence-agent\"]').click()");
     assert.ok(await ui("[...document.querySelectorAll('[role=\"tab\"]')].some(tab=>tab.textContent==='Managed identity' && tab.getClientRects().length>0)"));
     assert.ok(await ui("[...document.querySelectorAll('[role=\"tab\"]')].some(tab=>tab.textContent==='Service principal' && tab.getClientRects().length>0)"));
@@ -2340,6 +2347,158 @@ try {
     assert.equal(await readFile(process.env.LEKH_PUBLISHING_REFERENCE, 'utf8'), reference);
     await menuAction('close-tab');
     console.log('PASS: the supplied public article renders its real selector prompt/labels and managed-identity/service-principal tabs from authorized local project files without changing source');
+  }
+
+  await action('new');
+  for (const kind of ['note', 'tip', 'important', 'caution', 'warning']) {
+    await action('source');
+    await sourceEdit('');
+    await action('visual');
+    await action(`insert:callout-${kind}`);
+    await waitFor(async () => ui("Boolean(document.activeElement?.closest('.tiptap'))"), `the new ${kind} alert keeps the writing caret in Visual`, 5_000);
+    await browser.call('Input.insertText', { text: `Direct ${kind} content.` }, sessionId);
+    await waitFor(async () => ui(`document.querySelector('.publishing-callout-${kind} .publishing-callout-body')?.textContent === 'Direct ${kind} content.'`), `directly editable ${kind} alert`);
+    assert.equal(await ui("(() => {const e=document.querySelector('.tiptap').editor;e.setEditable(false,false);const editable=document.querySelector('.publishing-callout-body').isContentEditable;e.setEditable(true,false);return editable})()"), false, 'Alert bodies respect the editor lock while a native operation is running');
+    assert.equal(await ui("document.querySelector('.publishing-callout .publishing-block-tools')"), null);
+    assert.equal(await ui("getComputedStyle(document.querySelector('.publishing-callout')).borderLeftWidth"), '4px');
+    assert.equal(await ui("document.querySelectorAll('.publishing-callout-title .publishing-icon').length"), 1);
+    await action('source');
+    const raw = await ui("document.querySelector('#source-editor').value");
+    assert.match(raw, new RegExp(`> \\[!${kind.toUpperCase()}\\]`));
+    assert.ok(raw.includes(`> Direct ${kind} content.`));
+  }
+  await action('visual');
+  await ui("(() => {const p=document.querySelector('.publishing-callout-body p');const r=document.createRange();r.selectNodeContents(p);r.collapse(false);window.getSelection().removeAllRanges();window.getSelection().addRange(r);p.closest('.tiptap').focus()})()");
+  await action('insert:callout-tip');
+  assert.equal(await ui("document.querySelectorAll('[data-lekh-alert]').length"), 1, 'Choosing another type changes the current alert rather than nesting a new one');
+  assert.equal(await ui("document.querySelector('.publishing-callout-tip .publishing-callout-body').textContent"), 'Direct warning content.');
+  await browser.call('Input.insertText', { text: ' More text.' }, sessionId);
+  const alertBeforeUndo = await ui("document.querySelector('.publishing-callout-body').textContent");
+  await menuAction('undo');
+  assert.notEqual(await ui("document.querySelector('.publishing-callout-body').textContent"), alertBeforeUndo);
+  assert.ok(await ui("document.querySelector('.publishing-callout-tip') !== null"), 'Typing undo does not also undo a previous type change');
+  await menuAction('redo');
+  assert.equal(await ui("document.querySelector('.publishing-callout-body').textContent"), alertBeforeUndo);
+  await ui("(() => {const p=document.querySelector('.publishing-callout-body p:last-child');const r=document.createRange();r.selectNodeContents(p);r.collapse(false);window.getSelection().removeAllRanges();window.getSelection().addRange(r);p.closest('.tiptap').focus()})()");
+  await browser.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, sessionId);
+  await browser.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, sessionId);
+  await browser.call('Input.insertText', { text: 'A second alert paragraph.' }, sessionId);
+  assert.ok(await ui("document.querySelector('.publishing-callout-body').textContent.includes('A second alert paragraph.')"));
+  for (let count = 0; count < 2; count++) {
+    await browser.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, sessionId);
+    await browser.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, sessionId);
+  }
+  await browser.call('Input.insertText', { text: 'Outside the alert.' }, sessionId);
+  assert.equal(await ui("document.querySelector('.publishing-callout-body').textContent.includes('Outside the alert.')"), false, 'An empty final paragraph can exit the alert without trapping the caret');
+  assert.ok(await ui("[...document.querySelectorAll('.tiptap > p')].some(p=>p.textContent==='Outside the alert.')"));
+  await action('source');
+  await sourceEdit('> [!NOTE]\n> **Formatted** alert body.\n');
+  await action('visual');
+  await ui(`(() => {
+    const target=document.querySelector('.tiptap'),editor=target.editor;
+    const html=new DOMParser().parseFromString(editor.getHTML(),'text/html').querySelector('[data-lekh-alert]').outerHTML;
+    editor.commands.insertContentAt(editor.state.doc.content.size,{type:'paragraph'});
+    editor.commands.setTextSelection(editor.state.doc.content.size);
+    editor.commands.focus();
+    const transfer=new DataTransfer();transfer.setData('text/html',html);
+    target.dispatchEvent(new ClipboardEvent('paste',{clipboardData:transfer,bubbles:true,cancelable:true}));
+  })()`);
+  assert.equal(await ui("document.querySelectorAll('[data-lekh-alert]').length"), 2, 'Rich alert clipboard paste preserves the container');
+  assert.ok(await ui("[...document.querySelectorAll('.publishing-callout-body')].every(body=>body.textContent==='Formatted alert body.' && body.querySelector('strong')?.textContent==='Formatted')"), 'Alert labels and icons never become pasted body text');
+  await ui(`(() => {
+    const target=document.querySelector('.tiptap'),editor=target.editor;
+    editor.commands.insertContentAt(editor.state.doc.content.size,{type:'paragraph'});
+    editor.commands.setTextSelection(editor.state.doc.content.size);editor.commands.focus();
+    const transfer=new DataTransfer();
+    transfer.setData('text/html','<aside data-lekh-alert="note"><div class="publishing-callout-title">Note</div><div class="publishing-callout-body"><p onclick="window.smokeAlertExecuted=true">Safe <strong>rich text</strong><a href="javascript:window.smokeAlertExecuted=true"> link</a><script>window.smokeAlertExecuted=true</script></p></div></aside>');
+    target.dispatchEvent(new ClipboardEvent('paste',{clipboardData:transfer,bubbles:true,cancelable:true}));
+  })()`);
+  assert.equal(await ui("window.smokeAlertExecuted===undefined"), true);
+  assert.equal(await ui("document.querySelectorAll('[data-lekh-alert]').length"), 3);
+  assert.ok(await ui("document.querySelector('.tiptap').textContent.includes('Safe rich text')"), 'Safe content survives sanitization');
+  assert.doesNotMatch(await ui("document.querySelector('.tiptap').editor.getHTML()"), /<script|\sonclick=|javascript:/i, 'Alert clipboard content is schema-sanitized');
+  await action('source');
+  await sourceEdit('> [!NOTE]\n> Context.\n>\n> [guide]: https://example.com/guide "Guide"\n\n> [!TIP]\n> Read [the guide][guide].\n\n# [First](#tab/first)\n\n[The same guide][guide].\n\n# [Second](#tab/second)\n\nOther content.\n\n---\n');
+  await action('visual');
+  await ui("(() => {const p=document.querySelector('.publishing-callout-note .publishing-callout-body p');const r=document.createRange();r.selectNodeContents(p);r.collapse(true);window.getSelection().removeAllRanges();window.getSelection().addRange(r);p.closest('.tiptap').focus()})()");
+  await browser.call('Input.insertText', { text: 'Edited ' }, sessionId);
+  await action('source');
+  const savedAlertReferences = await ui("document.querySelector('#source-editor').value");
+  assert.ok(savedAlertReferences.includes('Edited Context.'));
+  const { documentPreviewHTML } = await import(new URL('../build/lib/markdown.js', import.meta.url));
+  assert.equal((documentPreviewHTML(savedAlertReferences, 'saved-alert').match(/href="https:\/\/example.com\/guide"/g) ?? []).length, 2, 'Serialized alert edits keep reference destinations used by siblings and protected tabs');
+  await action('source');
+  await sourceEdit('> [!NOTE]\n> A readable note.\n\n# [First example](#tab/first)\n\nVisible example text.\n\n# [Second example](#tab/second)\n\nSecond example text.\n\n---\n\n[!INCLUDE [Unresolved](./unavailable.md)]\n');
+  await action('visual');
+  await waitFor(async () => ui("document.querySelector('.publishing-unsupported pre') && document.querySelectorAll('[data-publishing-tab]').length===2"), 'contrast fixtures');
+  for (const theme of ['light', 'dark']) {
+    await menuAction(`theme:${theme}`);
+    const contrasts = await ui(`(() => {
+      const rgb = value => (value.match(/[\\d.]+/g)||[]).map(Number);
+      const luminance = value => {const c=value.slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+      return [...document.querySelectorAll('.publishing-tablist button,.publishing-tab-panel p,.publishing-unsupported p,.publishing-unsupported pre')].filter(e=>e.getClientRects().length).map(e=>{
+        let parent=e,bg;while(parent){const color=rgb(getComputedStyle(parent).backgroundColor);if(color.length===3||color[3]===1){bg=color;break}parent=parent.parentElement}
+        const fg=rgb(getComputedStyle(e).color),a=luminance(fg),b=luminance(bg||[255,255,255]);
+        return {text:e.textContent.slice(0,40),foreground:fg,background:bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+      });
+    })()`);
+    assert.ok(contrasts.length >= 5);
+    for (const item of contrasts) assert.ok(item.ratio >= 4.5, `${theme} text contrast must meet 4.5:1: ${JSON.stringify(item)}`);
+    await ui("document.querySelector('[data-publishing-tab=\"1\"]').click()");
+    assert.equal(await ui("document.querySelector('[data-publishing-panel=\"1\"]').hidden"), false);
+    if (!await ui("document.querySelector('[aria-controls=\"publishing-menu\"]').getClientRects().length > 0")) await action('format-menu');
+    await ui("document.querySelector('[aria-controls=\"publishing-menu\"]').click()");
+    assert.ok(await ui("document.querySelector('#publishing-menu [role=\"group\"][aria-label=\"Alerts\"]') !== null"));
+    assert.ok(await ui("[...document.querySelectorAll('#publishing-menu button')].every(button=>button.querySelector('svg') && button.title.length>20 && button.getAttribute('aria-description')===button.title)"));
+    await ui("document.body.click()");
+  }
+  await action('source');
+  const longPublishingLabel = `A detailed option ${'UnbrokenTechnicalPublishingLabel'.repeat(7)}`;
+  await sourceEdit(`:::selector title="Choose a narrow-window option"\n- [${longPublishingLabel}](#variant/first)\n- [Other option](#variant/second)\n:::selector-end\n\n:::zone pivot="first"\nFirst body.\n:::zone-end\n\n:::zone pivot="second"\nSecond body.\n:::zone-end\n\n# [${longPublishingLabel}](#tab/first)\n\nFirst example.\n\n# [Other example](#tab/second)\n\nSecond example.\n\n---\n`);
+  await action('visual');
+  await action('side-by-side');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,800)");
+  await waitFor(async () => ui("document.querySelector('.visual-surface [data-publishing-selector]') && document.querySelectorAll('[data-publishing-tab]').length===2"), 'narrow-window publishing content');
+  assert.ok(await ui("(() => {const view=document.querySelector('.visual-surface').getBoundingClientRect();return [...document.querySelectorAll('.visual-surface .publishing-variant-options button,.visual-surface .publishing-tablist button')].every(button=>{const box=button.getBoundingClientRect();return box.left>=view.left-1&&box.right<=view.right+1&&button.scrollWidth<=button.clientWidth+1})})()"), 'Long selector and tab labels wrap without clipping or crossing into Source');
+  await action('side-by-side');
+  await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+  await main.evaluate('smokeChoice=1');
+  await menuAction('close-tab');
+  console.log('PASS: all five alerts edit directly in Visual, type changes retain content, undo/redo and Enter work, GitHub-style cards have semantic icons, grouped tools have accessible descriptions, and light/dark tabs/warnings meet 4.5:1 contrast');
+
+  if (process.env.LEKH_PUBLIC_SCREENSHOTS === '1') {
+    const images = path.join(root, 'docs', 'images');
+    const alertsDemo = path.join(temporary, 'Writing with alerts.md');
+    await writeFile(alertsDemo, '# Make the important things clear.\n\nWrite directly in an alert, just as you write anywhere else.\n\n> [!NOTE]\n> A little context helps readers understand the next step.\n\n> [!TIP]\n> Share a useful shortcut or a better way to work.\n\n> [!IMPORTANT]\n> Put essential information where it cannot be missed.\n\n> [!CAUTION]\n> Explain the risk and the precautions readers should take.\n\n> [!WARNING]\n> Make serious risks clear before readers continue.\n');
+    await main.evaluate(`smokeOpenPath=${JSON.stringify(alertsDemo)}; smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1360,1120)`);
+    await action('open');
+    await action('visual');
+    for (const theme of ['light', 'dark']) {
+      await menuAction(`theme:${theme}`);
+      await ui("document.querySelector('#notification').hidden=true; document.activeElement?.blur()");
+      const capture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+      await writeFile(path.join(images, `alerts-${theme}.png`), Buffer.from(capture.data, 'base64'));
+    }
+    if (!await ui("document.querySelector('[aria-controls=\"publishing-menu\"]').getClientRects().length > 0")) await action('format-menu');
+    await ui("document.querySelector('[aria-controls=\"publishing-menu\"]').click()");
+    const menuCapture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+    await writeFile(path.join(images, 'publishing-menu-dark.png'), Buffer.from(menuCapture.data, 'base64'));
+    await ui("document.body.click()");
+    const publishingDemo = path.join(temporary, 'Publishing blocks.md');
+    await writeFile(publishingDemo, '# One document. Every reader.\n\nChoose an option without changing the source.\n\n:::selector title="Choose your approach"\n- [Quick start](#variant/quick)\n- [Detailed guide](#variant/detailed)\n:::selector-end\n\n:::zone pivot="quick"\nStart with a clear, focused example.\n:::zone-end\n\n:::zone pivot="detailed"\nAdd the background and details your readers need.\n:::zone-end\n\n# [JavaScript](#tab/javascript)\n\n```javascript\nconst release = "ready";\nconsole.log(release);\n```\n\n# [Python](#tab/python)\n\n```python\nrelease = "ready"\nprint(release)\n```\n\n---\n\n> [!TIP]\n> Keep your writing readable in both Light and Dark.\n');
+    await main.evaluate(`smokeOpenPath=${JSON.stringify(publishingDemo)}; smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1360,1000)`);
+    await action('open');
+    await action('visual');
+    await action('side-by-side');
+    await waitFor(async () => ui("document.querySelector('.visual-surface [data-publishing-selector]') && document.querySelectorAll('[data-publishing-tab]').length===2"), 'publishing documentation screenshot');
+    await ui("document.querySelector('#notification').hidden=true; document.activeElement?.blur()");
+    const splitCapture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+    await writeFile(path.join(images, 'publishing-split-dark.png'), Buffer.from(splitCapture.data, 'base64'));
+    await main.evaluate('smokeChoice=1');
+    await menuAction('close-tab');
+    await menuAction('close-tab');
+    await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
+    console.log('PASS: feature guide screenshots show editable alerts in Light/Dark, grouped icon tools, and Visual-scoped selectors with readable Dark tabs');
   }
 
   const grammarFixture = '# Grammar check\n\nWe made a error. We made a error.\n\nShe could of gone.\n\n`We made a error.`\n\n```text\nWe made a error.\n```\n\n[Link](https://example.com/a-error)\n';
@@ -2369,7 +2528,7 @@ try {
   assert.equal(await ui("document.querySelector('#source-editor').value"), grammarFixture, 'A source grammar correction is undoable without touching code or markup');
   await action('new');
   await action('source');
-  const visualGrammarFixture = '**We made a error.**\n\n`We made a error.`\n\n```text\nWe made a error.\n```\n';
+  const visualGrammarFixture = '> [!NOTE]\n> **We made a error.**\n\n`We made a error.`\n\n```text\nWe made a error.\n```\n';
   await sourceEdit(visualGrammarFixture);
   await action('visual');
   await waitFor(async () => ui("document.querySelectorAll('#writing-suggestions li').length === 1 && document.querySelectorAll('.tiptap .grammar-mark').length === 1"), 'Visual grammar and tab-scoped ignores', 90000);

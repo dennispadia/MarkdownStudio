@@ -1,6 +1,6 @@
 # Contributing to Lekh
 
-**[GitHub issues](https://github.com/dennispadia/lekh/issues)** are welcome for bugs, enhancements, and requests. Describe the workflow or reproduction steps and avoid private documents or credentials. Responses, resolutions, and future maintenance are not guaranteed; see [SUPPORT.md](SUPPORT.md).
+**[GitHub issues](https://github.com/dennispadia/lekh/issues)** are welcome for questions, bugs, enhancements, and requests. Describe the workflow or reproduction steps and avoid private documents or credentials. See [Help and feedback](SUPPORT.md).
 
 ## Development workflow
 

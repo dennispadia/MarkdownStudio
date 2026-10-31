@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { publishingTemplateMarkdown, publishingTemplates } from '../lib/publishing-templates.js';
+import { parser, documentPreviewHTML } from '../lib/markdown.js';
+import { publishingBlockAtStart } from '../lib/publishing.js';
+import { publishingIcon } from '../lib/publishing-icons.js';
 
 test('toolbar exposes every alert type and reusable authoring building block', () => {
   for (const kind of ['note', 'tip', 'important', 'caution', 'warning']) {
@@ -11,6 +14,26 @@ test('toolbar exposes every alert type and reusable authoring building block', (
   for (const kind of ['tabs', 'selector', 'steps', 'image', 'metadata', 'include']) {
     assert.ok(publishingTemplates.some(item => item.id === `publishing-${kind}`));
   }
+  for (const item of publishingTemplates) {
+    assert.ok(item.description.length > 20);
+    assert.match(publishingIcon(item.icon), /<svg[^>]*aria-hidden="true"/);
+    assert.equal(item.category, item.id.startsWith('callout-') ? 'alerts' : 'content');
+  }
+});
+
+test('alert markers inside quoted fences and comments do not truncate the surrounding alert', () => {
+  for (const fence of ['```', '~~~']) {
+    const raw = `> [!NOTE]\n> Before.\n>\n> ${fence}markdown\n> [!WARNING]\n> literal text\n> ${fence}\n>\n> After.\n`;
+    assert.equal(publishingBlockAtStart(raw)!.raw, raw);
+    const tokens = parser.parse(raw, {});
+    assert.equal(tokens.filter(token => token.type === 'publishing_callout_open').length, 1);
+    assert.ok(tokens.some(token => token.type === 'fence' && token.content.includes('[!WARNING]')));
+    assert.match(documentPreviewHTML(raw, 'test'), /After\./);
+  }
+  const comments = '> [!NOTE]\n> <!--\n> [!WARNING]\n> -->\n> Kept text.\n';
+  assert.equal(publishingBlockAtStart(comments)!.raw, comments);
+  const adjacent = '> [!NOTE]\n> One.\n> [!TIP]\n> Two.\n';
+  assert.equal(parser.parse(adjacent, {}).filter(token => token.type === 'publishing_callout_open').length, 2);
 });
 
 test('formatting selected text retains Markdown, code and literal replacement characters', () => {

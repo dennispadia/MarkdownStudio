@@ -9,7 +9,7 @@ Preparing source does not publish it. You decide the GitHub account, repository 
 3. Review the files in the initial change list. Commit source, tests, documentation, screenshots, artwork, package manifests/lockfile, and `.github` configuration.
 4. Confirm that `.tools`, `node_modules`, `build`, `dist`, `release`, `.env`, `.npmrc`, private certificates, and personal documents are **not** selected. `.gitignore` handles the known generated/private paths.
 5. Create the initial commit, then choose **Publish repository**. Select your account, a repository name, and public/private visibility.
-6. Follow the [support policy](../SUPPORT.md): keep **Issues enabled** in repository **Settings > General > Features** so users can report bugs, enhancements, and requests. No response time, resolution, or future maintenance is guaranteed.
+6. Follow [Help and feedback](../SUPPORT.md): keep **Issues enabled** in repository **Settings > General > Features** so users can ask questions and report bugs, enhancements, and requests.
 
 GitHub's browser uploader does not apply `.gitignore` for you. Do not drag the entire working folder into it. If needed, extract the generated clean source ZIP into a separate folder and use that reviewed source-only copy.
 
@@ -42,7 +42,7 @@ On GitHub:
 
 1. Open the repository's **Releases > Draft a new release**.
 2. Create a tag matching the verified version, such as `v0.8.0`, targeting the reviewed commit only when ready to publish.
-3. Add a description of the release, known limitations, the unsigned-installer warning, and the issue-based support policy with no guaranteed response time.
+3. Add a description of the release, tested scenarios, known limitations, the unsigned-installer warning, and a link for questions, bugs, and enhancement requests.
 4. Attach these files from `release`:
    - `Lekh-Markdown-editor-Setup-<version>-x64.exe`
    - `Lekh-<version>-source.zip`
@@ -72,7 +72,7 @@ The planned no-cost route is [SignPath Foundation's open-source program](https:/
 ### Maintainer enrollment
 
 1. Review the current [SignPath conditions](https://signpath.org/terms) and [apply](https://signpath.org/apply) for the public repository `https://github.com/dennispadia/lekh`. Provide the existing MIT license, public release, build workflow, and documentation as requested. Account creation, policy acceptance, MFA, and submission require the maintainer's participation.
-2. Confirm eligibility with SignPath, including project reputation, maintenance expectations, and the Electron application packaging. The issue-based support policy does not promise response times or future maintenance; do not assume acceptance solely because the license is MIT.
+2. Confirm eligibility with SignPath, including project reputation, maintenance expectations, and the Electron application packaging; do not assume acceptance solely because the license is MIT.
 3. Identify the authors, reviewers, and signing approvers. Once accepted, update this policy with the confirmed roles and the attribution required by SignPath. Retain the application's [privacy description](USER_GUIDE.md#privacy); do not claim enrollment or sponsorship before approval.
 4. Configure the approved repository/build integration and artifact policies with SignPath. Keep API tokens and other secrets in GitHub Actions secrets, never source code, release assets, logs, or chat. Organization/project identifiers and artifact/signing policy names must come from the approved account, not guessed placeholders.
 

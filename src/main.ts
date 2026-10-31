@@ -26,6 +26,8 @@ import { PublishingHeadings, PublishingNode, setPublishingHeadings } from './pub
 import { forgetPublishingDocument, initializePublishing, publishingHTML, refreshPublishingVariants, revealPublishingElement } from './publishing-view.js';
 import { publishingBlockRanges, publishingCSS } from '../lib/publishing.js';
 import { publishingTemplateMarkdown, publishingTemplates } from '../lib/publishing-templates.js';
+import { publishingIcon } from '../lib/publishing-icons.js';
+import { AlertNode } from './alert-node.js';
 import './style.css';
 
 let writingAssistance: WritingAssistance | undefined;
@@ -147,7 +149,7 @@ app.innerHTML = `
     <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><button type="button" id="writing-toggle" data-action="writing-assistance" aria-controls="writing-panel" aria-expanded="false" title="Offline English grammar checking">Writing assistance</button><span id="save-status" aria-live="polite">Ready to write</span><div class="zoom-controls" role="group" aria-label="Zoom controls"><button type="button" id="zoom-out" data-action="zoom-out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" id="zoom-reset" data-action="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%">100%</button><button type="button" id="zoom-in" data-action="zoom-in" aria-label="Zoom in" title="Zoom in">+</button></div></footer>
   </main>
   <div id="tabs-menu" class="dropdown view-menu" role="menu" aria-label="Open documents" hidden></div>
-  <div id="publishing-menu" class="dropdown view-menu publishing-insert-menu" role="menu" aria-label="Publishing blocks" hidden>${publishingTemplates.map(item => `<button type="button" data-action="insert:${item.id}" class="publishing-menu-${item.color || 'generic'}"><span class="publishing-swatch" aria-hidden="true"></span><span>${item.label}</span></button>`).join('')}</div>
+  <div id="publishing-menu" class="dropdown view-menu publishing-insert-menu" role="menu" aria-label="Publishing blocks" hidden>${(['alerts', 'content'] as const).map(category => `<div class="publishing-menu-group" role="group" aria-label="${category === 'alerts' ? 'Alerts' : 'Content blocks'}"><div class="publishing-menu-label" role="presentation">${category === 'alerts' ? 'Alerts' : 'Content blocks'}</div>${publishingTemplates.filter(item => item.category === category).map(item => `<button type="button" data-action="insert:${item.id}" class="publishing-menu-${item.color || 'generic'}" title="${item.description}" aria-description="${item.description}">${publishingIcon(item.icon)}<span>${item.label}</span></button>`).join('')}</div>`).join('')}</div>
   <div id="format-menu" class="dropdown view-menu" role="menu" hidden><div id="toolbar-overflow" role="group" aria-label="More editing tools" hidden></div>${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('allow-includes', 'Allow local includes…')}${button('revoke-includes', 'Stop local includes')}${button('writing-assistance', 'Writing assistance')}${button('help', 'Getting started', 'help')}</div>
   <div id="notification" role="status" hidden></div>
   <dialog id="publishing-image-dialog" aria-labelledby="publishing-image-title"><form method="dialog">
@@ -610,7 +612,7 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
       return ['img', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { src: imageDisplayURL(source, id), 'data-lekh-source': source })];
     },
   });
-  return new Editor({
+  const created: Editor = new Editor({
   element: host,
   extensions: [
     StarterKit.configure({ trailingNode: false, codeBlock: false, link: { openOnClick: false, protocols: ['https', 'http', 'mailto'] } }),
@@ -621,6 +623,7 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
     LocalImage.configure({ allowBase64: true }),
     TableKit.configure({ table: { resizable: false } }),
     TaskList, TaskItem.configure({ nested: true }), ContentsNode,
+    AlertNode.configure({ schema: () => created.schema }),
     PublishingNode.configure({
       documentId: id,
       editSource: (raw, position) => { void run(async () => editPublishingSource(id, raw, position)); },
@@ -649,6 +652,7 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
   },
   onSelectionUpdate: ({ editor: updated }) => { if (updated === editor) updateToolbar(); },
   });
+  return created;
 }
 let editor = createEditor(markdown);
 
@@ -905,6 +909,7 @@ function showMode(): void {
   source.hidden = !sideBySide && mode !== 'source';
   source.closest<HTMLElement>('.source-surface')!.hidden = source.hidden;
   visual.hidden = !sideBySide && mode !== 'visual';
+  if (activeTab) activeTab.visualViewport.hidden = visual.hidden;
   activeTab?.viewport.classList.toggle('side-by-side', sideBySide);
   const preview = Boolean(activeTab?.preview && mode === 'source');
   activeTab?.viewport.classList.toggle('has-preview', preview);
@@ -914,6 +919,7 @@ function showMode(): void {
   document.querySelector('.toolbar')!.classList.toggle('source-toolbar', mode === 'source');
   if (activeTab) activeTab.mode = mode;
   updatePaneHeaders();
+  if (!visual.hidden) synchronizeVisualHeadingAnchors();
   writingAssistance?.schedule();
 }
 
@@ -1144,12 +1150,12 @@ function unwrap<T>(result: Result<T>): T {
   return result.value;
 }
 
-function visualHeadingTargets(): Array<HTMLElement | undefined> {
-  const targets: Array<HTMLElement | undefined> = [];
+function visualHeadingRecords(): Array<{ element: HTMLElement; range?: { from: number; to: number } } | undefined> {
+  const targets: Array<{ element: HTMLElement; range?: { from: number; to: number } } | undefined> = [];
   editor.state.doc.descendants((node, position) => {
     if (node.type.name === 'heading') {
       const dom = editor.view.nodeDOM(position);
-      if (dom instanceof HTMLElement) targets.push(dom);
+      if (dom instanceof HTMLElement) targets.push({ element: dom, range: { from: position, to: position + node.nodeSize } });
     } else if (node.type.name === 'lekhPublishing') {
       const dom = editor.view.nodeDOM(position);
       if (!(dom instanceof HTMLElement)) return false;
@@ -1157,7 +1163,7 @@ function visualHeadingTargets(): Array<HTMLElement | undefined> {
       let next = 0;
       for (const heading of headings(String(node.attrs.markdown))) {
         const found = candidates.findIndex((candidate, index) => index >= next && candidate.textContent?.trim() === heading.displayText);
-        targets.push(found >= 0 ? candidates[found] : undefined);
+        targets.push(found >= 0 ? { element: candidates[found] } : undefined);
         if (found >= 0) next = found + 1;
       }
       return false;
@@ -1167,24 +1173,21 @@ function visualHeadingTargets(): Array<HTMLElement | undefined> {
   return targets;
 }
 
+function visualHeadingTargets(): Array<HTMLElement | undefined> {
+  return visualHeadingRecords().map(record => record?.element);
+}
+
 function synchronizeVisualHeadingAnchors(): void {
-  const targets = visualHeadingTargets();
+  const records = visualHeadingRecords();
   const used = new Map<string, number>();
-  const ids = new Map<HTMLElement, string>();
+  const anchors: Array<{ from: number; to: number; id: string }> = [];
   for (const [index, item] of headings(markdown).entries()) {
     const anchor = headingAnchor(item.text, used);
-    const target = targets[index];
-    if (!target) continue;
-    if (target.closest('.publishing-block')) target.id = anchor;
-    else ids.set(target, anchor);
+    const record = records[index];
+    if (!record) continue;
+    if (record.range) anchors.push({ ...record.range, id: anchor });
+    else record.element.id = anchor;
   }
-  const anchors: Array<{ from: number; to: number; id: string }> = [];
-  editor.state.doc.descendants((node, position) => {
-    if (node.type.name !== 'heading') return;
-    const dom = editor.view.nodeDOM(position);
-    const id = dom instanceof HTMLElement ? ids.get(dom) : undefined;
-    if (id) anchors.push({ from: position, to: position + node.nodeSize, id });
-  });
   setPublishingHeadings(editor, anchors);
 }
 
@@ -1217,6 +1220,12 @@ function editPublishingSource(id: string, raw: string, position: number): void {
 async function insertPublishingBlock(kind: string): Promise<boolean> {
   const template = publishingTemplates.find(item => item.id === kind);
   if (!template) return false;
+  if (mode === 'visual' && template.category === 'alerts') {
+    const changed = editor.chain().focus().command(({ tr }) => { closeHistory(tr); return true; }).setAlert(template.color).run();
+    if (!changed) throw new Error('The alert could not be applied at the current selection.');
+    editor.view.dispatch(closeHistory(editor.state.tr));
+    return true;
+  }
   const selected = selectionMarkdown();
   if (kind === 'publishing-include' && selected) throw new Error('Place the caret where you want the include. Selected text will not be replaced.');
   let raw = publishingTemplateMarkdown(kind, selected)!;
@@ -1548,6 +1557,13 @@ async function openPending(): Promise<void> {
   }
   if (results.length) await refreshRecent();
   if (errors.length) throw new Error(errors.join('\n'));
+}
+
+async function runAction(action: string): Promise<void> {
+  const id = documentId;
+  await run(async () => dispatch(action));
+  if (action.startsWith('insert:callout-') && documentId === id && mode === 'visual' &&
+    !busy && editor.isEditable && !document.querySelector('dialog[open]')) editor.view.focus();
 }
 
 async function run(operation: () => Promise<unknown>): Promise<void> {
@@ -1972,7 +1988,7 @@ document.addEventListener('click', event => {
     }
     return;
   }
-  if (action) void run(async () => dispatch(action));
+  if (action) void runAction(action);
   else if (!target.closest('.dropdown')) closeDropdowns();
   const link = target.closest<HTMLAnchorElement>('.tiptap a, .document-preview a');
   if (link) {
@@ -2414,7 +2430,7 @@ window.lekh.onAction(action => {
   if (action === 'open-pending') {
     pendingExternalOpen = true;
     if (!busy) { pendingExternalOpen = false; void run(openPending); }
-  } else void run(async () => dispatch(action));
+  } else void runAction(action);
 });
 element('tabs').addEventListener('keydown', event => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;

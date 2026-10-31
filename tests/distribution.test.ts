@@ -64,7 +64,7 @@ test('distribution uses the public npm registry and ships notices without develo
   assert.equal(manifest.name, 'lekh');
   assert.equal(lock.name, manifest.name);
   assert.equal(lock.packages[''].name, manifest.name);
-  assert.equal(manifest.version, '0.8.0');
+  assert.equal(manifest.version, '0.8.1');
   assert.equal(manifest.build.appId, 'com.lekh.desktop');
   assert.equal(manifest.build.productName, 'Lekh - Markdown editor');
   assert.equal(manifest.build.msi.shortcutName, 'Lekh');
@@ -138,8 +138,8 @@ test('public release contains only verified offline setup, source and checksums;
   assert.ok(publisher.includes('checked.size !== 2'));
   assert.ok(publisher.includes('asset.digest !== `sha256:'));
   assert.ok(publisher.indexOf('Uploaded asset verification failed:') < publisher.indexOf('draft: false'));
-  assert.ok(publisher.includes('fresh per-user install/uninstall on a GitHub-hosted Windows runner'));
-  assert.ok(publisher.includes('Genuine old-version upgrade and repair have not yet been verified.'));
+  assert.ok(publisher.includes('complete extracted-app desktop tests on a GitHub-hosted Windows runner'));
+  assert.ok(publisher.includes('tested installation, upgrade, and repair scenarios'));
 });
 
 test('native setup compilation embeds the exact offline payload and generates explicit build identity', async () => {

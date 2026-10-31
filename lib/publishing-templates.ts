@@ -1,15 +1,15 @@
 export const publishingTemplates = [
-  { id: 'callout-note', label: 'Note', color: 'note', markdown: '> [!NOTE]\n> Add information readers should notice.' },
-  { id: 'callout-tip', label: 'Tip', color: 'tip', markdown: '> [!TIP]\n> Add a useful suggestion.' },
-  { id: 'callout-important', label: 'Important', color: 'important', markdown: '> [!IMPORTANT]\n> Add essential information.' },
-  { id: 'callout-caution', label: 'Caution', color: 'caution', markdown: '> [!CAUTION]\n> Explain a risk and how to avoid it.' },
-  { id: 'callout-warning', label: 'Warning', color: 'warning', markdown: '> [!WARNING]\n> Explain a serious risk and the precautions to take.' },
-  { id: 'publishing-tabs', label: 'Tabbed examples', color: '', markdown: '# [First example](#tab/first)\n\nContent for the first example.\n\n# [Second example](#tab/second)\n\nContent for the second example.\n\n---' },
-  { id: 'publishing-selector', label: 'Variant selector', color: '', markdown: ':::selector title="Choose an option"\n- [First option](#variant/first)\n- [Second option](#variant/second)\n:::selector-end\n\n:::zone pivot="first"\nContent for the first option.\n:::zone-end\n\n:::zone pivot="second"\nContent for the second option.\n:::zone-end' },
-  { id: 'publishing-steps', label: 'Structured steps', color: '', markdown: ':::steps\n1. Describe the first step.\n2. Describe the next step.\n:::steps-end' },
-  { id: 'publishing-image', label: 'Image with description…', color: '', markdown: '' },
-  { id: 'publishing-metadata', label: 'Document metadata', color: '', markdown: '---\ntitle: Document title\ndescription: A short description of this document.\n---' },
-  { id: 'publishing-include', label: 'Local include', color: '', markdown: '[!INCLUDE [Shared content](./includes/shared.md)]' },
+  { id: 'callout-note', category: 'alerts', label: 'Note', icon: 'note', color: 'note', description: 'Add helpful context without interrupting the main instructions.', markdown: '> [!NOTE]\n> Add information readers should notice.' },
+  { id: 'callout-tip', category: 'alerts', label: 'Tip', icon: 'tip', color: 'tip', description: 'Highlight a useful shortcut, suggestion, or best practice.', markdown: '> [!TIP]\n> Add a useful suggestion.' },
+  { id: 'callout-important', category: 'alerts', label: 'Important', icon: 'important', color: 'important', description: 'Emphasize information readers need before continuing.', markdown: '> [!IMPORTANT]\n> Add essential information.' },
+  { id: 'callout-caution', category: 'alerts', label: 'Caution', icon: 'caution', color: 'caution', description: 'Explain a risk and the precautions needed to avoid it.', markdown: '> [!CAUTION]\n> Explain a risk and how to avoid it.' },
+  { id: 'callout-warning', category: 'alerts', label: 'Warning', icon: 'warning', color: 'warning', description: 'Call attention to a serious risk or potentially harmful action.', markdown: '> [!WARNING]\n> Explain a serious risk and the precautions to take.' },
+  { id: 'publishing-tabs', category: 'content', label: 'Tabbed examples', icon: 'tabs', color: '', description: 'Show related examples in accessible tabs within this document.', markdown: '# [First example](#tab/first)\n\nContent for the first example.\n\n# [Second example](#tab/second)\n\nContent for the second example.\n\n---' },
+  { id: 'publishing-selector', category: 'content', label: 'Variant selector', icon: 'selector', color: '', description: 'Let readers choose an option and show its matching document content.', markdown: ':::selector title="Choose an option"\n- [First option](#variant/first)\n- [Second option](#variant/second)\n:::selector-end\n\n:::zone pivot="first"\nContent for the first option.\n:::zone-end\n\n:::zone pivot="second"\nContent for the second option.\n:::zone-end' },
+  { id: 'publishing-steps', category: 'content', label: 'Structured steps', icon: 'steps', color: '', description: 'Organize a procedure into a clear sequence of steps.', markdown: ':::steps\n1. Describe the first step.\n2. Describe the next step.\n:::steps-end' },
+  { id: 'publishing-image', category: 'content', label: 'Image with description…', icon: 'image', color: '', description: 'Insert an image with alternate text and an optional long description.', markdown: '' },
+  { id: 'publishing-metadata', category: 'content', label: 'Document metadata', icon: 'metadata', color: '', description: 'Add a title, description, and other metadata outside the article body.', markdown: '---\ntitle: Document title\ndescription: A short description of this document.\n---' },
+  { id: 'publishing-include', category: 'content', label: 'Local include', icon: 'include', color: '', description: 'Reuse a local Markdown file after allowing its project folder.', markdown: '[!INCLUDE [Shared content](./includes/shared.md)]' },
 ] as const;
 
 export function publishingTemplateMarkdown(id: string, selection = ''): string | undefined {

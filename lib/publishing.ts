@@ -1,6 +1,7 @@
 import type MarkdownIt from 'markdown-it';
 import Token from 'markdown-it/lib/token.mjs';
 import type StateBlock from 'markdown-it/lib/rules_block/state_block.mjs';
+import { publishingIcon } from './publishing-icons.js';
 
 export type PublishingKind = 'callout' | 'tabs' | 'tab' | 'steps' | 'image' | 'caption' | 'metadata' | 'unsupported' | 'include' | 'zone' | 'selector';
 export type PublishingMeta = {
@@ -61,6 +62,37 @@ function directive(line: string): { name: string; rest: string; selfClosing: boo
 
 function opensBlock(item: NonNullable<ReturnType<typeof directive>>): boolean {
   return !item.selfClosing || item.name === 'image' && /\btype\s*=\s*["']?complex\b/i.test(item.rest);
+}
+
+function quotedCallout(read: (index: number) => string | undefined): { end: number; body: string } {
+  const body: string[] = [];
+  let fence: { character: string; length: number } | undefined;
+  let comment = false;
+  let cursor = 1;
+  for (; ; cursor++) {
+    const line = read(cursor);
+    if (line === undefined) break;
+    const quoted = /^ {0,3}>/.test(line);
+    if (!quoted) {
+      const next = read(cursor + 1) ?? '';
+      if (line.trim() || !/^ {0,3}>/.test(next) ||
+        (!fence && !comment && (calloutPattern.test(next) || divisionPattern.test(next)))) break;
+    }
+    if (!fence && !comment && (calloutPattern.test(line) || divisionPattern.test(line))) break;
+    const content = quoted ? line.replace(/^ {0,3}>[ \t]?/, '') : '';
+    body.push(content);
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(content);
+    if (fence) {
+      if (marker && marker[1][0] === fence.character && marker[1].length >= fence.length && !marker[2].trim()) fence = undefined;
+    } else {
+      const state: { touched: boolean; open: boolean } = comments(content, comment);
+      comment = state.open;
+      if (!state.touched && marker && (marker[1][0] !== '`' || !marker[2].includes('`'))) {
+        fence = { character: marker[1][0], length: marker[1].length };
+      }
+    }
+  }
+  return { end: cursor, body: body.join('\n') };
 }
 
 function comments(line: string, open: boolean): { touched: boolean; open: boolean } {
@@ -264,23 +296,11 @@ function inspect(lines: Lines, start: number, end: number, metadata: boolean): B
   const callout = calloutPattern.exec(line);
   const division = divisionPattern.exec(line);
   if (callout || division) {
-    let stop = start + 1;
-    const body: string[] = [];
-    while (stop < end) {
-      if (calloutPattern.test(lines.text[stop]) || divisionPattern.test(lines.text[stop])) break;
-      if (/^ {0,3}>/.test(lines.text[stop])) {
-        body.push(lines.text[stop].replace(/^ {0,3}>[ \t]?/, ''));
-        stop++;
-      } else if (!lines.text[stop].trim() && /^ {0,3}>/.test(lines.text[stop + 1] ?? '') &&
-        !calloutPattern.test(lines.text[stop + 1]) && !divisionPattern.test(lines.text[stop + 1])) {
-        body.push('');
-        stop++;
-      } else break;
-    }
+    const scanned = quotedCallout(offset => start + offset < end ? lines.text[start + offset] : undefined);
     const variant = callout ? callout[1].toLowerCase() : division![1] ?? division![2];
     return {
-      kind: 'callout', end: stop, variant, title: callout?.[2]?.trim() || division?.[3]?.trim(),
-      body: body.join('\n'), bodyLine: start + 1,
+      kind: 'callout', end: start + scanned.end, variant, title: callout?.[2]?.trim() || division?.[3]?.trim(),
+      body: scanned.body, bodyLine: start + 1,
     };
   }
   if (includePattern.test(line)) return unsupported(start + 1, 'Include not rendered. Authorize local includes to resolve this source.', 'include');
@@ -372,6 +392,7 @@ function prefixEnd(first: string, read: (index: number) => string | undefined): 
     return 1;
   }
   const quote = calloutPattern.test(first) || divisionPattern.test(first);
+  if (quote) return quotedCallout(read).end;
   const metadata = first.trim() === '---';
   let fence: { character: string; length: number } | undefined;
   let comment = false;
@@ -380,27 +401,19 @@ function prefixEnd(first: string, read: (index: number) => string | undefined): 
   for (; ; cursor++) {
     const line = read(cursor);
     if (line === undefined) return cursor;
-    if (quote) {
-      if (calloutPattern.test(line) || divisionPattern.test(line)) return cursor;
-      if (!/^ {0,3}>/.test(line)) {
-        const following = read(cursor + 1) ?? '';
-        if (line.trim() || !/^ {0,3}>/.test(following) || calloutPattern.test(following) || divisionPattern.test(following)) return cursor;
-      }
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (marker && marker[1][0] === fence.character && marker[1].length >= fence.length && !marker[2].trim()) fence = undefined;
     } else {
-      const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
-      if (fence) {
-        if (marker && marker[1][0] === fence.character && marker[1].length >= fence.length && !marker[2].trim()) fence = undefined;
-      } else {
-        const commentState: { touched: boolean; open: boolean } = comments(line, comment);
-        comment = commentState.open;
-        if (commentState.touched) continue;
-        if (marker && (marker[1][0] !== '`' || !marker[2].includes('`'))) fence = { character: marker[1][0], length: marker[1].length };
-        else if (metadata && /^(---|\.\.\.)[ \t]*$/.test(line)) return cursor + 1;
-        else if (item) {
-          const nested = directive(line);
-          if (nested?.name === item.name && opensBlock(nested)) depth++;
-          if (nested?.name === `${item.name}-end` && --depth === 0) return cursor + 1;
-        }
+      const commentState: { touched: boolean; open: boolean } = comments(line, comment);
+      comment = commentState.open;
+      if (commentState.touched) continue;
+      if (marker && (marker[1][0] !== '`' || !marker[2].includes('`'))) fence = { character: marker[1][0], length: marker[1].length };
+      else if (metadata && /^(---|\.\.\.)[ \t]*$/.test(line)) return cursor + 1;
+      else if (item) {
+        const nested = directive(line);
+        if (nested?.name === item.name && opensBlock(nested)) depth++;
+        if (nested?.name === `${item.name}-end` && --depth === 0) return cursor + 1;
       }
     }
   }
@@ -610,7 +623,7 @@ export function registerPublishing(parser: MarkdownIt): void {
   const escape = parser.utils.escapeHtml;
   parser.renderer.rules.publishing_callout_open = (tokens, index) => {
     const meta = tokens[index].meta as PublishingMeta;
-    return `<aside class="publishing-callout publishing-callout-${escape(meta.variant!)}" role="note"><p class="publishing-callout-title">${escape(meta.title!)}</p>\n`;
+    return `<aside class="publishing-callout publishing-callout-${escape(meta.variant!)}" role="note"><p class="publishing-callout-title">${publishingIcon(meta.variant!)}<span>${escape(meta.title!)}</span></p>\n`;
   };
   parser.renderer.rules.publishing_callout_close = () => '</aside>\n';
   parser.renderer.rules.publishing_steps_open = () => '<section class="publishing-steps" aria-label="Steps">\n';
@@ -654,29 +667,35 @@ const lightCalloutRules = Object.entries(publishingCalloutPalette).map(([name, c
   `.publishing-callout-${name} { --publishing-background: ${colors.background}; --publishing-border: ${colors.border}; }`).join('\n');
 
 export const publishingCSS = `
-.publishing-callout { --publishing-background: #f1f5f5; --publishing-border: #227c78; border-left: 3px solid var(--publishing-border); background: var(--publishing-background); color: #161616; padding: .5em 1em; margin: 1em 0; }
-.publishing-callout-title { color: var(--publishing-border); font-weight: 700; margin: .25em 0; }
+.publishing-callout { --publishing-background: #f1f5f5; --publishing-border: #227c78; border: 0; border-left: 4px solid var(--publishing-border); border-radius: 0 6px 6px 0; background: var(--publishing-background); color: #161616; padding: 14px 18px; margin: 1.25em 0; }
+.publishing-callout .publishing-callout-title { display: flex; align-items: center; gap: 8px; color: var(--publishing-border); font-weight: 650; line-height: 1.4; margin: 0 0 8px; }
+.publishing-icon { display: inline-block; width: 18px; height: 18px; flex: 0 0 18px; vertical-align: middle; }
+.publishing-callout-body > :first-child { margin-top: 0; }
+.publishing-callout-body > :last-child { margin-bottom: 0; }
+.publishing-callout > :last-child { margin-bottom: 0; }
 ${lightCalloutRules}
 ${Object.entries(publishingCalloutPalette).map(([name, colors]) =>
     `:root[data-theme="dark"] .publishing-callout-${name} { --publishing-background: ${colors.darkBackground}; --publishing-border: ${colors.darkBorder}; color: #fff; }`).join('\n')}
 .publishing-callout-checklist ul { list-style-type: "\\2713  "; }
 .publishing-callout-nextstepaction a { display: inline-block; font-weight: 650; }
-.publishing-tabs { border: 1px solid #dde5e5; border-radius: 6px; margin: 1em 0; overflow: hidden; }
-.publishing-tablist { display: flex; flex-wrap: wrap; border-bottom: 1px solid #dde5e5; background: #f1f5f5; }
-.publishing-tablist button { font: inherit; color: inherit; background: transparent; padding: .55em .9em; border: 0; border-bottom: 3px solid transparent; cursor: pointer; }
-.publishing-tablist button[aria-selected="true"] { border-bottom-color: #227c78; font-weight: 700; }
-.publishing-tablist button:focus-visible { outline: 2px solid #227c78; outline-offset: -3px; }
-.publishing-tab-panel { padding: .25em 1em; }
+.publishing-tabs { min-width: 0; color: var(--text, #263238); background: var(--paper, #fff); border: 1px solid var(--line, #dde5e5); border-radius: 6px; margin: 1em 0; overflow: hidden; }
+.publishing-tablist { display: flex; flex-wrap: wrap; color: var(--text, #263238); border-bottom: 1px solid var(--line, #dde5e5); background: var(--soft, #f1f5f5); }
+.publishing-tablist button { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; font: inherit; color: var(--text, #263238); background: transparent; padding: .65em .95em; border: 0; border-bottom: 3px solid transparent; cursor: pointer; }
+.publishing-tablist button:hover { color: var(--text, #263238); background: var(--hover, #e2ede6); }
+.publishing-tablist button[aria-selected="true"] { color: var(--text, #263238); background: var(--paper, #fff); border-bottom-color: var(--accent, #227c78); font-weight: 650; }
+.publishing-tablist button:focus-visible { outline: 2px solid var(--accent, #227c78); outline-offset: -3px; }
+.publishing-tab-panel { color: var(--text, #263238); padding: .5em 1em; }
 .publishing-tab-panel[hidden] { display: none; }
 .publishing-tab-label { display: none; font-weight: 700; margin-bottom: .5em; }
 .publishing-steps { border-left: 2px solid #dde5e5; margin: 1em 0; padding-left: 1em; }
 .publishing-steps > ol > li { padding-left: .5em; margin: .8em 0; }
-.publishing-selector { border: 1px solid #dde5e5; border-radius: 6px; margin: 1em 0; padding: .5em 1em; }
+.publishing-selector { color: var(--text, #263238); background: var(--soft, #f1f5f5); border: 1px solid var(--line, #dde5e5); border-radius: 6px; margin: 1em 0; padding: 14px 18px; }
 .publishing-selector-title,.publishing-zone-label { font-weight: 700; margin: .4em 0; }
-.publishing-variant-options { display: flex; flex-wrap: wrap; gap: .5em; }
-.publishing-variant-options button { font: inherit; color: inherit; border: 1px solid #dde5e5; border-radius: 4px; background: transparent; padding: .4em .8em; cursor: pointer; }
-.publishing-variant-options button[aria-pressed="true"] { border-color: #227c78; font-weight: 700; }
-.publishing-variant-options button:focus-visible { outline: 2px solid #227c78; outline-offset: 2px; }
+.publishing-variant-options { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.publishing-variant-options button { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font: inherit; color: var(--text, #263238); border: 1px solid var(--muted, #52636b); border-radius: 4px; background: var(--paper, #fff); padding: .5em .8em; cursor: pointer; white-space: normal; }
+.publishing-variant-options button[aria-pressed="true"] { color: #115ea3; background: #ebf3fc; border-color: #115ea3; font-weight: 650; }
+.publishing-variant-options button:focus-visible { outline: 2px solid var(--accent, #227c78); outline-offset: 2px; }
+:root[data-theme="dark"] .publishing-variant-options button[aria-pressed="true"] { color: #9ccbee; background: #002b49; border-color: #9ccbee; }
 .publishing-variant-option + .publishing-variant-option::before { content: " / "; }
 .publishing-zone { border-left: 2px solid #dde5e5; margin: 1em 0; padding-left: 1em; }
 .publishing-zone[hidden] { display: none; }
@@ -684,11 +703,14 @@ ${Object.entries(publishingCalloutPalette).map(([name, colors]) =>
 .publishing-image img { max-width: 100%; height: auto; }
 .publishing-image-icon img { width: 2em; max-height: 2em; object-fit: contain; }
 .publishing-image-bordered img { border: 1px solid #dde5e5; }
-.publishing-image figcaption { color: #607078; font-size: .9em; margin: .4em 0; }
-.publishing-metadata,.publishing-unsupported { margin: 1em 0; border: 1px solid #dde5e5; border-radius: 6px; padding: .5em 1em; }
+.publishing-image figcaption { color: var(--muted, #607078); font-size: .9em; margin: .4em 0; }
+.publishing-metadata,.publishing-unsupported { margin: 1em 0; border: 1px solid var(--line, #dde5e5); border-radius: 6px; padding: .75em 1em; }
 .publishing-metadata summary { cursor: pointer; font-weight: 650; }
 .publishing-unsupported { border-color: #b7791f; background: #fff8e6; color: #263238; }
 .publishing-metadata pre,.publishing-unsupported pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85em; }
+.publishing-unsupported pre { background: #fff3d4; color: #263238; border-color: #b7791f; }
+:root[data-theme="dark"] .publishing-unsupported { background: #3a2c17; color: #fff4df; border-color: #c69742; }
+:root[data-theme="dark"] .publishing-unsupported pre { background: #241e13; color: #fff4df; border-color: #8c6c35; }
 @media print {
   .publishing-metadata,.publishing-tablist { display: none !important; }
   .publishing-tab-panel[hidden],.publishing-tab-label { display: block !important; }

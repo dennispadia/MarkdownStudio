@@ -10,7 +10,7 @@
 
 The public EXE, source ZIP, and checksums were independently downloaded and verified. Earlier published assets remain unchanged.
 
-Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue](https://github.com/dennispadia/lekh/issues)** for bugs, enhancements, and requests. There is no guaranteed response time, resolution, or future maintenance commitment. See [SUPPORT.md](SUPPORT.md).
+Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue](https://github.com/dennispadia/lekh/issues)** for questions, bugs, enhancements, and requests. See [Help and feedback](SUPPORT.md).
 
 ## Writing features
 
@@ -22,7 +22,8 @@ Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue]
 | **Responsive interface** | One formatting toolbar, More tools and views overflow, shrinking tabs, an Open documents list, and a collapsible sidebar. |
 | **Links and tables** | Edit link text/addresses in place, remove links without deleting text, choose table dimensions, and add/remove table rows and columns. |
 | **Code and diagrams** | Search the offline language catalog, highlight code, copy raw code, and insert editable Mermaid diagrams at the current selection. Code is displayed, never executed. |
-| **Publishing blocks** | Use **Blocks** in the toolbar for five colored callout types, tabbed examples, variant selectors, structured steps, described images, metadata and local includes. Existing compatible authoring syntax renders automatically, without a platform-specific mode. |
+| **Editable alerts** | Add Note, Tip, Important, Caution or Warning from **Blocks > Alerts**, then type and format directly in Visual. Each type has its own icon, label and matching Light/Dark colors. |
+| **Publishing blocks** | Use the icon tools in **Blocks > Content blocks** for tabbed examples, variant selectors, structured steps, described images, metadata and local includes. Hover or focus a tool for its description. |
 | **Find/Replace** | Match case, Unicode whole words, regex, match counts, navigation, and replacement. |
 | **Writing assistance** | Optional offline English grammar checks powered by the bundled Harper engine. Review, apply, ignore, or ignore a suggestion throughout the current document. No text is sent online or changed automatically. |
 | **Word and PDF export** | Export the active document, including unsaved edits, with an explicit heading hierarchy, formatted links, aligned tables, nested lists, task boxes, syntax-colored code, supported images, and Mermaid diagrams. Export does not save the Markdown. |
@@ -48,7 +49,11 @@ Lekh uses a reader-friendly document hierarchy and renders supported rich blocks
 Note, Tip, Important, Caution and Warning have distinct light/dark colors. Tabs and document-wide variant selectors are separate controls.
 Exports retain every tab and variant as labeled content rather than dropping inactive alternatives.
 
-Publishing blocks are protected in Visual: **Edit source** selects their original Markdown without flattening custom syntax.
+**Alerts are directly editable in Visual.** Use normal text formatting, lists, links and code inside them; choose another alert type to change its appearance without losing its contents.
+Variant controls live within the document's Visual area or read-only preview, never above the Source column.
+Tabbed examples have explicit readable text and surface colors in both themes.
+
+Complex publishing containers remain source-preserving: **Edit source** selects their original Markdown without flattening custom syntax.
 Metadata has a collapsed source view instead of becoming article body text. Unsupported directives remain visible.
 Local includes require a saved document and an explicit, per-document project-folder grant. No remote content is fetched, and access can be revoked from **More tools > Stop local includes**.
 Publishing systems can supply additional metadata or build-time configuration; Lekh is not a replacement for their final validation pipeline.
@@ -60,6 +65,14 @@ The following captures show the Lekh interface with sample documents, not person
 ![Lekh in Light theme](docs/images/lekh-light.png)
 
 ![Lekh in Graphite + Teal Dark theme with paired independent documents](docs/images/lekh-dark-split.png)
+
+### Write directly in alerts
+
+![Editable Note, Tip, Important, Caution and Warning alerts in Dark](docs/images/alerts-dark.png)
+
+### Keep publishing controls with the document
+
+![Readable Dark tabs and a selector contained inside Visual beside Source](docs/images/publishing-split-dark.png)
 
 ## Install on Windows
 

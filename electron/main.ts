@@ -160,7 +160,11 @@ function paragraphItems(): MenuItemConstructorOptions[] {
 function insertItems(): MenuItemConstructorOptions[] {
   return [
     { label: 'Image...', accelerator: 'CmdOrCtrl+Shift+I', click: () => action('image') },
-    { label: 'Publishing blocks', submenu: publishingTemplates.map(item => ({ label: item.label, click: () => action(`insert:${item.id}`) })) },
+    { label: 'Publishing blocks', submenu: [
+      { label: 'Alerts', submenu: publishingTemplates.filter(item => item.category === 'alerts').map(item => ({ label: item.label, click: () => action(`insert:${item.id}`) })) },
+      { type: 'separator' },
+      ...publishingTemplates.filter(item => item.category === 'content').map(item => ({ label: item.label, click: () => action(`insert:${item.id}`) })),
+    ] },
     { label: 'Footnote (Source)', click: () => action('insert:footnote') },
     { label: 'Link...', accelerator: 'CmdOrCtrl+K', click: () => action('link') },
     { label: 'Link reference (Source)', click: () => action('insert:reference') },

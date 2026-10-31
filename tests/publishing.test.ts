@@ -73,7 +73,7 @@ test('nested publishing structures share standard tokens, source maps, links and
   assert.match(html, /Nested tip/);
   const nativeContainers = '> > [!NOTE]\n> > Nested native quote\n\n- > [!TIP]\n  > In a list\n\n> :::zone pivot=one\n> Zone body\n> :::zone-end\n';
   const nested = documentPreviewHTML(nativeContainers, '');
-  assert.match(nested, /<blockquote>\n<aside[^>]+><p[^>]+>Note<\/p>\n<p>Nested native quote<\/p>/);
+  assert.match(nested, /<blockquote>\n<aside[^>]+><p[^>]+><svg[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg><span>Note<\/span><\/p>\n<p>Nested native quote<\/p>/);
   assert.match(nested, /publishing-callout-tip/);
   assert.match(nested, /data-publishing-zone="one"/);
   assert.doesNotMatch(nested, /publishing-unsupported/);
@@ -423,7 +423,7 @@ test('all five measured light/dark palettes use matching label colors and light 
     assert.ok(xml.includes(`w:color="${palette.border.slice(1).toUpperCase()}"`));
   }
   assert.match(publishingCSS, /:root\[data-theme="dark"\] \.publishing-callout-note/);
-  assert.match(publishingCSS, /\.publishing-callout-title \{ color: var\(--publishing-border\)/);
+  assert.match(publishingCSS, /\.publishing-callout \.publishing-callout-title \{[^}]*color: var\(--publishing-border\)/);
 });
 
 test('PDF embeds a rebased publishing image only with the explicit project image grant', async () => {

@@ -82,13 +82,12 @@ test('installer identity is consistently pinned for future Lekh upgrades without
   assert.ok(verify.includes("Join-Path $env:APPDATA 'Lekh'"));
 });
 
-test('support invites issues without response guarantees and preserves MIT warranty terms', async () => {
+test('help invites feedback without no-support disclaimers and preserves the MIT license', async () => {
   for (const file of ['SUPPORT.md', 'CONTRIBUTING.md', 'README.md', 'docs/USER_GUIDE.md', '.github/workflows/publish-release.yml']) {
     const text = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.ok(text.includes('https://github.com/dennispadia/lekh/issues'), file);
     assert.match(text, /bugs?|enhancements?|requests?/i, file);
-    assert.match(text, /not guaranteed|no guaranteed/i, file);
-    assert.doesNotMatch(text, /without support|AI coding assistant|upstream contributions.*not|fork.*instead/i, file);
+    assert.doesNotMatch(text, /\b(?:without|no) support\b|not guaranteed|no guaranteed response|future maintenance commitment|AI coding assistant|fork.*instead/i, file);
   }
   const publishing = await readFile(new URL('../docs/PUBLISHING.md', import.meta.url), 'utf8');
   assert.ok(publishing.includes('Issues enabled'));

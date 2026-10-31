@@ -78,21 +78,45 @@ without an account, server, download, or network request. Existing spelling sugg
 
 Close the panel to keep writing with underlines, or disable checking to stop the worker and remove grammar underlines.
 
-### Editing features
-
 ### Publishing blocks and reader-friendly documents
 
-**Blocks** in the toolbar opens shortcuts for **Note, Tip, Important, Caution, Warning, Tabbed examples, Variant selector, Structured steps, Image with description, Document metadata, and Local include**.
+**Blocks** has two groups: **Alerts** and **Content blocks**. All tools have an icon and a short description available on hover or keyboard focus.
 The same commands are under **Insert > Publishing blocks**. At narrow widths, Blocks remains available through **More tools**.
-Select existing content before choosing a callout, tabbed example or selector to retain that content inside the new block. Without a selection, Lekh inserts an editable example.
-Each alert type has its own matching light/dark color and a text label, so meaning is not conveyed by color alone.
 
+#### Alerts: write directly in Visual
+
+1. Put the caret in a paragraph, or select the paragraphs you want to format.
+2. Choose **Blocks > Alerts > Note, Tip, Important, Caution, or Warning**.
+3. Type directly inside the alert. Use the normal toolbar for rich text, lists, links and code; there is no need to open Source to write its body.
+4. With the caret inside an alert, choose another type to change it without replacing the content.
+5. Press Enter to add a paragraph. Enter again on an empty final paragraph returns to normal writing outside the alert.
+
+Each alert has a semantic icon, text label and colored leading border. Meaning does not depend on color alone.
+Undo/redo includes alert insertion, body edits and type changes. Unchanged non-reference alerts retain their source syntax; edited alerts save as ordinary `> [!TYPE]` Markdown.
+During Visual edits, reference links and images may be written with resolved inline destinations to keep dependencies valid across blocks. Manage shared reference definitions in Source when removing a block that owns them.
+Content rendered from an included file or another protected publishing container stays read-only; open its source to edit that content.
+
+![Directly editable alerts in Light](images/alerts-light.png)
+
+![Directly editable alerts in Dark](images/alerts-dark.png)
+
+#### Tabs and variant selectors
+
+**Content blocks** includes **Tabbed examples, Variant selector, Structured steps, Image with description, Document metadata, and Local include**.
+Select existing content before choosing tabbed examples or a selector to retain that content inside the new block. Without a selection, Lekh inserts an example.
 Tabs switch between examples within one block. Variant selectors switch matching content throughout the current document; they are independent of tabs.
+Selectors stay inside Visual or the rendered Preview. In Visual + Source, they never span or displace the Source column.
 Source always retains every alternative. In Visual, inactive variant blocks keep a compact authoring placeholder so hidden content is not accidentally mistaken for absent content.
 Read-only previews hide inactive content. Static exports include **all** labeled alternatives.
 
-Recognized publishing blocks are protected Visual nodes: hover or focus a block and choose **Edit source** to select its exact syntax.
-Unrelated Visual edits retain the block's original Markdown, including unsupported directives. Source remains the way to edit these blocks' contents and attributes.
+![A selector contained within Visual, with readable Dark tabbed examples](images/publishing-split-dark.png)
+
+![The grouped Blocks menu with tool icons](images/publishing-menu-dark.png)
+
+#### Metadata, includes and complex blocks
+
+Complex publishing blocks are protected Visual nodes: hover or focus a block and choose **Edit source** to select its syntax.
+Unrelated Visual edits retain their original Markdown, including unsupported directives. Source remains the way to edit these containers' configuration and contents.
 Metadata is shown as a collapsed view rather than ordinary article text. This is rendering and preservation, not a complete YAML schema validator.
 
 For local includes:
@@ -106,6 +130,8 @@ For local includes:
 If publishing labels are defined in a local `zone-pivot-groups.yml`, allow the project folder so available definitions can be used. Otherwise selectors show the discovered variant IDs with an explanation.
 Lekh never downloads includes, images or publishing configuration from the internet.
 Features requiring a publishing site's complete build pipeline are not simulated as successful output; unsupported syntax remains identified and preserved.
+
+### Editor views and formatting
 
 - **Visual + Source:** turn on the switch in the toolbar to edit Visual on the left and Source on the right. Both represent the same document; edits update the other pane. Click the side you want to edit; toolbar formatting follows it. Turning the switch off keeps Visual and retains scroll offsets. The switch supports Space when focused. A two-file pair shares this same switch, which controls only the active document and preserves the other document's mode.
 - **Single-editor views:** **More (...) > Visual only / Source only**, and **View > Visual / source** (Ctrl+/), retain the separate views. These mode changes reset undo history as before; simply showing Source alongside Visual does not recreate the editor. Visual edits can normalize Markdown syntax; use Source for exact syntax and unsupported constructs.
@@ -264,7 +290,7 @@ Recent file paths, theme preference, and recovery data are stored in `%APPDATA%\
 
 ## Bugs, enhancements, and requests
 
-[Open a GitHub issue](https://github.com/dennispadia/lekh/issues) with reproduction steps or a description of the desired workflow. Do not include private documents or credentials. Responses, resolutions, and future maintenance are not guaranteed. Lekh is provided as-is without warranty under MIT; see [SUPPORT.md](../SUPPORT.md).
+[Open a GitHub issue](https://github.com/dennispadia/lekh/issues) with a question, reproduction steps, or a description of the desired workflow. Screenshots and small, non-sensitive samples are helpful. Do not include private documents or credentials. See [Help and feedback](../SUPPORT.md).
 
 ## Development and validation
 

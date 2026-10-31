@@ -4,6 +4,7 @@ import { firstPublishingBlock, publishingBlockAtStart } from '../lib/publishing.
 import { initializePublishing, publishingHTML } from './publishing-view.js';
 import { renderMermaidBlocks } from './diagrams.js';
 import { decorationLayer } from './decorations.js';
+import { editableAlertAtStart } from './alert-node.js';
 
 const headings = decorationLayer('publishing-headings');
 export const PublishingHeadings = headings.extension;
@@ -33,6 +34,7 @@ export const PublishingNode = Node.create<Options>({
     level: 'block',
     start: firstPublishingBlock,
     tokenize: source => {
+      if (editableAlertAtStart(source)) return undefined;
       const block = publishingBlockAtStart(source);
       return block ? { type: 'lekhPublishing', raw: block.raw } : undefined;
     },

@@ -95,62 +95,84 @@ export function initializePublishing(root: HTMLElement, reportError?: (message: 
 export function refreshPublishingVariants(pane: HTMLElement): void {
   const documentId = pane.dataset.documentId;
   if (!documentId) return;
+  pane.querySelector(':scope > .publishing-document-selector')?.remove();
+  const surfaces = [
+    pane.querySelector<HTMLElement>('.visual-surface'),
+    pane.querySelector<HTMLElement>('.document-preview'),
+  ].filter((surface): surface is HTMLElement => surface !== null);
+  const primary = surfaces.find(surface => !surface.closest('[hidden]') && surface.querySelector('[data-publishing-zone], [data-publishing-selector]:not(.publishing-document-selector)'))
+    ?? surfaces.find(surface => surface.querySelector('[data-publishing-zone], [data-publishing-selector]:not(.publishing-document-selector)'));
   const zones = [...pane.querySelectorAll<HTMLElement>('[data-publishing-zone]')];
   const selectors = [...pane.querySelectorAll<HTMLElement>('[data-publishing-selector]')]
     .filter(element => !element.classList.contains('publishing-document-selector'));
   const choices = new Map<string, string>();
-  for (const selector of selectors) {
+  for (const selector of selectors.filter(element => primary?.contains(element))) {
     for (const control of selector.querySelectorAll<HTMLElement>('[data-publishing-variant]')) {
       const id = control.dataset.publishingVariant;
       if (id) choices.set(id, control.textContent?.trim() || id);
     }
   }
-  for (const zone of zones) {
+  for (const zone of zones.filter(element => primary?.contains(element))) {
     for (const id of (zone.dataset.publishingZone ?? '').split(',').map(value => value.trim()).filter(Boolean)) {
       if (!choices.has(id)) choices.set(id, id.replace(/[-_]/g, ' '));
     }
   }
-  let bar = pane.querySelector<HTMLElement>(':scope > .publishing-document-selector');
-  if (!choices.size) { bar?.remove(); return; }
-  const title = selectors[0]?.getAttribute('aria-label') || 'Choose a variant';
-  const signature = JSON.stringify([title, [...choices]]);
-  if (!bar || bar.dataset.signature !== signature) {
-    bar?.remove();
-    bar = document.createElement('section');
-    bar.className = 'publishing-document-selector';
-    bar.dataset.publishingSelector = 'document';
-    bar.dataset.signature = signature;
-    bar.setAttribute('role', 'group');
-    bar.setAttribute('aria-label', title);
-    bar.title = 'Selection changes rendered content only. Source and exports keep every alternative.';
-    const heading = document.createElement('strong');
-    heading.textContent = title;
-    const controls = document.createElement('div');
-    for (const [id, label] of choices) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = label;
-      button.dataset.publishingChoice = id;
-      button.addEventListener('click', () => {
-        selectedVariants.set(documentId, id);
+  for (const selector of selectors) {
+    for (const control of selector.querySelectorAll<HTMLElement>('[data-publishing-variant]')) {
+      control.dataset.publishingChoice = control.dataset.publishingVariant;
+      if (control.dataset.publishingChoiceReady) continue;
+      control.dataset.publishingChoiceReady = 'true';
+      control.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectedVariants.set(documentId, control.dataset.publishingVariant!);
         refreshPublishingVariants(pane);
       });
-      controls.append(button);
     }
-    bar.append(heading, controls);
-    if (!selectors.length) {
+  }
+  for (const surface of surfaces) {
+    let bar = surface.querySelector<HTMLElement>(':scope > .publishing-document-selector');
+    const explicit = selectors.some(selector => surface.contains(selector));
+    if (!choices.size || explicit || !surface.querySelector('[data-publishing-zone]')) { bar?.remove(); continue; }
+    const signature = JSON.stringify([...choices]);
+    if (!bar || bar.dataset.signature !== signature) {
+      bar?.remove();
+      bar = document.createElement('section');
+      bar.className = 'publishing-document-selector publishing-selector';
+      bar.dataset.publishingSelector = 'document';
+      bar.dataset.signature = signature;
+      bar.setAttribute('role', 'group');
+      bar.setAttribute('aria-label', 'Choose a variant');
+      bar.title = 'Selection changes rendered content only. Source and exports keep every alternative.';
+      const heading = document.createElement('strong');
+      heading.textContent = 'Choose a variant';
+      const controls = document.createElement('div');
+      controls.className = 'publishing-variant-options';
+      for (const [id, label] of choices) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.dataset.publishingChoice = id;
+        button.addEventListener('click', () => {
+          selectedVariants.set(documentId, id);
+          refreshPublishingVariants(pane);
+        });
+        controls.append(button);
+      }
+      bar.append(heading, controls);
       const note = document.createElement('small');
       note.textContent = 'Using variant IDs. Allow the local project folder to load available publishing labels.';
       bar.append(note);
+      surface.prepend(bar);
     }
-    pane.insertBefore(bar, pane.querySelector('.pane-content'));
   }
+  if (!choices.size) return;
   let selected = selectedVariants.get(documentId);
   if (!selected || !choices.has(selected)) {
     selected = choices.keys().next().value!;
     selectedVariants.set(documentId, selected);
   }
-  for (const button of bar.querySelectorAll<HTMLElement>('[data-publishing-choice]')) {
+  for (const button of pane.querySelectorAll<HTMLElement>('[data-publishing-choice]')) {
     button.setAttribute('aria-pressed', String(button.dataset.publishingChoice === selected));
   }
   for (const zone of zones) {
