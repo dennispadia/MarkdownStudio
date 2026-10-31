@@ -109,6 +109,39 @@ function Wait-Until([scriptblock]$Probe, [int]$TimeoutSeconds = 15, [string]$Mes
     } while ($timer.Elapsed.TotalSeconds -lt $TimeoutSeconds)
     throw $Message
 }
+function Wait-SetupWindow($Process, [string]$Label, [int]$TimeoutSeconds = 30) {
+    $diagnostic = @{ Handle = '0'; Heading = '<missing>'; Primary = '<missing>'; ProviderError = '<none>' }
+    try {
+        return Wait-Until {
+            $Process.Refresh()
+            if ($Process.HasExited) { throw "$Label exited before its accessible window was ready (exit $($Process.ExitCode))." }
+            $handle = $Process.MainWindowHandle
+            $diagnostic.Handle = $handle.ToString()
+            $diagnostic.Heading = '<missing>'
+            $diagnostic.Primary = '<missing>'
+            if ($handle -eq [IntPtr]::Zero) { return $null }
+            try {
+                # Rebind each poll: an HWND can precede WPF's provider, or be replaced during startup.
+                $candidate = [Windows.Automation.AutomationElement]::FromHandle($handle)
+                if ($candidate.Current.ProcessId -ne $Process.Id) { throw "$Label window belongs to a different process." }
+                $heading = Find-Control $candidate 'Heading'
+                $primary = Find-Control $candidate 'Primary'
+                if ($null -ne $heading) { $diagnostic.Heading = $heading.Current.Name }
+                if ($null -ne $primary) { $diagnostic.Primary = $primary.Current.Name }
+                if ($null -ne $heading -and -not [string]::IsNullOrWhiteSpace($heading.Current.Name) -and $null -ne $primary) {
+                    return $candidate
+                }
+            } catch [Windows.Automation.ElementNotAvailableException] {
+                $diagnostic.ProviderError = $_.Exception.Message
+            } catch [Runtime.InteropServices.COMException] {
+                $diagnostic.ProviderError = "$($_.Exception.Message) (HRESULT $($_.Exception.HResult))"
+            }
+            return $null
+        } $TimeoutSeconds "$Label did not expose Heading and Primary accessibility within $TimeoutSeconds seconds."
+    } catch {
+        throw "$($_.Exception.Message) Window readiness diagnostic: pid=$($Process.Id); handle=$($diagnostic.Handle); heading='$($diagnostic.Heading)'; primary='$($diagnostic.Primary)'; lastProviderError='$($diagnostic.ProviderError)'."
+    }
+}
 function Read-StoryText($Control) {
     $text = [string]$Control.Current.Name
     $pattern = $null
@@ -123,8 +156,9 @@ function Read-StoryText($Control) {
     # WPF TextPattern represents the trailing InlineUIContainer quill as an embedded object.
     return $text.Replace([string][char]0xfffc, '').Trim()
 }
-function Get-StoryPage($Window) {
-    $control = Find-Control $Window 'StoryCount'
+function Get-StoryPage($Window, $CountControl) {
+    $control = $CountControl
+    if ($null -eq $control) { $control = Find-Control $Window 'StoryCount' }
     if ($null -eq $control) { return 0 }
     if ($control.Current.Name -match '^\s*([123])\s*(?:/|of)\s*3\s*$') { return [int]$Matches[1] }
     return 0
@@ -150,8 +184,9 @@ function Test-Story($Window, [switch]$ReducedMotion) {
         }
         $written = Find-Control $Window 'StoryWritten' -Raw
         $accessible = Find-Control $Window 'StoryAccessible' -Raw
+        $storyCount = Find-Control $Window 'StoryCount'
         if ($null -eq $written -or $null -eq $accessible) { throw 'Installing preview must expose StoryWritten and StoryAccessible in the raw UI Automation tree.' }
-        [void](Wait-Until { (Get-StoryPage $Window) -eq 1 } 10 'Story did not begin at page 1.')
+        [void](Wait-Until { (Get-StoryPage $Window $storyCount) -eq 1 } 10 'Story did not begin at page 1.')
         $complete = $accessible.Current.Name.Trim()
         if ([string]::IsNullOrWhiteSpace($complete)) { throw 'StoryAccessible.Name must expose the exact complete paragraph without the title.' }
         if (-not (Find-Control $Window 'StoryTitle').Current.Name.Trim().EndsWith($complete, [StringComparison]::Ordinal)) {
@@ -161,7 +196,7 @@ function Test-Story($Window, [switch]$ReducedMotion) {
             [void](Wait-Until { (Read-StoryText $written) -ceq $complete } 5 'Reduced-motion story did not immediately expose its complete paragraph.')
             $static = [Diagnostics.Stopwatch]::StartNew()
             while ($static.Elapsed.TotalMilliseconds -lt 2200) {
-                if ((Get-StoryPage $Window) -ne 1 -or (Read-StoryText $written) -cne $complete) {
+                if ((Get-StoryPage $Window $storyCount) -ne 1 -or (Read-StoryText $written) -cne $complete) {
                     throw 'Reduced-motion story changed text or automatically advanced instead of staying static.'
                 }
                 Start-Sleep -Milliseconds 50
@@ -173,7 +208,7 @@ function Test-Story($Window, [switch]$ReducedMotion) {
         $growth = 0
         $typed = $false
         $sample = [Diagnostics.Stopwatch]::StartNew()
-        while ($sample.Elapsed.TotalSeconds -lt 8 -and (Get-StoryPage $Window) -eq 1) {
+        while ($sample.Elapsed.TotalSeconds -lt 8 -and (Get-StoryPage $Window $storyCount) -eq 1) {
             $text = Read-StoryText $written
             if ($text.Length -ge 3 -and $text.Length -lt $complete.Length -and $complete.StartsWith($text, [StringComparison]::Ordinal)) {
                 if ($previousText.Length -ge 3 -and $text.Length -gt $previousText.Length -and
@@ -186,17 +221,17 @@ function Test-Story($Window, [switch]$ReducedMotion) {
         }
         if (-not $typed) { throw 'Installing preview did not expose progressive, genuinely typed story text.' }
         foreach ($page in @(1, 2, 3)) {
-            [void](Wait-Until { (Get-StoryPage $Window) -eq $page } 45 "Story did not automatically advance to page $page.")
+            [void](Wait-Until { (Get-StoryPage $Window $storyCount) -eq $page } 45 "Story did not automatically advance to page $page.")
             $fullText = $accessible.Current.Name.Trim()
             if ([string]::IsNullOrWhiteSpace($fullText)) { throw "Page $page has no complete accessible text." }
             # Allow 100 ms of sampling/scheduling tolerance around the two-second completed-page hold.
             [void](Wait-Until {
-                if ((Get-StoryPage $Window) -ne $page) { throw "Page $page advanced before its complete text was observed." }
+                if ((Get-StoryPage $Window $storyCount) -ne $page) { throw "Page $page advanced before its complete text was observed." }
                 $text = Read-StoryText $written
                 if ($text -cne $fullText) { return $false }
                 $hold = [Diagnostics.Stopwatch]::StartNew()
                 while ($hold.Elapsed.TotalMilliseconds -lt 1900) {
-                    if ((Get-StoryPage $Window) -ne $page) { throw "Page $page did not hold for two seconds after typing." }
+                    if ((Get-StoryPage $Window $storyCount) -ne $page) { throw "Page $page did not hold for two seconds after typing." }
                     if ((Read-StoryText $written) -cne $fullText) { throw "Page $page changed its completed paragraph during the hold." }
                     Start-Sleep -Milliseconds 25
                 }
@@ -212,18 +247,7 @@ function Test-SetupPreview([string]$State, [bool]$MotionEnabled) {
     $preview = Start-Process -FilePath $SetupPath -ArgumentList "--preview=$state" -PassThru
     $window = $null
     try {
-        $window = Wait-Until {
-            $preview.Refresh()
-            if ($preview.HasExited) { throw "Preview $state exited before showing a window." }
-            if ($preview.MainWindowHandle -ne [IntPtr]::Zero) {
-                return [Windows.Automation.AutomationElement]::FromHandle($preview.MainWindowHandle)
-            }
-        } 15 "Preview $state did not show a native window."
-        [void](Wait-Until {
-            $heading = Find-Control $window 'Heading'
-            $primary = Find-Control $window 'Primary'
-            return $null -ne $heading -and -not [string]::IsNullOrWhiteSpace($heading.Current.Name) -and $null -ne $primary
-        } 15 "Preview $state is missing Heading or Primary accessibility.")
+        $window = Wait-SetupWindow $preview "Preview $state"
         if ($window.Current.ProcessId -ne $preview.Id) { throw 'Preview window belongs to a different process.' }
         if ($state -eq 'installing') { Test-Story $window -ReducedMotion:(-not $MotionEnabled) }
         Write-Host "PASS: native accessible preview $state."
@@ -325,13 +349,7 @@ function Test-HostedInstallation {
         $sentinelContent = 'Preserve user profile: ' + [guid]::NewGuid().ToString('N')
         [IO.File]::WriteAllText($sentinel, $sentinelContent, [Text.UTF8Encoding]::new($false))
         $setup = Start-Process -FilePath $SetupPath -PassThru
-        $window = Wait-Until {
-            $setup.Refresh()
-            if ($setup.HasExited) { throw 'Hosted setup exited before showing its install window.' }
-            if ($setup.MainWindowHandle -ne [IntPtr]::Zero) {
-                return [Windows.Automation.AutomationElement]::FromHandle($setup.MainWindowHandle)
-            }
-        } 20 'Hosted setup did not show a native window.'
+        $window = Wait-SetupWindow $setup 'Hosted setup'
         if ($window.Current.ProcessId -ne $setup.Id) { throw 'Hosted setup window belongs to a different process.' }
         $primary = Wait-Until {
             $button = Find-Control $window 'Primary'

@@ -7,7 +7,7 @@
 - Embed and verify the existing per-user MSI engine, retaining the original upgrade identity, application filename, settings/recovery profile, and every editor feature. Keep explicit save-and-close handling, cancellation/rollback, native stage progress, local diagnostics, and no forced restart.
 - Publish `Lekh-Markdown-editor-Setup-0.7.1-x64.exe` instead of a separate public MSI, with a clean source ZIP and checksums. Retain the successful setup payload locally for offline Windows Installer repair.
 
-The setup, application, and internal MSI remain unsigned. Native engine/story tests, safe preview automation, and extracted-app regression tests are separate from real install/upgrade/repair/uninstall coverage; consult the release's verified build for the checks actually run.
+Published with successful native engine/story tests, animated/reduced-motion setup previews, complete extracted-app regression tests, and a real clean-runner per-user install/registration/uninstall that preserves the recovery profile. Public EXE/source/checksum downloads were independently verified before retiring the previous public MSI asset. The setup, application, and internal MSI remain unsigned; genuine old-version upgrade and repair testing remains pending.
 
 ## 0.7.0
 

@@ -241,6 +241,32 @@ test('Windows Installer registration uses exact current-user API queries and han
     'uninstall must remove exact Windows Installer registration, not just its executable');
 });
 
+test('native window readiness polls fresh roots for required controls rather than trusting an early HWND', async () => {
+  const verify = await readFile(new URL('../scripts/Test-Setup.ps1', import.meta.url), 'utf8');
+  const readiness = verify.slice(verify.indexOf('function Wait-SetupWindow'), verify.indexOf('function Read-StoryText'));
+  assert.ok(readiness.includes('[int]$TimeoutSeconds = 30'));
+  assert.ok(readiness.includes('return Wait-Until {'));
+  assert.ok(readiness.includes('$Process.Refresh()'));
+  assert.ok(readiness.includes('$Process.HasExited'));
+  assert.ok(readiness.includes('$handle = $Process.MainWindowHandle'));
+  assert.ok(readiness.includes('$candidate = [Windows.Automation.AutomationElement]::FromHandle($handle)'));
+  assert.ok(readiness.includes("Find-Control $candidate 'Heading'"));
+  assert.ok(readiness.includes("Find-Control $candidate 'Primary'"));
+  assert.ok(readiness.includes('-not [string]::IsNullOrWhiteSpace($heading.Current.Name) -and $null -ne $primary'));
+  assert.ok(readiness.indexOf('return $candidate') > readiness.indexOf("Find-Control $candidate 'Primary'"));
+  assert.ok(readiness.includes('catch [Windows.Automation.ElementNotAvailableException]'));
+  assert.ok(readiness.includes('Window readiness diagnostic:'));
+  for (const field of ['pid=', 'handle=', 'heading=', 'primary=', 'lastProviderError=']) assert.ok(readiness.includes(field));
+  assert.doesNotMatch(readiness, /Start-Sleep/, 'readiness must use the existing bounded predicate loop, not a startup delay');
+  assert.ok(verify.includes('$window = Wait-SetupWindow $preview "Preview $state"'));
+  assert.ok(verify.includes("$window = Wait-SetupWindow $setup 'Hosted setup'"));
+  const story = verify.slice(verify.indexOf('function Test-Story'), verify.indexOf('function Test-SetupPreview'));
+  assert.ok(story.includes("$storyCount = Find-Control $Window 'StoryCount'"));
+  assert.doesNotMatch(story, /Get-StoryPage \$Window\)/,
+    'reuse the materialized count peer so tree-discovery latency cannot consume the observed page hold');
+  assert.ok(story.includes('Get-StoryPage $Window $storyCount'));
+});
+
 test('motion verification respects local preferences and restores both hosted animation test modes', async () => {
   const verify = await readFile(new URL('../scripts/Test-Setup.ps1', import.meta.url), 'utf8');
   assert.ok(verify.includes('ReadParameter(0x1042, 0, out value, 0)'));

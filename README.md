@@ -6,11 +6,11 @@
 
 A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Lekh downloads for Windows x64](https://github.com/dennispadia/lekh/releases/latest)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases) · [User guide](docs/USER_GUIDE.md)
+**[Download Lekh 0.7.1 for Windows x64 (.exe)](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-Markdown-editor-Setup-0.7.1-x64.exe)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) · [User guide](docs/USER_GUIDE.md)
 
 Version **0.7.1** adds a real offline premium **EXE setup**, with the approved Segoe UI Light wordmark, smaller Sanskrit लेख, and refined quill in Graphite + Teal. A quill writes Lekh's three-part origin story, automatically advancing two seconds after each chapter finishes. Pause/resume, previous/next, complete accessible text, and Windows reduced-motion support are included. Installation never waits for the story. All editor features are unchanged.
 
-**Publication in progress:** use the latest release link above for the currently verified download. The existing MSI remains available until the replacement EXE is built, tested, published, and independently verified.
+**Published and verified:** the Windows build passed the complete extracted-app desktop suite, native engine/story tests, animated and reduced-motion setup previews, and a real isolated per-user install/registration/uninstall with recovery-profile preservation. The public EXE, source ZIP, and checksum list were independently downloaded and matched GitHub's asset digests and the published SHA-256 checksums. The previous public MSI download is retired; source archives and Git tags remain available.
 
 ### Upgrading to Lekh
 
@@ -143,15 +143,15 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 **Windows 10/11, x64, with .NET Framework 4.8 or newer** (normally included in current Windows versions). Other operating systems and architectures are not packaged or tested.
 
-**Release status:** the **Lekh 0.7.1 premium EXE** is being validated for publication; the latest release page identifies the currently verified download. Previous Markdown Studio release downloads have been retired; their Git tags and source history remain available. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** **Lekh 0.7.1 premium EXE** is the latest published, verified installer. All existing editing features are retained. Previous public MSI and Markdown Studio release downloads have been retired; Git tags and source history remain available. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. Open **[the latest verified Lekh release](https://github.com/dennispadia/lekh/releases/latest)** and download its Windows x64 installer. The premium EXE is published only after validation succeeds.
+1. **[Download the verified Lekh 0.7.1 Windows x64 setup EXE](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-Markdown-editor-Setup-0.7.1-x64.exe)**, or open [the latest release](https://github.com/dennispadia/lekh/releases/latest) for downloads and release notes.
 2. Double-click the installer to install for your current Windows user. In premium setup, choose **Install Lekh**; no administrator access is requested.
 3. Open **Lekh** from the desktop or Start menu.
 
 The premium setup EXE embeds the application and its MSI engine: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the setup EXE itself, not the editor executable from a developer build. No internet connection is needed during installation.
 
-The installer is attached to the GitHub Release, not stored among the source files. **SHA256SUMS.txt** and a clean source ZIP are available on [the same release page](https://github.com/dennispadia/lekh/releases/latest).
+The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/lekh/releases/download/v0.7.1/SHA256SUMS.txt) and a [clean source ZIP](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-0.7.1-source.zip) are available with the release.
 
 **Unsigned software:** the application, setup EXE, and internal MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
