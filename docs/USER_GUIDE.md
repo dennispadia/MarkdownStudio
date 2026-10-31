@@ -62,6 +62,22 @@ Export uses the **active tab's** current text, including unsaved edits. Exportin
 - The pair's **x** closes both documents, checking unsaved changes in each before closing either. Cancel leaves both open. **Ctrl+W** or **Close active file** closes only that side and restores the remaining file as a normal tab.
 - Pairing lasts while the app is open. Draft recovery preserves unsaved document contents, not split layouts.
 
+### Offline writing assistance
+
+Choose **Writing assistance** in the status bar and enable **offline English grammar checks**.
+The setting is remembered; it starts off until you enable it. Harper runs on this device in a background worker,
+without an account, server, download, or network request. Existing spelling suggestions remain separate.
+
+- Grammar and punctuation suggestions are underlined in Visual and Source modes. Click an underline or use the suggestion list.
+- Choose a proposed replacement to apply it, **Ignore** for that occurrence, or **Ignore throughout document** for the same rule and text in that tab.
+- Applied changes use the editor's undo history. Merely checking, browsing or ignoring suggestions never changes saved or unsaved Markdown.
+- Code and technical syntax are excluded; suggestions crossing protected formatting boundaries are omitted instead of risking damage to your document.
+- Checks apply to the active document, including the active side of a split. Switching documents or editing invalidates old results before a replacement can be applied.
+- Checks support up to 100,000 Markdown characters per document. The panel explicitly reports larger documents, processing errors, and result limits. Use **Check again** to retry.
+- Ignore choices last for the current tab session. The tool is English-first, not a translation service, and grammar suggestions may be imperfect.
+
+Close the panel to keep writing with underlines, or disable checking to stop the worker and remove grammar underlines.
+
 ### Editing features
 
 - **Visual + Source:** turn on the switch in the toolbar to edit Visual on the left and Source on the right. Both represent the same document; edits update the other pane. Click the side you want to edit; toolbar formatting follows it. Turning the switch off keeps Visual and retains scroll offsets. The switch supports Space when focused. A two-file pair shares this same switch, which controls only the active document and preserves the other document's mode.

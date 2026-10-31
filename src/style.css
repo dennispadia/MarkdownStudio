@@ -236,6 +236,24 @@ main { flex: 1; min-width: 0; display: flex; flex-direction: column; container-t
 .source-highlights mark { color: transparent; background: #e8c34d77; border-radius: 2px; }
 .source-highlights mark.current-match { background: #58b68c99; }
 .is-split .source-highlights { padding: 20px; font-size: 13px; }
+.grammar-highlights { position: absolute; inset: 0; margin: 0; padding: 12px 24px; border: 0; color: transparent; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; font: 14px/24px Consolas, monospace; tab-size: 2; overflow: hidden; pointer-events: none; }
+.is-split .grammar-highlights { padding: 20px; font-size: 13px; }
+.grammar-mark { text-decoration: underline wavy #b36a19; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.tiptap .grammar-mark { cursor: pointer; }
+:root[data-theme="dark"] .grammar-mark { text-decoration-color: #efb76d; }
+#writing-panel { border-top: 1px solid var(--line); padding: 10px 20px; background: var(--paper); max-height: 260px; overflow: auto; flex-shrink: 0; font-size: 12px; }
+.writing-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.writing-header label { display: flex; align-items: center; gap: 6px; }
+.writing-note { color: var(--muted); margin: 6px 0; }
+#writing-status { margin: 6px 0; }
+#writing-suggestions { list-style: none; padding: 0; margin: 0; }
+#writing-suggestions li { padding: 8px 0; border-top: 1px solid var(--line); }
+#writing-suggestions p { margin: 0 0 4px; }
+#writing-suggestions li > div { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+#writing-suggestions button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+#writing-suggestions [data-grammar-apply] { background: var(--soft); color: var(--accent); }
+.grammar-original { padding: 0; font-family: Consolas, monospace; color: var(--muted); }
+#writing-toggle { font-size: inherit; padding: 3px 5px; }
 .pane-content.has-preview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); overflow: hidden; padding: 0; }
 .has-preview .source-surface { min-height: 0; border-right: 1px solid var(--line); }
 .has-preview .document-source { min-height: 0; border-radius: 0; }
@@ -348,7 +366,7 @@ dialog input { display: block; width: 100%; margin-top: 6px; min-width: 300px; }
   #word-count { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }
 @container (max-width: 300px) {
-  footer > #word-count, footer > #save-status { display: none; }
+  footer > #word-count, footer > #save-status, footer > #writing-toggle { display: none; }
   .zoom-controls { margin-left: auto; }
 }
 @container (max-width: 120px) {

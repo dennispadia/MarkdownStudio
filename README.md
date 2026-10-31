@@ -23,6 +23,7 @@ Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue]
 | **Links and tables** | Edit link text/addresses in place, remove links without deleting text, choose table dimensions, and add/remove table rows and columns. |
 | **Code and diagrams** | Search the offline language catalog, highlight code, copy raw code, and insert editable Mermaid diagrams at the current selection. Code is displayed, never executed. |
 | **Find/Replace** | Match case, Unicode whole words, regex, match counts, navigation, and replacement. |
+| **Writing assistance** | Optional offline English grammar checks powered by the bundled Harper engine. Review, apply, ignore, or ignore a suggestion throughout the current document. No text is sent online or changed automatically. |
 | **Word and PDF export** | Export the active document, including unsaved edits, with an explicit heading hierarchy, formatted links, aligned tables, nested lists, task boxes, syntax-colored code, supported images, and Mermaid diagrams. Export does not save the Markdown. |
 | **Workspace** | Light/Dark themes, a resizable sidebar, heading outline, five recent files, zoom controls, word count, and Focus mode (F9). |
 | **Safeguards** | Unsaved-change prompts, external-edit detection, atomic saves, recovery drafts, Save As, and Save All. Recovery is not a backup. |

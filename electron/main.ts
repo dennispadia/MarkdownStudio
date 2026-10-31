@@ -605,6 +605,7 @@ function createWindow(): void {
       { label: 'Visual + Source', click: send('side-by-side') },
       { label: 'Visual / source', accelerator: 'CmdOrCtrl+/', click: send('mode') },
       { label: 'Source + Preview', click: send('preview') },
+      { label: 'Writing assistance', click: send('writing-assistance') },
       { label: 'Toggle sidebar', accelerator: 'CmdOrCtrl+Shift+B', click: send('sidebar') },
       { label: 'Focus mode', accelerator: 'F9', click: send('focus') },
       { label: 'Split with...', click: send('split') },

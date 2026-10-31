@@ -1,0 +1,818 @@
+HARPER 2.13.0 - EMBEDDED WEBASSEMBLY AND DATA NOTICES
+==================================================
+
+This file supplements the separately distributed Harper Apache-2.0 license
+and fflate MIT license. It does not replace the licenses of Lekh or its other
+dependencies. The notices below apply to the identified components.
+
+Version and source reference
+----------------------------
+Package: harper.js 2.13.0, using its full binaryInlined export.
+Upstream: https://github.com/Automattic/harper/tree/v2.13.0
+Pinned upstream revision: f4ebc61d77df1fc00b6aa8bc604e91af3534dad1
+Embedded WASM SHA-256:
+e2d2998448e29acbf80cc2da768198a4ead4bf0dd838feb16f09373b5fca1e16
+
+The embedded bytes were verified equal to harper.js/dist/harper_wasm_bg.wasm.
+Runtime source-path/version references in those bytes were checked against
+the pinned Cargo.lock. Referenced crate archives were checked against the
+Cargo.lock checksums. License texts below were obtained from the exact
+published crate source archives, not from current development branches.
+Identical notices shared by several components are reproduced once.
+
+This is a bounded component-notice record, not a representation that every
+package in Cargo.lock is linked into the WASM. Development/build dependencies
+are not presumed to be redistributed merely because they occur in that file.
+
+HARPER'S EMBEDDED LANGUAGE DATA
+-------------------------------
+Harper's own code, curated dictionary (harper-core/dictionary.dict),
+annotations (harper-core/annotations.json), and published derived data are
+distributed under its upstream Apache-2.0 declaration:
+https://github.com/Automattic/harper/blob/f4ebc61d77df1fc00b6aa8bc604e91af3534dad1/LICENSE
+https://github.com/Automattic/harper/blob/f4ebc61d77df1fc00b6aa8bc604e91af3534dad1/harper-core/Cargo.toml
+https://github.com/Automattic/harper/blob/f4ebc61d77df1fc00b6aa8bc604e91af3534dad1/harper-thesaurus/Cargo.toml
+
+The pinned source tree does not provide a separate dictionary NOTICE or
+data-specific license. This statement records the upstream license grant;
+it does not assert an independently verified chain of title for every word.
+Disabling spelling rules does not remove dictionary data from the binary.
+
+The bundled harper-thesaurus/thesaurus.txt is Moby Thesaurus II.
+The introducing upstream change identifies its public-domain status:
+https://github.com/Automattic/harper/pull/2085
+
+Upstream's statement:
+This uses Moby Thesaurus II, a public domain thesaurus.
+
+The bundled harper-thesaurus/word-freq.txt is a ranked word list generated
+by the Harper contributor from a small Wikipedia dump, as described at:
+https://github.com/Automattic/harper/pull/2085#issuecomment-3694928096
+The file is published within the Apache-2.0 Harper source tree. No separate
+frequency-data license or notice accompanies that file in the pinned source.
+This identifies the provenance of the published word statistics; it does not
+reproduce Wikipedia articles or impose an inferred article-text license on
+the word list.
+
+Harper's built-in Brill models and chunker model/vocabulary are also published
+in the Apache-2.0 harper-brill package. Its include_str!/include_bytes! uses
+are recorded at:
+https://github.com/Automattic/harper/blob/f4ebc61d77df1fc00b6aa8bc604e91af3534dad1/harper-brill/src/lib.rs
+
+MOZILLA PUBLIC LICENSE 2.0 COMPONENTS - SOURCE AVAILABILITY
+----------------------------------------------------------
+The full WASM contains code from:
+  cssparser 0.38.0
+  dtoa-short 0.3.5
+
+Their published Cargo.toml files declare MPL-2.0. They are not relicensed
+solely by Harper's package-level Apache-2.0 declaration.
+
+The corresponding unmodified Source Code Form, including the original
+license notices, is available without charge from these exact source
+archives:
+https://static.crates.io/crates/cssparser/cssparser-0.38.0.crate
+https://static.crates.io/crates/dtoa-short/dtoa-short-0.3.5.crate
+
+These are gzip-compressed tar archives. Each contains the crate's LICENSE
+file and preferred source files. Source Code Form of these components is
+governed by the Mozilla Public License, version 2.0. The license text is
+available in those archives and at https://www.mozilla.org/MPL/2.0/.
+Lekh does not modify these components. Recipients retain their MPL rights
+in that Source Code Form. This source-availability notice applies to the
+MPL-covered components, not to the unrelated source files of the application.
+
+Original MPL 2.0 Exhibit A notice:
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+ICU4X UNICODE DATA AND SOFTWARE
+--------------------------------
+The following exact source archives carry the identical notice below:
+  icu_collections 2.3.0
+  icu_locale_core 2.3.0
+  icu_normalizer 2.3.0
+  icu_normalizer_data 2.3.0
+  icu_properties 2.3.0
+  icu_properties_data 2.3.0
+  icu_provider 2.3.1
+  litemap 0.8.3
+  potential_utf 0.1.6
+  writeable 0.6.4
+  zerotrie 0.2.5
+  zerovec 0.11.8
+
+This covers their Unicode/ICU normalization and character-property data as
+well as the corresponding software. Exact source archive URL pattern:
+https://static.crates.io/crates/NAME/NAME-VERSION.crate
+Original file in each archive: NAME-VERSION/LICENSE
+
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 2020-2024 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+
+SPDX-License-Identifier: Unicode-3.0
+
+—
+
+Portions of ICU4X may have been adapted from ICU4C and/or ICU4J.
+ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation and others.
+
+UNICODE IDENTIFIER TABLES
+--------------------------
+Component: unicode-ident 1.0.27, LICENSE-UNICODE.
+https://static.crates.io/crates/unicode-ident/unicode-ident-1.0.27.crate
+The full WASM's Typst syntax parser depends on unicode-ident. Its declared
+license is (MIT OR Apache-2.0) AND Unicode-3.0. The Apache-2.0 option is used
+for the code; the additional data notice is retained below.
+
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2023 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+
+REGEX UNICODE TABLES
+---------------------
+Component: regex-syntax 0.8.11, src/unicode_tables/LICENSE-UNICODE.
+https://static.crates.io/crates/regex-syntax/regex-syntax-0.8.11.crate
+This is an additional notice for its embedded Unicode character tables,
+separate from the crate's MIT OR Apache-2.0 software license.
+
+UNICODE, INC. LICENSE AGREEMENT - DATA FILES AND SOFTWARE
+
+Unicode Data Files include all data files under the directories
+http://www.unicode.org/Public/, http://www.unicode.org/reports/,
+http://www.unicode.org/cldr/data/, http://source.icu-project.org/repos/icu/, and
+http://www.unicode.org/utility/trac/browser/.
+
+Unicode Data Files do not include PDF online code charts under the
+directory http://www.unicode.org/Public/.
+
+Software includes any source code published in the Unicode Standard
+or under the directories
+http://www.unicode.org/Public/, http://www.unicode.org/reports/,
+http://www.unicode.org/cldr/data/, http://source.icu-project.org/repos/icu/, and
+http://www.unicode.org/utility/trac/browser/.
+
+NOTICE TO USER: Carefully read the following legal agreement.
+BY DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING UNICODE INC.'S
+DATA FILES ("DATA FILES"), AND/OR SOFTWARE ("SOFTWARE"),
+YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT.
+IF YOU DO NOT AGREE, DO NOT DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE
+THE DATA FILES OR SOFTWARE.
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2018 Unicode, Inc. All rights reserved.
+Distributed under the Terms of Use in http://www.unicode.org/copyright.html.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Unicode data files and any associated documentation
+(the "Data Files") or Unicode software and any associated documentation
+(the "Software") to deal in the Data Files or Software
+without restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, and/or sell copies of
+the Data Files or Software, and to permit persons to whom the Data Files
+or Software are furnished to do so, provided that either
+(a) this copyright and permission notice appear with all copies
+of the Data Files or Software, or
+(b) this copyright and permission notice appear in associated
+Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT OF THIRD PARTY RIGHTS.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS
+NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL
+DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THE DATA FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder
+shall not be used in advertising or otherwise to promote the sale,
+use or other dealings in these Data Files or Software without prior
+written authorization of the copyright holder.
+
+AHO-CORASICK, FST, MEMCHR
+--------------------------
+Components and original files (identical notices):
+  aho-corasick 1.1.5, LICENSE-MIT
+  fst 0.4.7, LICENSE-MIT
+  memchr 2.8.3, LICENSE-MIT
+https://static.crates.io/crates/aho-corasick/aho-corasick-1.1.5.crate
+https://static.crates.io/crates/fst/fst-0.4.7.crate
+https://static.crates.io/crates/memchr/memchr-2.8.3.crate
+The MIT option is used for these alternatively licensed components.
+
+The MIT License (MIT)
+
+Copyright (c) 2015 Andrew Gallant
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+CACHED
+--------
+Component: cached 2.0.2, COPYRIGHT and LICENSE.
+https://static.crates.io/crates/cached/cached-2.0.2.crate
+
+Copyrights in the "cached" project are retained by their contributors. No
+copyright assignment is required to contribute to the "cached" project.
+
+Copyright attributions may be noted at the top of individual files.
+For full authorship information, see the version control history.
+https://github.com/jaemk/cached/graphs/contributors
+
+MIT License
+
+Copyright (c) 2017 James Kominick
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+DATA-ENCODING
+---------------
+Component: data-encoding 2.11.1, LICENSE.
+https://static.crates.io/crates/data-encoding/data-encoding-2.11.1.crate
+
+The MIT License (MIT)
+
+Copyright (c) 2015-2020 Julien Cretin
+Copyright (c) 2017-2020 Google Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+FOLDHASH
+----------
+Components: foldhash 0.1.5 and 0.2.0, LICENSE (identical notice).
+https://static.crates.io/crates/foldhash/foldhash-0.1.5.crate
+https://static.crates.io/crates/foldhash/foldhash-0.2.0.crate
+
+Copyright (c) 2024 Orson Peters
+
+This software is provided 'as-is', without any express or implied warranty. In
+no event will the authors be held liable for any damages arising from the use of
+this software.
+
+Permission is granted to anyone to use this software for any purpose, including
+commercial applications, and to alter it and redistribute it freely, subject to
+the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not claim
+    that you wrote the original software. If you use this software in a product,
+    an acknowledgment in the product documentation would be appreciated but is
+    not required.
+
+2. Altered source versions must be plainly marked as such, and must not be
+    misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source distribution.
+
+LEVENSHTEIN_AUTOMATA
+---------------------
+Component: levenshtein_automata 0.2.1, LICENSE.
+https://static.crates.io/crates/levenshtein_automata/levenshtein_automata-0.2.1.crate
+
+Copyright (c) 2018 Paul Masurel
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+LRU
+-----
+Component: lru 0.18.5, LICENSE.
+https://static.crates.io/crates/lru/lru-0.18.5.crate
+
+MIT License
+
+Copyright (c) 2016 Jerome Froelich
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ORDERED-FLOAT
+---------------
+Components: ordered-float 4.6.0 and 5.5.0, LICENSE-MIT (identical notice).
+https://static.crates.io/crates/ordered-float/ordered-float-4.6.0.crate
+https://static.crates.io/crates/ordered-float/ordered-float-5.5.0.crate
+
+Copyright (c) 2015 Jonathan Reem
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+PHF AND PHF_SHARED
+--------------------
+Components: phf 0.14.0 and phf_shared 0.14.0, LICENSE (identical notice).
+https://static.crates.io/crates/phf/phf-0.14.0.crate
+https://static.crates.io/crates/phf_shared/phf_shared-0.14.0.crate
+
+The MIT License (MIT)
+
+Copyright (c) 2014-2022 Steven Fackler, Yuki Okushi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+PULLDOWN-CMARK AND PULLDOWN-CMARK-ESCAPE
+---------------------------------------
+Components: pulldown-cmark 0.13.4 and pulldown-cmark-escape 0.11.0,
+LICENSE (identical notice).
+https://static.crates.io/crates/pulldown-cmark/pulldown-cmark-0.13.4.crate
+https://static.crates.io/crates/pulldown-cmark-escape/pulldown-cmark-escape-0.11.0.crate
+
+The MIT License
+
+Copyright 2015 Google Inc. All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+MESSAGEPACK MODEL READER
+--------------------------
+Components: rmp-serde 1.3.1 and rmp 0.8.15, LICENSE (identical notice).
+https://static.crates.io/crates/rmp-serde/rmp-serde-1.3.1.crate
+https://static.crates.io/crates/rmp/rmp-0.8.15.crate
+Harper loads its embedded chunker model through Burn's NamedMpkBytesRecorder,
+which uses this MessagePack reader.
+
+MIT License
+
+Copyright (c) 2017 Evgeny Safronov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+RUZSTD
+--------
+Component: ruzstd 0.9.1, LICENSE.
+https://static.crates.io/crates/ruzstd/ruzstd-0.9.1.crate
+
+MIT License
+
+Copyright (c) 2019 Moritz Borcherding
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+SERDE-WASM-BINDGEN
+-------------------
+Component: serde-wasm-bindgen 0.6.5, LICENSE.
+https://static.crates.io/crates/serde-wasm-bindgen/serde-wasm-bindgen-0.6.5.crate
+
+MIT License
+
+Copyright (c) 2019 Cloudflare, Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+SHARDED-SLAB
+--------------
+Component: sharded-slab 0.1.7, LICENSE.
+https://static.crates.io/crates/sharded-slab/sharded-slab-0.1.7.crate
+
+Copyright (c) 2019 Eliza Weisman
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+STRUM
+-------
+Components: strum 0.27.2 and 0.28.0, LICENSE (identical notice).
+https://static.crates.io/crates/strum/strum-0.27.2.crate
+https://static.crates.io/crates/strum/strum-0.28.0.crate
+
+MIT License
+
+Copyright (c) 2019 Peter Glotfelty
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+TRACING
+---------
+Components: tracing-core 0.1.36 and tracing-subscriber 0.3.23,
+LICENSE (identical notice).
+https://static.crates.io/crates/tracing-core/tracing-core-0.1.36.crate
+https://static.crates.io/crates/tracing-subscriber/tracing-subscriber-0.3.23.crate
+
+Copyright (c) 2019 Tokio Contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+SPIN CODE IN TRACING-CORE AND ZIP
+----------------------------------
+Components/original files with identical notices:
+  tracing-core 0.1.36, src/spin/LICENSE
+  zip 8.6.0, LICENSE
+https://static.crates.io/crates/tracing-core/tracing-core-0.1.36.crate
+https://static.crates.io/crates/zip/zip-8.6.0.crate
+
+The MIT License (MIT)
+
+Copyright (c) 2014 Mathijs van de Nes
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+TWOX-HASH
+-----------
+Component: twox-hash 2.1.5, LICENSE.txt.
+https://static.crates.io/crates/twox-hash/twox-hash-2.1.5.crate
+
+The MIT License (MIT)
+
+Copyright (c) 2015 Jake Goulding
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+UNICODE-BLOCKS
+----------------
+Component: unicode-blocks 0.1.10, LICENSE.
+https://static.crates.io/crates/unicode-blocks/unicode-blocks-0.1.10.crate
+
+MIT License
+
+Copyright (c) 2020 magiclen.org (Ron Li)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ZLIB-RS
+---------
+Component: zlib-rs 0.6.8, LICENSE.
+https://static.crates.io/crates/zlib-rs/zlib-rs-0.6.8.crate
+
+(C) 2024 Trifecta Tech Foundation
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source distribution.
+
+APACHE-2.0 ALTERNATIVES
+------------------------
+For third-party software available under Apache-2.0, that license is used;
+where alternatives are offered, Apache-2.0 is selected. This includes the
+inspected versions of ammonia,
+Burn, bytemuck, chrono, crossbeam-epoch, crc32fast, cubecl-common, dlmalloc,
+ecow, fid-rs, getrandom, hashbrown, html5ever, indexmap, itoa, js-sys,
+lazy_static, louds-rs, ndarray, once_cell, parking_lot_core, percent-encoding,
+regex, regex-automata, regex-syntax, rs-conllu, serde, serde_core, serde_json,
+smallvec, string_cache, tendril, tinyvec, trie-rs, typst-syntax,
+unicode-ident, unicode-math-class, unicode-script, unicode-segmentation, unicode-width,
+url, uuid, and wasm-bindgen.
+The separate Unicode-table notices above remain applicable to regex-syntax
+and unicode-ident.
+
+The selected license is the standard Apache License, Version 2.0, a copy of
+which is distributed with Harper. Source licenses can also be inspected in
+the exact archive versions specified by the pinned upstream Cargo.lock:
+https://github.com/Automattic/harper/blob/f4ebc61d77df1fc00b6aa8bc604e91af3534dad1/Cargo.lock

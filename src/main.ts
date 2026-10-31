@@ -20,8 +20,11 @@ import { LanguageCodeBlock } from './code-block.js';
 import { ContentsNode } from './contents-node.js';
 import { renderMermaidBlocks } from './diagrams.js';
 import { ContextMenu } from './context-menu.js';
+import { GrammarHighlights } from './grammar-highlights.js';
+import { WritingAssistance } from './writing-assistance.js';
 import './style.css';
 
+let writingAssistance: WritingAssistance | undefined;
 const syntaxStyle = document.createElement('style');
 syntaxStyle.textContent = [
   syntaxCSS('.tiptap'),
@@ -125,10 +128,15 @@ app.innerHTML = `
     </section>
     <div id="recovery-banner" hidden>Unsaved drafts from your last session are available. ${button('recover', 'Recover drafts')}${button('dismiss-recovery', 'Dismiss')}</div>
     <div class="canvas" id="canvas"><article class="paper" id="visual-editor" aria-label="Visual Markdown editor"></article><textarea id="source-editor" aria-label="Markdown source" spellcheck="false" hidden></textarea></div>
-    <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><span id="save-status" aria-live="polite">Ready to write</span><div class="zoom-controls" role="group" aria-label="Zoom controls"><button type="button" id="zoom-out" data-action="zoom-out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" id="zoom-reset" data-action="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%">100%</button><button type="button" id="zoom-in" data-action="zoom-in" aria-label="Zoom in" title="Zoom in">+</button></div></footer>
+    <section id="writing-panel" hidden aria-labelledby="writing-title">
+      <div class="writing-header"><strong id="writing-title">Writing assistance</strong><label><input id="writing-enabled" type="checkbox" />Enable offline English grammar checks</label><button type="button" id="writing-check">Check again</button><button type="button" id="writing-close" aria-label="Close writing assistance">Close</button></div>
+      <p class="writing-note">Powered by Harper, entirely on this device. Suggestions never change your text unless you apply them. English only; suggestions may be imperfect.</p>
+      <p id="writing-status" role="status" aria-live="polite"></p><ul id="writing-suggestions" aria-label="Grammar suggestions"></ul>
+    </section>
+    <footer><span id="word-count">0 words</span><span class="local-status">Local only</span><button type="button" id="writing-toggle" data-action="writing-assistance" aria-controls="writing-panel" aria-expanded="false" title="Offline English grammar checking">Writing assistance</button><span id="save-status" aria-live="polite">Ready to write</span><div class="zoom-controls" role="group" aria-label="Zoom controls"><button type="button" id="zoom-out" data-action="zoom-out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" id="zoom-reset" data-action="zoom-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%">100%</button><button type="button" id="zoom-in" data-action="zoom-in" aria-label="Zoom in" title="Zoom in">+</button></div></footer>
   </main>
   <div id="tabs-menu" class="dropdown view-menu" role="menu" aria-label="Open documents" hidden></div>
-  <div id="format-menu" class="dropdown view-menu" role="menu" hidden><div id="toolbar-overflow" role="group" aria-label="More editing tools" hidden></div>${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('help', 'Getting started', 'help')}</div>
+  <div id="format-menu" class="dropdown view-menu" role="menu" hidden><div id="toolbar-overflow" role="group" aria-label="More editing tools" hidden></div>${button('visual', 'Visual only')}${button('source', 'Source only')}${button('preview', 'Source + Preview (read-only)')}${button('writing-assistance', 'Writing assistance')}${button('help', 'Getting started', 'help')}</div>
   <div id="notification" role="status" hidden></div>
   <dialog id="image-storage-dialog" aria-labelledby="image-storage-title"><form method="dialog">
     <h2 id="image-storage-title">Store this image</h2>
@@ -194,6 +202,7 @@ app.innerHTML = `
     <p><b>Save:</b> the Save button saves the active file. Its arrow opens Save All and Save As. Hover over tools for their keyboard shortcuts, or open ${button('shortcuts', 'Keyboard shortcuts')} (F1). At narrower widths, More formatting keeps less-used tools available.</p>
     <p><b>Visual</b> works like a word processor. Type <code># </code> for a heading, <code>- </code> for a list, or use the toolbar.</p>
     <p><b>Code blocks</b> have a searchable language selector and Copy button at the bottom-right. Select PowerShell, Python, JSON, or another supported language for syntax colors. Code contents are never reformatted or executed. PDF and Word include the colors, not the controls.</p>
+    <p><b>Writing assistance:</b> enable offline English grammar checks from the status bar, More tools, or View menu. Harper runs locally in the background. Review underlined suggestions, apply an undoable correction, or ignore it once or throughout the current document. No text is sent online or changed automatically; suggestions can be imperfect.</p>
     <p><b>Sidebar</b>: drag its right edge to resize, or focus the edge and use Left/Right (Home/End set limits). Double-click the edge to reset. Width is remembered between launches and limited to leave room for editing. Use the button to the left of Visual/Source or Ctrl+Shift+B to toggle outline/recent files. <b>View &gt; Focus mode</b> or F9 also hides the document header; Escape restores your previous sidebar preference.</p>
     <p><b>Find</b>: click Find or press Ctrl+F to open or close the find bar. Close and Escape also dismiss it; the search and replacement text are retained.</p>
     <p><b>Right-click</b> for Formatting, Paragraph (Heading 1-6 or normal text), Insert, Copy / Paste As, and spelling suggestions. Choose <b>Table &gt; Insert table</b> or <b>Insert &gt; Table</b> to choose rows and columns. Row/column editing controls become available inside a table.</p>
@@ -580,7 +589,7 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
     }),
     LocalImage.configure({ allowBase64: true }),
     TableKit.configure({ table: { resizable: false } }),
-    TaskList, TaskItem.configure({ nested: true }), ContentsNode, Markdown,
+    TaskList, TaskItem.configure({ nested: true }), ContentsNode, Markdown, GrammarHighlights,
   ],
   content,
   contentType: 'markdown',
@@ -868,6 +877,7 @@ function showMode(): void {
   document.querySelector('.toolbar')!.classList.toggle('source-toolbar', mode === 'source');
   if (activeTab) activeTab.mode = mode;
   updatePaneHeaders();
+  writingAssistance?.schedule();
 }
 
 function activateTab(id: string): void {
@@ -1023,6 +1033,7 @@ async function closeGroup(ids: readonly string[]): Promise<void> {
   for (const id of ids) {
     const tab = tabs.find(tab => tab.id === id)!;
     unwrap(await window.lekh.closeDocument(id));
+    writingAssistance?.forget(id);
     tab.editor.destroy();
     tab.pane.remove();
     tabs.splice(tabs.indexOf(tab), 1);
@@ -1043,6 +1054,7 @@ async function closeTab(id: string): Promise<void> {
   const partner = pair ? (pair.leftId === id ? pair.rightId : pair.leftId) : null;
   const index = tabs.findIndex(tab => tab.id === id);
   unwrap(await window.lekh.closeDocument(id));
+  writingAssistance?.forget(id);
   editor.destroy();
   activeTab!.pane.remove();
   tabs.splice(index, 1);
@@ -1123,6 +1135,7 @@ function update(): void {
     previewTimer = setTimeout(() => { if (activeTab) refreshPreview(activeTab); }, 120);
   }
   if (!element('find-panel').hidden) scheduleSearch();
+  writingAssistance?.schedule();
 }
 
 function changed(content: string, record = true): void {
@@ -1183,6 +1196,7 @@ function useSource(): void {
     mode = 'source';
     activeTab.mode = mode;
     updateToolbar();
+    writingAssistance?.schedule();
   } else if (mode !== 'source') switchMode('source');
 }
 
@@ -1525,6 +1539,7 @@ async function dispatch(action: string): Promise<void> {
     return;
   }
   switch (action) {
+    case 'writing-assistance': writingAssistance?.open(); break;
     case 'side-by-side': toggleSideBySide(); break;
     case 'split': openSplit(); break;
     case 'preview': togglePreview(); break;
@@ -1711,6 +1726,7 @@ function activateEventPane(event: Event): void {
       mode = next;
       activeTab.mode = next;
       updateToolbar();
+      writingAssistance?.schedule();
     }
   }
 }
@@ -2220,6 +2236,16 @@ void run(async () => {
   tabs.push(activeTab);
   source.value = markdown;
   resetVisual(markdown);
+  writingAssistance = new WritingAssistance({
+    context: () => activeTab ? { id: documentId, markdown, mode, editor, source, pane: activeTab.pane } : undefined,
+    applySource: (from, to, replacement) => {
+      useSource();
+      source.focus();
+      source.setRangeText(replacement, from, to, 'end');
+      changed(source.value);
+    },
+    report: message => notify(message, true),
+  });
   showWorkspace();
   update();
   await refreshZoom();

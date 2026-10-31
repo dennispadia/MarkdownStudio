@@ -2,6 +2,8 @@
 
 ## 0.8.0 — development, not published
 
+- Add opt-in, on-device English grammar and punctuation checking with the bundled Harper engine. Review suggestions in Visual and Source, apply an undoable correction, or ignore it once or throughout the current document. Code, protected syntax, stale results and other tabs are guarded; no text is sent online.
+
 - Establish independent Lekh application (`com.lekh.desktop`), npm (`lekh`), installer, and `%APPDATA%\Lekh` profile identities. No migration aliases or automatic removal of another product are included.
 - Use a new stable MSI upgrade code, `DCBCF7FA-11DA-4F35-8D27-D066EEC6C582`, for future Lekh upgrades, with application files under `%LOCALAPPDATA%\lekh`.
 - Use Lekh-only renderer storage keys, image protocol, diagram partition, preload bridge, and table-of-contents markers.
