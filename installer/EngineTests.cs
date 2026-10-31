@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Controls;
 
 namespace Lekh.Setup
@@ -25,6 +26,7 @@ namespace Lekh.Setup
             try
             {
                 Progress();
+                NativeProgressRecords();
                 Identity();
                 PreviousVersions();
                 UpgradeSequence();
@@ -81,6 +83,121 @@ namespace Lekh.Setup
                 { "ProductName", BuildInfo.ProductName }, { "ProductVersion", BuildInfo.Version },
                 { "UpgradeCode", "{" + SetupPolicy.UpgradeCode + "}" }, { "MSIINSTALLPERUSER", "1" }
             };
+        }
+        [DllImport("msi.dll", ExactSpelling = true)]
+        private static extern uint MsiCreateRecord(uint fields);
+        [DllImport("msi.dll", ExactSpelling = true)]
+        private static extern uint MsiRecordSetInteger(uint record, uint field, int value);
+        [DllImport("msi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        private static extern uint MsiRecordSetStringW(uint record, uint field, string value);
+        private static void WithProgressRecord(uint fields, int?[] values, Action<uint> use)
+        {
+            uint record = MsiCreateRecord(fields);
+            if (record == 0) throw new InvalidOperationException("Cannot create a native MSI test record.");
+            try
+            {
+                for (uint field = 1; field <= values.Length; field++)
+                    if (values[field - 1].HasValue) Native.Check(MsiRecordSetInteger(record, field, values[field - 1].Value), "Set test progress field");
+                use(record);
+            }
+            finally { Native.MsiCloseHandle(record); }
+        }
+        private static void NativeProgressRecords()
+        {
+            const uint progressMessage = 0x0a000000;
+            List<SetupUpdate> updates = new List<SetupUpdate>();
+            List<string> logs = new List<string>();
+            NativeEngine startup = new NativeEngine(update => updates.Add(update), text => logs.Add(text));
+            WithProgressRecord(3, new int?[] { 1, null, 0 }, record =>
+            {
+                Check(startup.Callback(IntPtr.Zero, progressMessage, record) == 1 && !startup.CallbackFailed && startup.CanCancel,
+                    "An initial native explicit-progress record with null unused ticks must not abort fresh setup.");
+                Check(updates[updates.Count - 1].Percent == null, "An initial progress-mode message does not invent a total or percentage.");
+                Check(logs[0].Contains("count=3") && logs[0].Contains("field 2 integer=MSI_NULL_INTEGER null=True"),
+                    "The initial null/unused field is captured exactly in owned setup diagnostics.");
+            });
+            updates.Clear(); logs.Clear();
+            NativeEngine engine = new NativeEngine(update => updates.Add(update), text => logs.Add(text));
+            WithProgressRecord(4, new int?[] { 0, 100, 0, 0 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Native reset record accepted."));
+            WithProgressRecord(3, new int?[] { 1, 5, 1 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Three-field implicit-action progress accepted without unused field 4."));
+            Check(engine.Callback(IntPtr.Zero, 0x09000000, 0) == 1 && updates[updates.Count - 1].Percent == 5, "Implicit native action ticks applied.");
+            WithProgressRecord(3, new int?[] { 1, null, 0 }, record =>
+            {
+                Check(Native.MsiRecordGetFieldCount(record) == 3 && Native.MsiRecordGetInteger(record, 2) == Int32.MinValue &&
+                    Native.MsiRecordGetInteger(record, 4) == Int32.MinValue, "Native omitted/null fields really return MSI_NULL_INTEGER.");
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1 && !engine.CallbackFailed,
+                    "Documented explicit-progress mode accepts ignored null field 2 without cancelling MSI.");
+            });
+            Check(engine.Callback(IntPtr.Zero, 0x09000000, 0) == 1 && updates[updates.Count - 1].Percent == 5, "Explicit-progress mode disables previous implicit action ticks.");
+            WithProgressRecord(2, new int?[] { 2, 20 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1 && updates[updates.Count - 1].Percent == 25,
+                    "Two-field progress increments accept missing unused fields 3 and 4."));
+            WithProgressRecord(2, new int?[] { 3, 100 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1 && updates[updates.Count - 1].Percent == 12,
+                    "Two-field progress addition adjusts the denominator."));
+            WithProgressRecord(4, new int?[] { 0, 100, 1, 0 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Native backward reset accepted."));
+            WithProgressRecord(2, new int?[] { 2, 25 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1 && updates[updates.Count - 1].Percent == 75,
+                    "Backward execution still applies explicit progress correctly."));
+            WithProgressRecord(4, new int?[] { 0, 100, 0, 1 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1 && updates[updates.Count - 1].Percent == null,
+                    "Native script-generation reset stays indeterminate."));
+            WithProgressRecord(4, new int?[] { 1, null, 0, null }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Present but null unused fields are also valid."));
+            WithProgressRecord(2, new int?[] { 2, null }, record =>
+            {
+                Native.Check(MsiRecordSetStringW(record, 2, "7"), "Set numeric progress string");
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Native integer-convertible fields remain supported.");
+            });
+            WithProgressRecord(3, new int?[] { 1, 0, 1 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Zero implicit-action ticks are valid."));
+            WithProgressRecord(2, new int?[] { 2, 0 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Zero explicit ticks are valid."));
+            WithProgressRecord(2, new int?[] { 3, 0 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 1, "Zero added ticks are valid."));
+            Check(logs[0].Contains("count=4") && logs[0].Contains("field 1 integer=0"), "First actual native progress record is logged with its field count and values.");
+            foreach (int?[] values in new int?[][] {
+                new int?[] { }, new int?[] { null, 100 }, new int?[] { 4, 100 },
+                new int?[] { 0, 100, 0 }, new int?[] { 0, null, 0, 0 }, new int?[] { 0, -1, 0, 0 },
+                new int?[] { 0, 100, null, 0 }, new int?[] { 0, 100, 2, 0 }, new int?[] { 0, 100, 0, null }, new int?[] { 0, 100, 0, 2 },
+                new int?[] { 1, 5 }, new int?[] { 1, null, 1 }, new int?[] { 1, -1, 1 }, new int?[] { 1, 5, null }, new int?[] { 1, 5, 2 },
+                new int?[] { 2 }, new int?[] { 2, null }, new int?[] { 2, -1 }, new int?[] { 3 }, new int?[] { 3, null }, new int?[] { 3, -1 }
+            })
+            {
+                NativeEngine invalid = new NativeEngine(update => { }, text => { });
+                WithProgressRecord((uint)values.Length, values, record =>
+                {
+                    Check(invalid.Callback(IntPtr.Zero, progressMessage, record) == 2 && invalid.CallbackFailed && !invalid.CanCancel,
+                        "Malformed required fields still fail safely through the actual native callback boundary.");
+                    Check(invalid.FailureMessage.Contains("progress record: count=" + values.Length), "Malformed record diagnostics retain exact count and relevant fields.");
+                });
+            }
+            WithProgressRecord(2, new int?[] { 2, null }, record =>
+            {
+                Native.Check(MsiRecordSetStringW(record, 2, "not-an-integer"), "Set malformed progress string");
+                NativeEngine invalid = new NativeEngine(update => { }, text => { });
+                Check(invalid.Callback(IntPtr.Zero, progressMessage, record) == 2, "Noninteger required ticks are rejected.");
+                Check(invalid.FailureMessage.Contains("integer=MSI_NULL_INTEGER null=False text=\"not-an-integer\""),
+                    "Diagnostics distinguish a noninteger required field from a genuinely null optional field.");
+            });
+            WithProgressRecord(2, new int?[] { 2, null }, record =>
+            {
+                Native.Check(MsiRecordSetStringW(record, 2, new string('x', 300)), "Set long malformed progress string");
+                NativeEngine invalid = new NativeEngine(update => { }, text => { });
+                Check(invalid.Callback(IntPtr.Zero, progressMessage, record) == 2 && invalid.FailureMessage.Contains("[truncated]"),
+                    "Malformed long fields still fail safely with bounded, explicitly truncated diagnostics.");
+            });
+            engine.Cancel();
+            WithProgressRecord(2, new int?[] { 2, 0 }, record =>
+                Check(engine.Callback(IntPtr.Zero, progressMessage, record) == 2 && !engine.CanCancel, "User cancellation still travels through the MSI callback."));
+            MsiProgress unchanged = new MsiProgress();
+            unchanged.Message(0, 100, 0, 0);
+            unchanged.Message(2, 20, Int32.MinValue, Int32.MinValue, 2);
+            Reject(() => unchanged.Message(0, 999, 2, 0), "Malformed required direction remains an error.");
+            Check(unchanged.Percent == 20, "Rejected records cannot mutate the previous progress state.");
         }
         private static void Identity()
         {

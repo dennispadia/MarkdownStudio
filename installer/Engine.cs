@@ -99,19 +99,39 @@ namespace Lekh.Setup
         {
             position = Math.Max(0, Math.Min(total, position + (backward ? -ticks : ticks)));
         }
-        public void Message(int kind, int value, int direction, int script)
+        private static void RequireFields(uint count, uint required)
         {
-            if (value < 0) throw new InvalidDataException("Windows Installer reported invalid progress.");
+            if (count < required) throw new InvalidDataException("Windows Installer progress record is missing required field " + required + ".");
+        }
+        private static void RequireTicks(int value)
+        {
+            if (value < 0) throw new InvalidDataException("Windows Installer progress field 2 must contain nonnegative integer ticks.");
+        }
+        private static void RequireFlag(int value, uint field)
+        {
+            if (value != 0 && value != 1) throw new InvalidDataException("Windows Installer progress field " + field + " must contain 0 or 1.");
+        }
+        public void Message(int kind, int value, int direction, int script, uint fieldCount = 4)
+        {
+            RequireFields(fieldCount, 1);
             switch (kind)
             {
                 case 0:
+                    RequireFields(fieldCount, 4);
+                    RequireTicks(value); RequireFlag(direction, 3); RequireFlag(script, 4);
                     total = value; backward = direction == 1; estimated = script == 1;
                     position = backward ? total : 0; actionTicks = 0; actionData = false;
                     break;
-                case 1: actionTicks = value; actionData = direction == 1; break;
-                case 2: Move(value); break;
-                case 3: total += value; if (backward) position += value; break;
-                default: throw new InvalidDataException("Unknown Windows Installer progress message.");
+                case 1:
+                    RequireFields(fieldCount, 3);
+                    RequireFlag(direction, 3);
+                    // Microsoft defines field 2 as ignored when field 3 is zero; it may be MSI_NULL_INTEGER.
+                    if (direction == 1) RequireTicks(value);
+                    actionTicks = direction == 1 ? value : 0; actionData = direction == 1;
+                    break;
+                case 2: RequireFields(fieldCount, 2); RequireTicks(value); Move(value); break;
+                case 3: RequireFields(fieldCount, 2); RequireTicks(value); total += value; if (backward) position += value; break;
+                default: throw new InvalidDataException("Unknown Windows Installer progress message kind: " + kind + ".");
             }
         }
     }
@@ -207,6 +227,7 @@ namespace Lekh.Setup
         private readonly MsiProgress progress = new MsiProgress();
         private volatile bool cancelRequested, canCancel = true;
         private bool cancelSent, repair, executing;
+        private bool progressObserved;
         private readonly InstalledProduct previousProduct;
         private readonly Action verifyRemoval;
         private readonly Func<bool> payloadPresent;
@@ -295,7 +316,7 @@ namespace Lekh.Setup
             log("Windows Installer action: " + action);
             Report();
         }
-        private int Callback(IntPtr context, uint type, uint record)
+        internal int Callback(IntPtr context, uint type, uint record)
         {
             try
             {
@@ -303,8 +324,20 @@ namespace Lekh.Setup
                 switch (message)
                 {
                     case 0x0a000000:
-                        progress.Message(Native.MsiRecordGetInteger(record, 1), Native.MsiRecordGetInteger(record, 2),
-                            Native.MsiRecordGetInteger(record, 3), Native.MsiRecordGetInteger(record, 4));
+                        if (!progressObserved)
+                        {
+                            log("First " + Native.DescribeProgressRecord(record));
+                            progressObserved = true;
+                        }
+                        try
+                        {
+                            progress.Message(Native.MsiRecordGetInteger(record, 1), Native.MsiRecordGetInteger(record, 2),
+                                Native.MsiRecordGetInteger(record, 3), Native.MsiRecordGetInteger(record, 4), Native.MsiRecordGetFieldCount(record));
+                        }
+                        catch (InvalidDataException error)
+                        {
+                            throw new InvalidDataException(error.Message + " " + Native.DescribeProgressRecord(record), error);
+                        }
                         if (cancelSent && progress.Backward) stage = "rollback";
                         Report();
                         break;
@@ -499,6 +532,8 @@ namespace Lekh.Setup
         [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiEnableLogW")]
         internal static extern uint MsiEnableLog(uint mode, string path, uint attributes);
         [DllImport("msi.dll")] internal static extern int MsiRecordGetInteger(uint record, uint field);
+        [DllImport("msi.dll")] internal static extern uint MsiRecordGetFieldCount(uint record);
+        [DllImport("msi.dll")] private static extern int MsiRecordIsNull(uint record, uint field);
         [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiRecordGetStringW")]
         private static extern uint MsiRecordGetString(uint record, uint field, StringBuilder value, ref uint length);
         [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiFormatRecordW")]
@@ -557,6 +592,25 @@ namespace Lekh.Setup
             length++;
             Check(MsiRecordGetString(record, field, value, ref length), "Read MSI string");
             return value.ToString();
+        }
+        internal static string DescribeProgressRecord(uint record)
+        {
+            uint count = MsiRecordGetFieldCount(record);
+            StringBuilder description = new StringBuilder("Windows Installer progress record: count=" + count);
+            for (uint field = 1; field <= Math.Min(count, 4u); field++)
+            {
+                int number = MsiRecordGetInteger(record, field);
+                StringBuilder text = new StringBuilder(129);
+                uint capacity = (uint)text.Capacity;
+                uint result = MsiRecordGetString(record, field, text, ref capacity);
+                if (result != 0 && result != 234) Check(result, "Read progress diagnostic field");
+                description.Append("; field ").Append(field).Append(" integer=")
+                    .Append(number == Int32.MinValue ? "MSI_NULL_INTEGER" : number.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    .Append(" null=").Append(MsiRecordIsNull(record, field) != 0)
+                    .Append(" text=\"").Append(text.ToString().Replace("\r", "\\r").Replace("\n", "\\n")).Append("\"");
+                if (result == 234) description.Append(" [truncated]");
+            }
+            return description.ToString();
         }
         internal static string FormatRecord(uint record)
         {
