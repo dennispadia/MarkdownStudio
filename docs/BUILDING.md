@@ -4,7 +4,7 @@
 
 - Windows 10/11 x64.
 - Node.js >=22.15.0 and npm. The setup script and CI use Node 22.22.0.
-- Windows .NET Framework 4.x with WPF and its framework C# compiler (included on supported Windows versions). No separate .NET SDK or runtime download is required for setup.
+- Windows .NET Framework 4.8 or newer with WPF and its framework C# compiler (included in current Windows 10/11 versions). No separate .NET SDK is required for setup.
 - Internet access for the first dependency, Electron runtime, and WiX tool downloads.
 
 WiX is fetched by electron-builder; you do not need to install Word, Pandoc, or WiX manually. First builds can take several minutes. Windows corporate policy can restrict downloads or installer execution.

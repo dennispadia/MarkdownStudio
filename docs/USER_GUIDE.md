@@ -6,7 +6,7 @@ A local-first Windows desktop application for writing Markdown with a friendly v
 
 ## Open the application
 
-Install the shared Lekh 0.7.0 x64 MSI, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without administrator access. Use the verified download linked from the [README](../README.md#install-on-windows).
+Download the verified Windows x64 installer linked from the [README](../README.md#install-on-windows). The premium Lekh setup EXE embeds its offline MSI engine; choose **Install Lekh**, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without requesting administrator access. Save and close any installed Lekh or Markdown Studio first; setup does not force-close the editor. The origin story supports Pause/Resume and Previous/Next, respects Windows' animation preference, and never delays installation.
 
 For a source checkout, double-click **Launch.cmd** in the project root. The developer build is **release\win-unpacked\Lekh - Markdown editor.exe**; keep that entire folder together.
 

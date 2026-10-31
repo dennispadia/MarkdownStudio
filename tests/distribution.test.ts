@@ -168,13 +168,17 @@ test('setup verification is non-destructive by default and exercises native acce
   for (const state of ['ready', 'open', 'preparing', 'installing', 'finishing', 'success', 'restart', 'error', 'stopping', 'cancelled']) {
     assert.ok(verify.includes(`'${state}'`));
   }
-  for (const id of ['Primary', 'Heading', 'StoryPrevious', 'StoryNext', 'StoryPause', 'StoryCount', 'StoryTitle', 'StoryWritten']) {
+  for (const id of ['Primary', 'Heading', 'StoryPrevious', 'StoryNext', 'StoryPause', 'StoryCount', 'StoryTitle', 'StoryWritten', 'StoryAccessible']) {
     assert.ok(verify.includes(`'${id}'`));
   }
   assert.ok(verify.includes('[Windows.Automation.TreeWalker]::RawViewWalker'));
   assert.ok(verify.includes("Find-Control $Window 'StoryWritten' -Raw"));
-  assert.ok(verify.includes("(Find-Control $Window 'StoryTitle').Current.Name.Trim()"));
-  assert.doesNotMatch(verify, /StoryAccessible/, 'hidden layout copy is not a discoverable accessibility contract');
+  assert.ok(verify.includes("Find-Control $Window 'StoryAccessible' -Raw"));
+  assert.ok(verify.includes('$fullText = $accessible.Current.Name.Trim()'));
+  assert.ok(verify.includes('$text = [string]$Control.Current.Name'));
+  assert.ok(verify.includes("$Control.Current.AutomationId -ne 'StoryWritten'"));
+  assert.ok(verify.includes('$complete.StartsWith($text, [StringComparison]::Ordinal)'));
+  assert.ok(verify.includes('if ($text -cne $fullText)'));
   assert.ok(verify.includes('[Windows.Automation.TextPattern]::Pattern'));
   assert.ok(verify.includes('[Windows.Automation.ValuePattern]::Pattern'));
   assert.ok(verify.includes('[Windows.Automation.WindowPattern]::Pattern'));
@@ -211,4 +215,25 @@ test('real setup installation is explicitly opted in on a clean hosted runner an
   assert.ok(hosted.includes('if ($InstallOnHostedRunner) {\n    Test-HostedInstallation') ||
     hosted.includes('if ($InstallOnHostedRunner) {\r\n    Test-HostedInstallation'));
   assert.ok(workflow.includes('run: npm run verify:setup -- -InstallOnHostedRunner'));
+});
+
+test('motion verification respects local preferences and restores both hosted animation test modes', async () => {
+  const verify = await readFile(new URL('../scripts/Test-Setup.ps1', import.meta.url), 'utf8');
+  assert.ok(verify.includes('ReadParameter(0x1042, 0, out value, 0)'));
+  assert.ok(verify.includes('WriteParameter(0x1043, 0, new IntPtr(enabled ? 1 : 0), 2)'),
+    'test changes broadcast without persisting a desktop preference to the registry');
+  assert.ok(verify.includes("if (-not $InstallOnHostedRunner -or $env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted')"));
+  assert.ok(verify.includes('if ($InstallOnHostedRunner) { Set-HostedClientAreaAnimation $true }'));
+  assert.ok(verify.indexOf('$originalAnimation = [SetupVerificationDesktop]::GetClientAreaAnimation()') > verify.indexOf('$preview.Dispose()'),
+    'the preference scope must wrap preview calls, not recursively execute inside preview cleanup');
+  assert.match(verify, /if \(\$InstallOnHostedRunner\) \{\s+Set-HostedClientAreaAnimation \$false\s+Test-SetupPreview 'installing' \$false/);
+  assert.match(verify, /finally \{\s+if \(\$InstallOnHostedRunner\) \{\s+Set-HostedClientAreaAnimation \$originalAnimation/);
+  assert.ok(verify.includes('Test-Story $window -ReducedMotion:(-not $MotionEnabled)'));
+  assert.ok(verify.includes('if ($ReducedMotion)'));
+  assert.ok(verify.includes('Reduced-motion story changed text or automatically advanced'));
+  assert.ok(verify.includes('SKIP: motion-specific typing/autoplay UI measurement'));
+  assert.ok(verify.includes('engine story self-tests still ran'));
+  for (const field of ['pause=', 'pauseEnabled=', 'partialNameLength=', 'partialReadLength=', 'textPatternLength=', 'fullLength=', 'writtenId=', 'count=']) {
+    assert.ok(verify.includes(field), `failure diagnostic requires ${field}`);
+  }
 });

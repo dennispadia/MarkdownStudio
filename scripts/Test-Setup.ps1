@@ -20,6 +20,39 @@ foreach ($argument in @('--self-test', '--verify-payload')) {
 }
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+public static class SetupVerificationDesktop
+{
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ReadParameter(uint action, uint parameter, out int value, uint flags);
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool WriteParameter(uint action, uint parameter, IntPtr value, uint flags);
+    public static bool GetClientAreaAnimation()
+    {
+        int value;
+        if (!ReadParameter(0x1042, 0, out value, 0))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        return value != 0;
+    }
+    public static void SetClientAreaAnimation(bool enabled)
+    {
+        if (!WriteParameter(0x1043, 0, new IntPtr(enabled ? 1 : 0), 2))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+}
+'@
+function Set-HostedClientAreaAnimation([bool]$Enabled) {
+    if (-not $InstallOnHostedRunner -or $env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
+        throw 'Desktop animation preferences may be changed only during opted-in GitHub-hosted verification.'
+    }
+    [SetupVerificationDesktop]::SetClientAreaAnimation($Enabled)
+    if ([SetupVerificationDesktop]::GetClientAreaAnimation() -ne $Enabled) { throw 'Windows did not apply the requested animation test preference.' }
+}
 function Find-Control($Window, [string]$Id, [switch]$Raw) {
     $condition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty, $Id)
     if (-not $Raw) { return $Window.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition) }
@@ -47,13 +80,15 @@ function Wait-Until([scriptblock]$Probe, [int]$TimeoutSeconds = 15, [string]$Mes
     throw $Message
 }
 function Read-StoryText($Control) {
+    $text = [string]$Control.Current.Name
     $pattern = $null
-    if ($Control.TryGetCurrentPattern([Windows.Automation.TextPattern]::Pattern, [ref]$pattern)) {
-        $text = $pattern.DocumentRange.GetText(-1)
-    } elseif ($Control.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
-        $text = $pattern.Current.Value
-    } else {
-        $text = $Control.Current.Name
+    # StoryWritten explicitly publishes the live Run text in Name; its TextPattern may be stale.
+    if ($Control.Current.AutomationId -ne 'StoryWritten' -and [string]::IsNullOrWhiteSpace($text)) {
+        if ($Control.TryGetCurrentPattern([Windows.Automation.TextPattern]::Pattern, [ref]$pattern)) {
+            $text = $pattern.DocumentRange.GetText(-1)
+        } elseif ($Control.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
+            $text = $pattern.Current.Value
+        }
     }
     # WPF TextPattern represents the trailing InlineUIContainer quill as an embedded object.
     return $text.Replace([string][char]0xfffc, '').Trim()
@@ -64,52 +99,86 @@ function Get-StoryPage($Window) {
     if ($control.Current.Name -match '^\s*([123])\s*(?:/|of)\s*3\s*$') { return [int]$Matches[1] }
     return 0
 }
-function Test-Story($Window) {
-    foreach ($id in @('StoryPrevious', 'StoryNext', 'StoryPause', 'StoryCount', 'StoryTitle')) {
-        if ($null -eq (Find-Control $Window $id)) { throw "Installing preview is missing accessible story control $id." }
-    }
-    $written = Find-Control $Window 'StoryWritten' -Raw
-    if ($null -eq $written) { throw 'Installing preview must expose AutomationId StoryWritten in the raw UI Automation tree.' }
-    [void](Wait-Until { (Get-StoryPage $Window) -eq 1 } 10 'Story did not begin at page 1.')
-    $complete = (Find-Control $Window 'StoryTitle').Current.Name.Trim()
-    if ([string]::IsNullOrWhiteSpace($complete)) { throw 'StoryTitle.Name must expose the title and complete story text.' }
-    $previousText = ''
-    $growth = 0
-    $typed = $false
-    $sample = [Diagnostics.Stopwatch]::StartNew()
-    while ($sample.Elapsed.TotalSeconds -lt 8 -and (Get-StoryPage $Window) -eq 1) {
-        $text = Read-StoryText $written
-        if ($text.Length -ge 3 -and $text.Length -lt $complete.Length -and $complete.Contains($text)) {
-            if ($previousText.Length -ge 3 -and $text.Length -gt $previousText.Length -and
-                $text.StartsWith($previousText, [StringComparison]::Ordinal)) { $growth++ }
-            $previousText = $text
-            if ($growth -ge 2) { $typed = $true }
+function Get-StoryDiagnostic($Window) {
+    try {
+        $written = Find-Control $Window 'StoryWritten' -Raw
+        $accessible = Find-Control $Window 'StoryAccessible' -Raw
+        $pause = Find-Control $Window 'StoryPause'
+        $count = Find-Control $Window 'StoryCount'
+        $pattern = $null
+        $patternLength = -1
+        if ($null -ne $written -and $written.TryGetCurrentPattern([Windows.Automation.TextPattern]::Pattern, [ref]$pattern)) {
+            $patternLength = $pattern.DocumentRange.GetText(-1).Length
         }
-        if ($typed) { break }
-        Start-Sleep -Milliseconds 50
-    }
-    if (-not $typed) { throw 'Installing preview did not expose progressive, genuinely typed story text.' }
-    foreach ($page in @(1, 2, 3)) {
-        [void](Wait-Until { (Get-StoryPage $Window) -eq $page } 45 "Story did not automatically advance to page $page.")
-        $fullText = (Find-Control $Window 'StoryTitle').Current.Name.Trim()
-        if ([string]::IsNullOrWhiteSpace($fullText)) { throw "Page $page has no complete accessible text." }
-        # Allow 100 ms of sampling/scheduling tolerance around the two-second completed-page hold.
-        [void](Wait-Until {
-            if ((Get-StoryPage $Window) -ne $page) { throw "Page $page advanced before its complete text was observed." }
-            $text = Read-StoryText $written
-            if ($text.Length -lt 20 -or -not $fullText.EndsWith($text, [StringComparison]::Ordinal)) { return $false }
-            $hold = [Diagnostics.Stopwatch]::StartNew()
-            while ($hold.Elapsed.TotalMilliseconds -lt 1900) {
-                if ((Get-StoryPage $Window) -ne $page) { throw "Page $page did not hold for two seconds after typing." }
-                if ((Read-StoryText $written) -cne $text) { return $false }
-                Start-Sleep -Milliseconds 25
-            }
-            return $true
-        } 30 "Page $page never finished typing with a two-second hold.")
-    }
-    Write-Host 'PASS: story types progressively, automatically cycles 1 -> 2 -> 3, and holds completed pages for two seconds.'
+        return "Story diagnostic: animation=$([SetupVerificationDesktop]::GetClientAreaAnimation()); pause='$($pause.Current.Name)'; pauseEnabled=$($pause.Current.IsEnabled); partialNameLength=$(([string]$written.Current.Name).Length); partialReadLength=$((Read-StoryText $written).Length); textPatternLength=$patternLength; fullLength=$(([string]$accessible.Current.Name).Trim().Length); writtenId='$($written.Current.AutomationId)'; count='$($count.Current.Name)'."
+    } catch { return "Story diagnostic unavailable: $($_.Exception.Message)" }
 }
-foreach ($state in @('installing', 'ready', 'open', 'preparing', 'finishing', 'success', 'restart', 'error', 'stopping', 'cancelled')) {
+function Test-Story($Window, [switch]$ReducedMotion) {
+    try {
+        foreach ($id in @('StoryPrevious', 'StoryNext', 'StoryPause', 'StoryCount', 'StoryTitle')) {
+            if ($null -eq (Find-Control $Window $id)) { throw "Installing preview is missing accessible story control $id." }
+        }
+        $written = Find-Control $Window 'StoryWritten' -Raw
+        $accessible = Find-Control $Window 'StoryAccessible' -Raw
+        if ($null -eq $written -or $null -eq $accessible) { throw 'Installing preview must expose StoryWritten and StoryAccessible in the raw UI Automation tree.' }
+        [void](Wait-Until { (Get-StoryPage $Window) -eq 1 } 10 'Story did not begin at page 1.')
+        $complete = $accessible.Current.Name.Trim()
+        if ([string]::IsNullOrWhiteSpace($complete)) { throw 'StoryAccessible.Name must expose the exact complete paragraph without the title.' }
+        if (-not (Find-Control $Window 'StoryTitle').Current.Name.Trim().EndsWith($complete, [StringComparison]::Ordinal)) {
+            throw 'The screen-reader title does not contain the complete story paragraph.'
+        }
+        if ($ReducedMotion) {
+            [void](Wait-Until { (Read-StoryText $written) -ceq $complete } 5 'Reduced-motion story did not immediately expose its complete paragraph.')
+            $static = [Diagnostics.Stopwatch]::StartNew()
+            while ($static.Elapsed.TotalMilliseconds -lt 2200) {
+                if ((Get-StoryPage $Window) -ne 1 -or (Read-StoryText $written) -cne $complete) {
+                    throw 'Reduced-motion story changed text or automatically advanced instead of staying static.'
+                }
+                Start-Sleep -Milliseconds 50
+            }
+            Write-Host 'PASS: reduced-motion story displays the complete, static paragraph. SKIP: motion-specific typing/autoplay UI measurement because client-area animation is disabled; engine story self-tests still ran.'
+            return
+        }
+        $previousText = ''
+        $growth = 0
+        $typed = $false
+        $sample = [Diagnostics.Stopwatch]::StartNew()
+        while ($sample.Elapsed.TotalSeconds -lt 8 -and (Get-StoryPage $Window) -eq 1) {
+            $text = Read-StoryText $written
+            if ($text.Length -ge 3 -and $text.Length -lt $complete.Length -and $complete.StartsWith($text, [StringComparison]::Ordinal)) {
+                if ($previousText.Length -ge 3 -and $text.Length -gt $previousText.Length -and
+                    $text.StartsWith($previousText, [StringComparison]::Ordinal)) { $growth++ }
+                $previousText = $text
+                if ($growth -ge 2) { $typed = $true }
+            }
+            if ($typed) { break }
+            Start-Sleep -Milliseconds 50
+        }
+        if (-not $typed) { throw 'Installing preview did not expose progressive, genuinely typed story text.' }
+        foreach ($page in @(1, 2, 3)) {
+            [void](Wait-Until { (Get-StoryPage $Window) -eq $page } 45 "Story did not automatically advance to page $page.")
+            $fullText = $accessible.Current.Name.Trim()
+            if ([string]::IsNullOrWhiteSpace($fullText)) { throw "Page $page has no complete accessible text." }
+            # Allow 100 ms of sampling/scheduling tolerance around the two-second completed-page hold.
+            [void](Wait-Until {
+                if ((Get-StoryPage $Window) -ne $page) { throw "Page $page advanced before its complete text was observed." }
+                $text = Read-StoryText $written
+                if ($text -cne $fullText) { return $false }
+                $hold = [Diagnostics.Stopwatch]::StartNew()
+                while ($hold.Elapsed.TotalMilliseconds -lt 1900) {
+                    if ((Get-StoryPage $Window) -ne $page) { throw "Page $page did not hold for two seconds after typing." }
+                    if ((Read-StoryText $written) -cne $fullText) { throw "Page $page changed its completed paragraph during the hold." }
+                    Start-Sleep -Milliseconds 25
+                }
+                return $true
+            } 30 "Page $page never finished typing with a two-second hold.")
+        }
+        Write-Host 'PASS: story types progressively, automatically cycles 1 -> 2 -> 3, and holds completed pages for two seconds.'
+    } catch {
+        throw "$($_.Exception.Message) $(Get-StoryDiagnostic $Window)"
+    }
+}
+function Test-SetupPreview([string]$State, [bool]$MotionEnabled) {
     $preview = Start-Process -FilePath $SetupPath -ArgumentList "--preview=$state" -PassThru
     $window = $null
     try {
@@ -126,7 +195,7 @@ foreach ($state in @('installing', 'ready', 'open', 'preparing', 'finishing', 's
             return $null -ne $heading -and -not [string]::IsNullOrWhiteSpace($heading.Current.Name) -and $null -ne $primary
         } 15 "Preview $state is missing Heading or Primary accessibility.")
         if ($window.Current.ProcessId -ne $preview.Id) { throw 'Preview window belongs to a different process.' }
-        if ($state -eq 'installing') { Test-Story $window }
+        if ($state -eq 'installing') { Test-Story $window -ReducedMotion:(-not $MotionEnabled) }
         Write-Host "PASS: native accessible preview $state."
     } finally {
         if (-not $preview.HasExited) {
@@ -142,6 +211,24 @@ foreach ($state in @('installing', 'ready', 'open', 'preparing', 'finishing', 's
             }
         }
         $preview.Dispose()
+    }
+}
+$originalAnimation = [SetupVerificationDesktop]::GetClientAreaAnimation()
+Write-Host "Desktop client-area animation before verification: $originalAnimation."
+try {
+    if ($InstallOnHostedRunner) { Set-HostedClientAreaAnimation $true }
+    $motionEnabled = [SetupVerificationDesktop]::GetClientAreaAnimation()
+    foreach ($state in @('installing', 'ready', 'open', 'preparing', 'finishing', 'success', 'restart', 'error', 'stopping', 'cancelled')) {
+        Test-SetupPreview $state $motionEnabled
+    }
+    if ($InstallOnHostedRunner) {
+        Set-HostedClientAreaAnimation $false
+        Test-SetupPreview 'installing' $false
+    }
+} finally {
+    if ($InstallOnHostedRunner) {
+        Set-HostedClientAreaAnimation $originalAnimation
+        Write-Host "Restored desktop client-area animation: $originalAnimation."
     }
 }
 function Read-MsiProperty($Database, [string]$Name) {

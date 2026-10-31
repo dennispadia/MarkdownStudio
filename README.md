@@ -6,13 +6,15 @@
 
 A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-**[Download Lekh 0.7.0 for Windows x64](https://github.com/dennispadia/lekh/releases/download/v0.7.0/Lekh-Markdown-editor-0.7.0-x64.msi)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.7.0) · [User guide](docs/USER_GUIDE.md)
+**[Lekh downloads for Windows x64](https://github.com/dennispadia/lekh/releases/latest)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases) · [User guide](docs/USER_GUIDE.md)
 
-The **published 0.7.0 release** uses Segoe UI Light, a smaller Sanskrit लेख beside Lekh, and the refined quill in Graphite + Teal. It changes branding, not editing features. The installer and extracted application passed the complete Windows desktop tests; the public MSI and source ZIP were independently downloaded and matched the published SHA-256 checksums and GitHub asset digests.
+Version **0.7.1** adds a real offline premium **EXE setup**, with the approved Segoe UI Light wordmark, smaller Sanskrit लेख, and refined quill in Graphite + Teal. A quill writes Lekh's three-part origin story, automatically advancing two seconds after each chapter finishes. Pause/resume, previous/next, complete accessible text, and Windows reduced-motion support are included. Installation never waits for the story. All editor features are unchanged.
+
+**Publication in progress:** use the latest release link above for the currently verified download. The existing MSI remains available until the replacement EXE is built, tested, published, and independently verified.
 
 ### Upgrading to Lekh
 
-Your existing preferences, recent files, recovery drafts, and marked tables of contents retain their original storage identities. The MSI retains the original upgrade identity. Close the existing app before upgrading. Because the executable becomes **Lekh - Markdown editor.exe**, Windows file associations and pinned shortcuts may need to be reselected or repinned. New MSI builds are named **Lekh-Markdown-editor-0.7.0-x64.msi**; download filenames use hyphens so GitHub preserves their names and checksum entries. Real install/upgrade/repair/uninstall testing in a disposable VM remains pending.
+Your existing preferences, recent files, recovery drafts, and marked tables of contents retain their original storage identities. The EXE wraps the same per-user MSI engine and original upgrade identity. Save and close the existing app before upgrading; setup will ask rather than force-close it. The application executable remains **Lekh - Markdown editor.exe**; Windows file associations and pinned shortcuts may need to be reselected or repinned after upgrading from Markdown Studio. Public setup downloads are named **Lekh-Markdown-editor-Setup-0.7.1-x64.exe**, using GitHub-safe hyphens. Genuine old-version upgrades and repair still need a disposable-VM test matrix.
 
 The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
 
@@ -25,7 +27,7 @@ The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account
 - **Shrinking document tabs:** labels shorten as space runs out, the selected tab stays visible, and **Open documents** lists every tab, including those that cannot fit.
 - **Mermaid insertion at the caret:** Visual insertion stays in Visual and places the diagram at the current selection, not the end. Source insertion uses its own caret, preserves editable dual view, and changes only the active split document. One undo removes the insertion.
 
-These are working features retained in the **verified Lekh 0.7.0 installer**. The official build runs the desktop tests against the extracted installer application. Installer-speed and early running-app prompt improvements remain separate pending work.
+These are working features retained from the **verified Lekh 0.7.0 installer**. The official build continues running the complete desktop tests against the application extracted from the internal MSI. Premium setup adds early running-app checks without changing the editor.
 
 ### Included from 0.6.5
 
@@ -68,7 +70,7 @@ These interface changes remain included in the **verified Lekh 0.7.0 installer**
 - Further Explorer launches reuse the existing window and open files in tabs. An already-open file is focused without replacing unsaved edits; minimized windows are restored.
 - File requests wait until the editor is ready or its current operation finishes. Unreadable files report an error without blocking other requested files.
 
-Close the app before upgrading with a new MSI. For Lekh builds, choose **Open with > Choose another app > Lekh** if Windows no longer remembers your `.md` default.
+Close the app before upgrading with a new installer. For Lekh builds, choose **Open with > Choose another app > Lekh** if Windows no longer remembers your `.md` default.
 
 ### Included from 0.6.0
 
@@ -139,19 +141,19 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 
 ## Install on Windows
 
-**Windows 10/11, x64.** Other operating systems and architectures are not packaged or tested.
+**Windows 10/11, x64, with .NET Framework 4.8 or newer** (normally included in current Windows versions). Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **Lekh 0.7.0** is the latest published, verified installer. All existing editing features are retained. Previous Markdown Studio release downloads have been retired; their Git tags and source history remain available. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+**Release status:** the **Lekh 0.7.1 premium EXE** is being validated for publication; the latest release page identifies the currently verified download. Previous Markdown Studio release downloads have been retired; their Git tags and source history remain available. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
 
-1. **[Download the verified Lekh 0.7.0 Windows x64 MSI installer](https://github.com/dennispadia/lekh/releases/download/v0.7.0/Lekh-Markdown-editor-0.7.0-x64.msi)**, or open [Releases](https://github.com/dennispadia/lekh/releases) for downloads and release notes.
-2. Double-click the MSI to install for your current Windows user.
+1. Open **[the latest verified Lekh release](https://github.com/dennispadia/lekh/releases/latest)** and download its Windows x64 installer. The premium EXE is published only after validation succeeds.
+2. Double-click the installer to install for your current Windows user. In premium setup, choose **Install Lekh**; no administrator access is requested.
 3. Open **Lekh** from the desktop or Start menu.
 
-The MSI contains the desktop runtime: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the MSI itself, not just the executable from a developer build.
+The premium setup EXE embeds the application and its MSI engine: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the setup EXE itself, not the editor executable from a developer build. No internet connection is needed during installation.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/lekh/releases/download/v0.7.0/SHA256SUMS.txt) and a [clean source ZIP](https://github.com/dennispadia/lekh/releases/download/v0.7.0/Lekh-0.7.0-source.zip) are available with the release.
+The installer is attached to the GitHub Release, not stored among the source files. **SHA256SUMS.txt** and a clean source ZIP are available on [the same release page](https://github.com/dennispadia/lekh/releases/latest).
 
-**Unsigned software:** the application and MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
+**Unsigned software:** the application, setup EXE, and internal MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
 
 Uninstall through **Windows Settings > Apps > Installed apps**. Your Markdown documents are not installer-managed files. The app does not intentionally delete its separate settings/recovery profile on uninstall.
 
