@@ -65,7 +65,7 @@ export async function storeImage(
   throw new Error('Could not create a unique image asset. Try again.');
 }
 
-export async function readImage(source: string, documentPath: string | null): Promise<{ data: Buffer; mime: string }> {
+export async function readImage(source: string, documentPath: string | null, authorizedRoot?: string | null): Promise<{ data: Buffer; mime: string }> {
   const embedded = /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(source);
   if (embedded) {
     if (embedded[2].length > MAX_IMAGE_BYTES * 1.4) throw new Error('Image exceeds the 20 MB limit.');
@@ -75,11 +75,18 @@ export async function readImage(source: string, documentPath: string | null): Pr
     throw new Error('Only embedded images and relative local images are supported. Insert an image from the toolbar to embed it.');
   }
   if (!documentPath) throw new Error('Save the Markdown file before using relative image paths.');
-  const root = await realpath(path.dirname(documentPath));
-  const file = await realpath(path.resolve(root, decodeURIComponent(source)));
-  const relative = path.relative(root, file);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error('Images must be inside the Markdown file\'s folder. Use Insert image to embed an image from another folder.');
+  const directory = await realpath(path.dirname(documentPath));
+  const root = authorizedRoot ? await realpath(authorizedRoot) : directory;
+  const outside = (file: string) => {
+    const relative = path.relative(root, file);
+    return relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+  };
+  if (authorizedRoot && outside(await realpath(documentPath))) throw new Error('The saved document is outside the authorized project folder.');
+  const decoded = decodeURIComponent(source);
+  if (/^[a-z][a-z\d+.-]*:/i.test(decoded) || path.isAbsolute(decoded)) throw new Error('Image paths must be relative to the document.');
+  const file = await realpath(path.resolve(directory, decoded));
+  if (outside(file)) {
+    throw new Error(authorizedRoot ? 'Images must be inside the authorized project folder.' : 'Images must be inside the Markdown file\'s folder. Use Insert image to embed an image from another folder.');
   }
   const mime = mimeTypes[path.extname(file).toLowerCase()];
   if (!mime) throw new Error('Supported image formats are PNG, JPEG, GIF, and WebP.');

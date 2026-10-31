@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, protocol, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -13,6 +13,8 @@ import { themes } from '../lib/themes.js';
 import { formattingShortcuts } from '../lib/shortcuts.js';
 import { fileArguments } from '../lib/launch.js';
 import { productName, productTitle, userDataDirectory } from '../lib/branding.js';
+import { preparePublishing } from '../lib/includes.js';
+import { publishingTemplates } from '../lib/publishing-templates.js';
 import type { ContextMenuItem, EditorContext, OpenedFile, Result } from '../src/bridge.js';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'lekh-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
@@ -28,6 +30,7 @@ const pendingFiles: string[] = [];
 let rendererReady = false;
 interface NativeDocument { path: string | null; diskContent: string | null }
 const documents = new Map<string, NativeDocument>();
+const publishingRoots = new Map<string, string>();
 let dirty = false;
 let allowClose = false;
 let recentFiles: string[] = [];
@@ -157,6 +160,7 @@ function paragraphItems(): MenuItemConstructorOptions[] {
 function insertItems(): MenuItemConstructorOptions[] {
   return [
     { label: 'Image...', accelerator: 'CmdOrCtrl+Shift+I', click: () => action('image') },
+    { label: 'Publishing blocks', submenu: publishingTemplates.map(item => ({ label: item.label, click: () => action(`insert:${item.id}`) })) },
     { label: 'Footnote (Source)', click: () => action('insert:footnote') },
     { label: 'Link...', accelerator: 'CmdOrCtrl+K', click: () => action('link') },
     { label: 'Link reference (Source)', click: () => action('insert:reference') },
@@ -204,8 +208,8 @@ async function validateRaster(data: Buffer, mime: string): Promise<void> {
   } finally { decoder.destroy(); }
 }
 
-async function exportPDF(content: string, documentPath: string | null, loadDiagram?: DiagramImageLoader): Promise<Buffer> {
-  const html = await toPrintHTML(content, documentPath, loadDiagram);
+async function exportPDF(content: string, documentPath: string | null, loadDiagram?: DiagramImageLoader, imageRoot?: string | null): Promise<Buffer> {
+  const html = await toPrintHTML(content, documentPath, loadDiagram, imageRoot);
   const printWindow = new BrowserWindow({
     show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true },
   });
@@ -225,7 +229,7 @@ async function exportPDF(content: string, documentPath: string | null, loadDiagr
   } finally { printWindow.destroy(); }
 }
 
-async function exportWithDiagrams(content: string, currentPath: string | null, format: 'pdf' | 'docx'): Promise<Buffer> {
+async function exportWithDiagrams(content: string, currentPath: string | null, format: 'pdf' | 'docx', imageRoot?: string | null): Promise<Buffer> {
   const diagrams = parser.parse(content, {}).filter(token => token.type === 'fence' && isMermaidLanguage(token.info));
   if (diagrams.length > diagramLimits.diagrams) throw new Error('Export supports at most 32 Mermaid diagrams.');
   for (const diagram of diagrams) prepareMermaid(diagram.content);
@@ -271,8 +275,8 @@ async function exportWithDiagrams(content: string, currentPath: string | null, f
   };
   try {
     return format === 'pdf'
-      ? await exportPDF(content, currentPath, loadDiagram)
-      : await toDocx(content, source => readImage(source, currentPath), loadDiagram);
+      ? await exportPDF(content, currentPath, loadDiagram, imageRoot)
+      : await toDocx(content, source => readImage(source, currentPath, imageRoot), loadDiagram);
   } finally { if (renderer && !renderer.isDestroyed()) renderer.destroy(); }
 }
 
@@ -321,7 +325,7 @@ function installIPC(): void {
   });
   handle('editor:copy-image', async (id: unknown, source: unknown) => {
     contentArgument(source);
-    const { data } = await readImage(source, documentFor(id).path);
+    const { data } = await readImage(source, documentFor(id).path, publishingRoots.get(String(id)));
     const image = nativeImage.createFromBuffer(data);
     if (image.isEmpty()) throw new Error('This image could not be decoded for copying.');
     clipboard.writeImage(image);
@@ -389,6 +393,36 @@ function installIPC(): void {
   handle('document:release', async (id: unknown) => {
     documentFor(id);
     documents.delete(String(id));
+    publishingRoots.delete(String(id));
+  });
+  handle('publishing:allow-includes', async (id: unknown) => {
+    const document = documentFor(id);
+    if (!document.path) throw new Error('Save this document before allowing local includes.');
+    const selected = await dialog.showOpenDialog(window, {
+      title: 'Allow local includes for this document', buttonLabel: 'Allow this folder',
+      properties: ['openDirectory'],
+    });
+    if (selected.canceled) return false;
+    const root = await realpath(selected.filePaths[0]);
+    const file = await realpath(document.path);
+    const relative = path.relative(root, file);
+    if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error('Choose a project folder that contains this saved document.');
+    }
+    publishingRoots.set(String(id), root);
+    return true;
+  });
+  handle('publishing:prepare', async (id: unknown, content: unknown) => {
+    const document = documentFor(id);
+    contentArgument(content);
+    const root = publishingRoots.get(String(id)) ?? null;
+    const prepared = await preparePublishing(content, document.path, root);
+    if ((publishingRoots.get(String(id)) ?? null) !== root) throw new Error('Local include access changed. Refresh the preview.');
+    return prepared;
+  });
+  handle('publishing:revoke-includes', async (id: unknown) => {
+    documentFor(id);
+    publishingRoots.delete(String(id));
   });
   handle('document:save', async (id: unknown, content: unknown, saveAs: unknown) => {
     const document = documentFor(id);
@@ -470,7 +504,8 @@ function installIPC(): void {
     if ([...documents.values()].some(document => document.path && samePath(selection.filePath!, document.path))) {
       throw new Error('Export cannot replace an open Markdown source file.');
     }
-    const data = await exportWithDiagrams(content, currentPath, format);
+    const prepared = await preparePublishing(content, currentPath, publishingRoots.get(String(id)) ?? null);
+    const data = await exportWithDiagrams(prepared.markdown, currentPath, format, publishingRoots.get(String(id)));
     await atomicWrite(selection.filePath, data);
     return selection.filePath;
   });
@@ -605,6 +640,8 @@ function createWindow(): void {
       { label: 'Visual + Source', click: send('side-by-side') },
       { label: 'Visual / source', accelerator: 'CmdOrCtrl+/', click: send('mode') },
       { label: 'Source + Preview', click: send('preview') },
+      { label: 'Allow local includes...', click: send('allow-includes') },
+      { label: 'Stop local includes', click: send('revoke-includes') },
       { label: 'Writing assistance', click: send('writing-assistance') },
       { label: 'Toggle sidebar', accelerator: 'CmdOrCtrl+Shift+B', click: send('sidebar') },
       { label: 'Focus mode', accelerator: 'F9', click: send('focus') },
@@ -647,7 +684,10 @@ if (primaryInstance) void app.whenReady().then(async () => {
       const parameters = new URL(request.url).searchParams;
       const source = parameters.get('source');
       if (!source) throw new Error('Missing image source.');
-      const { data, mime } = await readImage(source, documentFor(parameters.get('document')).path);
+      const documentId = parameters.get('document');
+      const root = publishingRoots.get(documentId ?? '');
+      const { data, mime } = await readImage(source, documentFor(documentId).path, root);
+      if (publishingRoots.get(documentId ?? '') !== root) throw new Error('Local image access changed. Refresh the preview.');
       return new Response(new Uint8Array(data), { headers: { 'Content-Type': mime, 'Cache-Control': 'no-store' } });
     } catch (error) {
       console.error('Image could not be displayed:', error);

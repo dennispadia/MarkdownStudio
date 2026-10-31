@@ -27,6 +27,9 @@ export interface LekhAPI {
   save: (id: string, content: string, saveAs: boolean) => Promise<Result<{ path: string } | null>>;
   newDocument: () => Promise<Result<string>>;
   closeDocument: (id: string) => Promise<Result<void>>;
+  allowPublishingIncludes: (id: string) => Promise<Result<boolean>>;
+  revokePublishingIncludes: (id: string) => Promise<Result<void>>;
+  preparePublishing: (id: string, content: string) => Promise<Result<{ markdown: string; includes: string[] }>>;
   exportDocument: (id: string, content: string, format: 'pdf' | 'docx') => Promise<Result<string | null>>;
   insertImage: () => Promise<Result<string | null>>;
   storeImage: (id: string, source: string, storage: 'embedded' | 'assets') => Promise<Result<string>>;

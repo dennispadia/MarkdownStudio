@@ -1,35 +1,18 @@
-import { Extension, type Editor } from '@tiptap/core';
+import type { Editor } from '@tiptap/core';
 import { Mark, type Node } from '@tiptap/pm/model';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { Decoration } from '@tiptap/pm/view';
 import type { GrammarIssue } from '../lib/grammar.js';
+import { decorationLayer } from './decorations.js';
 
-const key = new PluginKey<DecorationSet>('writing-assistance');
+const layer = decorationLayer('writing-assistance');
 type Highlight = { from: number; to: number; message: string; index: number };
 
-export const GrammarHighlights = Extension.create({
-  name: 'grammarHighlights',
-  addProseMirrorPlugins() {
-    return [new Plugin<DecorationSet>({
-      key,
-      state: {
-        init: () => DecorationSet.empty,
-        apply(transaction, previous) {
-          const highlights: Highlight[] | undefined = transaction.getMeta(key);
-          if (highlights) return DecorationSet.create(transaction.doc, highlights.map(item =>
-            Decoration.inline(item.from, item.to, {
-              class: 'grammar-mark', title: item.message, 'data-grammar-issue': String(item.index),
-            })));
-          return transaction.docChanged ? DecorationSet.empty : previous;
-        },
-      },
-      props: { decorations: state => key.getState(state) },
-    })];
-  },
-});
+export const GrammarHighlights = layer.extension;
 
 export function setGrammarHighlights(editor: Editor, highlights: Highlight[]): void {
-  editor.view.dispatch(editor.state.tr.setMeta(key, highlights).setMeta('addToHistory', false));
+  layer.set(editor, highlights.map(item => Decoration.inline(item.from, item.to, {
+    class: 'grammar-mark', title: item.message, 'data-grammar-issue': String(item.index),
+  })));
 }
 
 export interface VisualGrammarSnapshot {

@@ -11,6 +11,7 @@ import { readImage } from './images.js';
 import { highlightedHTML, highlightedSegments, syntaxCSS, type CodeSegment } from './highlight.js';
 import { diagramLimits, isMermaidLanguage, prepareMermaid } from './diagrams.js';
 import { productName } from './branding.js';
+import { publishingCalloutPalette, publishingCSS, type PublishingMeta } from './publishing.js';
 
 export type ImageLoader = (source: string) => Promise<{ data: Buffer; mime: string }>;
 /** The renderer supplies locally rendered PNGs keyed by the original fence source. */
@@ -87,6 +88,8 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
   let headerCell = false;
   let headerRow = false;
   let cellAlignment: IParagraphOptions['alignment'];
+  const callouts: PublishingMeta[] = [];
+  let caption = false;
 
   const indentation = () => 360 * ((lists.at(-1)?.level ?? -1) + 1 + quote);
   const availableWidth = () => currentCell ? columnWidth - 320 : contentWidth - indentation();
@@ -96,6 +99,7 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
     const item = items.at(-1);
     const marker = item?.pending && list && currentCell === null;
     const left = indentation();
+    const alertColors = publishingCalloutPalette[callouts.at(-1)?.variant ?? ''];
     const paragraph = new Paragraph({
       children,
       widowControl: true,
@@ -105,6 +109,13 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
       ...(quote && currentCell === null ? {
         shading: { fill: ink.soft },
         border: { left: { color: ink.accent, style: BorderStyle.SINGLE, size: 18, space: 12 } },
+      } : {}),
+      ...(callouts.length && currentCell === null ? {
+        shading: { fill: alertColors?.background.slice(1).toUpperCase() ?? ink.soft },
+        border: { left: {
+          color: alertColors?.border.slice(1).toUpperCase() ?? ink.accent,
+          style: BorderStyle.SINGLE, size: 18, space: 12,
+        } },
       } : {}),
       ...options,
     });
@@ -132,8 +143,12 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
         case 'strong_open': stack.push(style); style = { ...style, bold: true }; break;
         case 'em_open': stack.push(style); style = { ...style, italics: true }; break;
         case 's_open': stack.push(style); style = { ...style, strike: true }; break;
+        case 'publishing_sub_open': stack.push(style); style = { ...style, subScript: true }; break;
+        case 'publishing_sup_open': stack.push(style); style = { ...style, superScript: true }; break;
         case 'strong_close':
         case 'em_close':
+        case 'publishing_sub_close':
+        case 'publishing_sup_close':
         case 's_close': style = stack.pop() ?? inherited; break;
         case 'text': runs.push(new TextRun({ ...style, text: token.content })); break;
         case 'code_inline': runs.push(new TextRun({ ...style, text: token.content, font: 'Consolas', size: 19, shading: { fill: ink.code } })); break;
@@ -180,7 +195,33 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
   }
 
   for (const [tokenIndex, token] of tokens.entries()) {
-    if (token.type === 'heading_open') {
+    if (token.type === 'publishing_callout_open') {
+      const meta = token.meta as PublishingMeta;
+      callouts.push(meta);
+      appendParagraph([new TextRun({
+        text: meta.title!, bold: true, color: publishingCalloutPalette[meta.variant!]?.border.slice(1).toUpperCase() ?? ink.accent,
+      })], { keepNext: true });
+    } else if (token.type === 'publishing_callout_close') callouts.pop();
+    else if (token.type === 'publishing_selector') {
+      const meta = token.meta as PublishingMeta;
+      appendParagraph([new TextRun({ text: meta.title!, bold: true, color: ink.accent })], { keepNext: true });
+      appendParagraph([new TextRun({ text: meta.options!.map(option => option.label).join(' / '), color: ink.muted })], { keepNext: true });
+    } else if (token.type === 'publishing_zone_open') {
+      appendParagraph([new TextRun({ text: (token.meta as PublishingMeta).label!, bold: true, size: 26, color: ink.accent })],
+        { keepNext: true, spacing: { before: 300, after: 140 } });
+    }
+    else if (token.type === 'publishing_tab_open') {
+      appendParagraph([new TextRun({ text: (token.meta as PublishingMeta).label!, bold: true, size: 26, color: ink.accent })],
+        { keepNext: true, spacing: { before: 300, after: 140 } });
+    } else if (token.type === 'publishing_caption_open') caption = true;
+    else if (token.type === 'publishing_caption_close') caption = false;
+    else if (token.type === 'publishing_unsupported') {
+      appendParagraph([new TextRun({ text: (token.meta as PublishingMeta).reason!, bold: true, color: '956019' })],
+        { shading: { fill: 'FFF8E6' }, keepNext: true });
+      for (const line of token.content.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n')) {
+        appendParagraph([new TextRun({ text: line || ' ', font: 'Consolas', size: 18 })], { shading: { fill: 'FFF8E6' } });
+      }
+    } else if (token.type === 'heading_open') {
       heading = headingLevels[Number(token.tag.slice(1)) - 1];
       bookmark = headingBookmarks.get(token);
     } else if (token.type === 'heading_close') {
@@ -256,7 +297,8 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
       const children = token.children ?? [];
       const task = items.at(-1)?.pending && lists.length ? /^\[([ xX])\]\s+/.exec(children[0]?.type === 'text' ? children[0].content : '') : null;
       if (task) children[0].content = children[0].content.slice(task[0].length);
-      const runs = await inline(children, currentCell ? { size: 19, ...(headerCell ? { bold: true } : {}) } : quote ? { color: ink.muted } : {});
+      const runs = await inline(children, currentCell ? { size: 19, ...(headerCell ? { bold: true } : {}) } :
+        caption ? { size: 19, italics: true, color: ink.muted } : quote ? { color: ink.muted } : {});
       if (task) {
         runs.unshift(new TextRun({ children: [task[1].toLowerCase() === 'x' ? '\u2611' : '\u2610', new Tab()], font: 'Segoe UI Symbol', color: ink.accent }));
         items.at(-1)!.pending = false;
@@ -372,10 +414,13 @@ export const printCSS = `
   pre code { background: none; padding: 0; border-radius: 0; }
   hr { border: 0; border-top: 1px solid #${ink.line}; margin: 24pt 0; }
   figure.mermaid-diagram { margin: 12pt 0; }
+  ${publishingCSS}
+  .publishing-tablist { display: none; }
+  .publishing-tab-panel[hidden],.publishing-tab-label { display: block; }
   ${syntaxCSS('pre')}
 `;
 
-export async function toPrintHTML(markdown: string, documentPath: string | null, loadDiagram?: DiagramImageLoader): Promise<string> {
+export async function toPrintHTML(markdown: string, documentPath: string | null, loadDiagram?: DiagramImageLoader, authorizedRoot?: string | null): Promise<string> {
   const tokens = parser.parse(markdown, {});
   if (tokens.filter(token => token.type === 'fence' && isMermaidLanguage(token.info)).length > diagramLimits.diagrams) throw new Error('An export supports at most 32 Mermaid diagrams.');
   const anchors = new Map<string, number>();
@@ -405,11 +450,11 @@ export async function toPrintHTML(markdown: string, documentPath: string | null,
     if (token.type === 'heading_open') token.attrSet('id', headingAnchor(tokens[index + 1].content, anchors));
     for (const child of token.children ?? []) {
       if (child.type === 'image') {
-        const { data, mime } = await readImage(child.attrGet('src') ?? '', documentPath);
+        const { data, mime } = await readImage(child.attrGet('src') ?? '', documentPath, authorizedRoot);
         child.attrSet('src', `data:${mime};base64,${data.toString('base64')}`);
       }
     }
   }
-  const html = parser.renderer.render(tokens, { ...parser.options, highlight: highlightedHTML }, {});
+  const html = parser.renderer.render(tokens, { ...parser.options, highlight: highlightedHTML }, { publishingExport: true });
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${escapeHTML(`${productName} export`)}</title><style>${printCSS}</style></head><body>${html}</body></html>`;
 }

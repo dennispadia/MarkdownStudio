@@ -2202,6 +2202,146 @@ try {
     await writeFile(process.env.LEKH_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
     await menuAction('close-tab');
   }
+  const { unzipEntries } = await import(new URL('../build/tests/zip.js', import.meta.url));
+  const { publishingBlockRanges } = await import(new URL('../build/lib/publishing.js', import.meta.url));
+  const publishingRoot = path.join(temporary, 'publishing-project');
+  for (const directory of ['docs', 'includes', 'assets']) await mkdir(path.join(publishingRoot, directory), { recursive: true });
+  await writeFile(path.join(publishingRoot, 'assets', 'pixel.png'), testPNG(1, 1));
+  await writeFile(path.join(publishingRoot, 'includes', 'shared.md'), 'Shared included prose.\n\n![Shared pixel](../assets/pixel.png)\n');
+  await writeFile(path.join(publishingRoot, 'zone-pivot-groups.yml'), 'groups:\n- id: example-options\n  title: Approaches\n  prompt: Choose an approach\n  pivots:\n  - id: first\n    title: First approach\n  - id: second\n    title: Second approach\n');
+  const publishingFixture = [
+    '---', 'title: Publishing fixture', 'zone_pivot_groups: example-options', '---', '',
+    '# Publishing fixture', '', 'Unrelated prose.', '',
+    '> [!NOTE]', '> A purple note.', '', '> [!TIP]', '> A helpful green tip.', '',
+    '> [!IMPORTANT]', '> Essential blue information.', '', '> [!CAUTION]', '> Red caution.', '',
+    '> [!WARNING]', '> Orange warning.', '',
+    '#### [Managed identity](#tab/msi)', '', '```bash', 'printf "identity"', '```', '',
+    '#### [Service principal](#tab/spn)', '', '```bash', 'printf "principal"', '```', '', '---', '',
+    ':::zone pivot="first"', 'First variant body.', ':::zone-end', '',
+    ':::zone pivot="second"', 'Second variant body.', ':::zone-end', '',
+    '[!INCLUDE [Shared content](../includes/shared.md)]', '',
+    ':::custom-widget', '<script>window.smokePublishingExecuted=true</script>', ':::custom-widget-end', '',
+  ].join('\n');
+  const publishingFile = path.join(publishingRoot, 'docs', 'article.md');
+  await writeFile(publishingFile, publishingFixture);
+  await main.evaluate(`smokeOpenPath=${JSON.stringify(publishingFile)}`);
+  await action('open');
+  const publishingDocument = await activeTab();
+  await action('visual');
+  await waitFor(async () => ui("document.querySelectorAll('.publishing-callout').length === 5 && document.querySelectorAll('[data-publishing-tabs]').length === 1"), 'protected rich publishing blocks');
+  assert.equal(await ui("window.smokePublishingExecuted === undefined"), true, 'Unsupported HTML is never executable');
+  for (const [theme, expected] of [
+    ['light', ['rgb(239, 217, 253)', 'rgb(241, 250, 241)', 'rgb(235, 243, 252)', 'rgb(253, 243, 244)', 'rgb(255, 249, 245)']],
+    ['dark', ['rgb(59, 46, 88)', 'rgb(5, 75, 22)', 'rgb(0, 65, 115)', 'rgb(99, 0, 1)', 'rgb(74, 30, 4)']],
+  ]) {
+    await menuAction(`theme:${theme}`);
+    for (const [index, kind] of ['note', 'tip', 'important', 'caution', 'warning'].entries()) {
+      assert.equal(await ui(`getComputedStyle(document.querySelector('.publishing-callout-${kind}')).backgroundColor`), expected[index], `${kind} matches the published ${theme} alert color`);
+    }
+  }
+  await ui("document.querySelector('[data-publishing-tab=\"1\"]').click()");
+  assert.equal(await ui("document.querySelector('[data-publishing-panel=\"0\"]').hidden"), true);
+  assert.equal(await ui("document.querySelector('[data-publishing-panel=\"1\"]').hidden"), false);
+  await ui("document.querySelector('[data-publishing-tab=\"0\"]').focus()");
+  await browser.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }, sessionId);
+  await browser.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 }, sessionId);
+  assert.equal(await ui("document.activeElement.dataset.publishingTab"), '1', 'Tabs support keyboard navigation');
+  await ui("document.querySelector('[data-publishing-tab=\"0\"]').click(); document.querySelector('.publishing-copy-code').click()");
+  await waitFor(async () => (await main.evaluate('smokeElectron.clipboard.readText()')) === 'printf "identity"\n', 'rich-block raw code copy');
+  await main.evaluate(`smokeOpenPath=${JSON.stringify(publishingRoot)}`);
+  await action('allow-includes');
+  await waitFor(async () => ui("document.querySelector('.publishing-document-selector')?.getAttribute('aria-label') === 'Choose an approach' && document.querySelector('.tiptap').textContent.includes('Shared included prose.') && [...document.querySelectorAll('.publishing-block img')].some(image=>image.complete && image.naturalWidth===1)"), 'authorized includes, rebased images and local publishing labels');
+  await ui("document.querySelector('[data-publishing-choice=\"second\"]').click()");
+  assert.equal(await ui("document.querySelector('[data-publishing-zone=\"first\"]').hidden"), true);
+  assert.equal(await ui("document.querySelector('[data-publishing-zone=\"second\"]').hidden"), false);
+  assert.ok(await ui("document.querySelector('.publishing-variant-placeholder')?.textContent.includes('preserved')"), 'Inactive authoring content remains visibly represented');
+  const publishingWord = path.join(temporary, 'publishing.docx');
+  await main.evaluate(`smokeSavePath=${JSON.stringify(publishingWord)}`);
+  await menuAction('export-docx');
+  const publishingXML = unzipEntries(await readFile(publishingWord)).get('word/document.xml').toString();
+  for (const text of ['Managed identity', 'Service principal', 'First variant body.', 'Second variant body.', 'Shared included prose.']) assert.ok(publishingXML.includes(text), `Word keeps ${text}`);
+  assert.doesNotMatch(publishingXML, /zone_pivot_groups|Edit source|Copy failed/);
+  const publishingPDF = path.join(temporary, 'publishing.pdf');
+  await main.evaluate(`smokeSavePath=${JSON.stringify(publishingPDF)}`);
+  await menuAction('export-pdf');
+  assert.equal((await readFile(publishingPDF)).subarray(0, 5).toString(), '%PDF-');
+  await ui("(() => {const p=[...document.querySelectorAll('.tiptap > p')].find(p=>p.textContent==='Unrelated prose.');p.focus();const range=document.createRange();range.selectNodeContents(p);range.collapse(false);window.getSelection().removeAllRanges();window.getSelection().addRange(range);p.closest('.tiptap').focus()})()");
+  await browser.call('Input.insertText', { text: ' Added.' }, sessionId);
+  await action('source');
+  const retainedPublishing = await ui("document.querySelector('#source-editor').value");
+  assert.ok(retainedPublishing.includes('Unrelated prose. Added.'));
+  for (const block of publishingBlockRanges(publishingFixture)) assert.ok(retainedPublishing.includes(block.raw.trimEnd()), `Visual editing preserves ${block.kind} source`);
+  assert.equal(await readFile(publishingFile, 'utf8'), publishingFixture, 'Rendering and interaction never save or overwrite the source');
+  await action('revoke-includes');
+  await action('preview');
+  await waitFor(async () => ui("document.querySelector('.document-preview').textContent.includes('Publishing fixture') && !document.querySelector('.document-preview').textContent.includes('Shared included prose.')"), 'include access revocation clears rendered content');
+  await main.evaluate('smokeChoice=1');
+  await menuAction('close-tab');
+  await action('new');
+  await action('source');
+  const blockSelection = '**Selected $& text**';
+  const blockDocument = `Before.\n\n${blockSelection}\n\nAfter.\n`;
+  await sourceEdit(blockDocument);
+  await ui(`document.querySelector('#source-editor').setSelectionRange(${blockDocument.indexOf(blockSelection)},${blockDocument.indexOf(blockSelection) + blockSelection.length})`);
+  if (!await ui("document.querySelector('[aria-controls=\"publishing-menu\"]').getClientRects().length > 0")) await action('format-menu');
+  await ui("document.querySelector('[aria-controls=\"publishing-menu\"]').click()");
+  assert.equal(await ui("document.querySelector('#publishing-menu').hidden"), false);
+  await ui("document.querySelector('#publishing-menu [data-action=\"insert:callout-tip\"]').click()");
+  await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'toolbar callout insertion');
+  const formattedSelection = await ui("document.querySelector('#source-editor').value");
+  assert.ok(formattedSelection.includes(`> [!TIP]\n> ${blockSelection}`));
+  assert.equal(formattedSelection.split(blockSelection).length - 1, 1, 'Formatting the selection must not duplicate it');
+  await menuAction('undo');
+  assert.equal(await ui("document.querySelector('#source-editor').value"), blockDocument);
+  await main.evaluate(`smokeOpenPath=${JSON.stringify(path.join(publishingRoot, 'assets', 'pixel.png'))}`);
+  await ui("document.querySelector('#publishing-menu [data-action=\"insert:publishing-image\"]').click()");
+  await waitFor(async () => ui("document.querySelector('#publishing-image-dialog').open"), 'described image dialog');
+  await ui("document.querySelector('#publishing-image-alt').value='A \"quoted\" diagram'; document.querySelector('#publishing-image-dialog button[value=\"insert\"]').click()");
+  await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'image directive insertion');
+  await action('visual');
+  await waitFor(async () => ui("[...document.querySelectorAll('.publishing-block img')].some(image=>image.getAttribute('alt')==='A \"quoted\" diagram' && image.naturalWidth===1)"), 'quoted image description');
+  await main.evaluate('smokeChoice=1');
+  await menuAction('close-tab');
+  assert.equal(await tabCount(), 1);
+  console.log('PASS: publishing toolbar, exact light/dark alert colors, keyboard tabs, raw code copy, global variants/local labels, protected source roundtrip, authorized includes/images/revocation, all-alternative Word/PDF exports and described-image insertion');
+
+  await action('new');
+  await action('source');
+  await sourceEdit('# Root\n\n## Setup\n\nFirst section.\n\n> [!NOTE]\n> ## Setup\n>\n> Second section.\n\n[Go first](#setup)\n\n[Go second](#setup-1)\n');
+  await action('visual');
+  await waitFor(async () => ui("document.querySelector('.publishing-callout h2')?.id === 'setup-1' && document.querySelector('.tiptap > h2')?.id === 'setup'"), 'document-wide duplicate heading anchors');
+  await ui("window.smokePublishingScroll=[]; document.querySelectorAll('.tiptap h2').forEach(h=>h.scrollIntoView=()=>window.smokePublishingScroll.push(h.id)); document.querySelector('.tiptap a[href=\"#setup\"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}))");
+  await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'first duplicate heading navigation');
+  await ui("document.querySelector('.tiptap a[href=\"#setup-1\"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}))");
+  await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'second duplicate heading navigation');
+  assert.deepEqual(await ui("window.smokePublishingScroll"), ['setup', 'setup-1']);
+  await main.evaluate('smokeChoice=1');
+  await menuAction('close-tab');
+  console.log('PASS: publishing headings share document-wide unique anchors and navigate to the correct duplicate');
+
+  if (process.env.LEKH_PUBLISHING_REFERENCE && process.env.LEKH_PUBLISHING_ROOT) {
+    const reference = await readFile(process.env.LEKH_PUBLISHING_REFERENCE, 'utf8');
+    await main.evaluate(`smokeOpenPath=${JSON.stringify(process.env.LEKH_PUBLISHING_REFERENCE)}`);
+    await action('open');
+    await main.evaluate(`smokeOpenPath=${JSON.stringify(process.env.LEKH_PUBLISHING_ROOT)}`);
+    await action('allow-includes');
+    await action('visual');
+    await waitFor(async () => ui("document.querySelector('.publishing-document-selector')?.getAttribute('aria-label') === 'Choose your Pacemaker Fencing Solution' && document.querySelectorAll('[data-publishing-tabs]').length >= 2"), 'actual reference selectors, includes and implicitly terminated tab groups', 90000);
+    await ui("document.querySelector('[data-publishing-choice=\"azure-fence-agent\"]').click()");
+    assert.ok(await ui("[...document.querySelectorAll('[role=\"tab\"]')].some(tab=>tab.textContent==='Managed identity' && tab.getClientRects().length>0)"));
+    assert.ok(await ui("[...document.querySelectorAll('[role=\"tab\"]')].some(tab=>tab.textContent==='Service principal' && tab.getClientRects().length>0)"));
+    assert.equal(await ui("document.querySelector('.tiptap').textContent.includes('Unclosed tabs')"), false);
+    if (process.env.LEKH_SCREENSHOT) {
+      const capture = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
+      await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'publishing-reference.png'), Buffer.from(capture.data, 'base64'));
+    }
+    await action('source');
+    assert.equal(await ui("document.querySelector('#source-editor').value"), reference.replace(/\r\n/g, '\n'), 'Actual public article remains unchanged through rendering and selector interaction');
+    assert.equal(await readFile(process.env.LEKH_PUBLISHING_REFERENCE, 'utf8'), reference);
+    await menuAction('close-tab');
+    console.log('PASS: the supplied public article renders its real selector prompt/labels and managed-identity/service-principal tabs from authorized local project files without changing source');
+  }
+
   const grammarFixture = '# Grammar check\n\nWe made a error. We made a error.\n\nShe could of gone.\n\n`We made a error.`\n\n```text\nWe made a error.\n```\n\n[Link](https://example.com/a-error)\n';
   const grammarCRLF = path.join(temporary, 'Grammar CRLF.md');
   await writeFile(grammarCRLF, grammarFixture.replace(/\n/g, '\r\n'));

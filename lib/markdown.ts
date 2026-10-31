@@ -1,6 +1,8 @@
 import MarkdownIt from 'markdown-it';
+import { registerPublishing } from './publishing.js';
 
 export const parser = new MarkdownIt({ html: false, linkify: true, breaks: false });
+registerPublishing(parser);
 parser.block.ruler.before('paragraph', 'lekh_toc_marker', (state, startLine, _endLine, silent) => {
   const line = state.src.slice(state.bMarks[startLine] + state.tShift[startLine], state.eMarks[startLine]);
   if (!/^<!-- \/?lekh:toc -->$/.test(line)) return false;
@@ -49,7 +51,11 @@ export function documentPreviewHTML(markdown: string, documentId: string): strin
   const tokens = parser.parse(markdown, {});
   const scopeImages = (items: typeof tokens): void => {
     for (const token of items) {
-      if (token.type === 'image') token.attrSet('src', imageDisplayURL(token.attrGet('src') ?? '', documentId));
+      if (token.type === 'image') {
+        const source = token.attrGet('src') ?? '';
+        token.attrSet('data-lekh-source', source);
+        token.attrSet('src', imageDisplayURL(source, documentId));
+      }
       if (token.children) scopeImages(token.children);
     }
   };

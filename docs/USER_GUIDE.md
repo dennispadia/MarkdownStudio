@@ -80,6 +80,33 @@ Close the panel to keep writing with underlines, or disable checking to stop the
 
 ### Editing features
 
+### Publishing blocks and reader-friendly documents
+
+**Blocks** in the toolbar opens shortcuts for **Note, Tip, Important, Caution, Warning, Tabbed examples, Variant selector, Structured steps, Image with description, Document metadata, and Local include**.
+The same commands are under **Insert > Publishing blocks**. At narrow widths, Blocks remains available through **More tools**.
+Select existing content before choosing a callout, tabbed example or selector to retain that content inside the new block. Without a selection, Lekh inserts an editable example.
+Each alert type has its own matching light/dark color and a text label, so meaning is not conveyed by color alone.
+
+Tabs switch between examples within one block. Variant selectors switch matching content throughout the current document; they are independent of tabs.
+Source always retains every alternative. In Visual, inactive variant blocks keep a compact authoring placeholder so hidden content is not accidentally mistaken for absent content.
+Read-only previews hide inactive content. Static exports include **all** labeled alternatives.
+
+Recognized publishing blocks are protected Visual nodes: hover or focus a block and choose **Edit source** to select its exact syntax.
+Unrelated Visual edits retain the block's original Markdown, including unsupported directives. Source remains the way to edit these blocks' contents and attributes.
+Metadata is shown as a collapsed view rather than ordinary article text. This is rendering and preservation, not a complete YAML schema validator.
+
+For local includes:
+
+1. Save the Markdown document inside its project folder.
+2. Choose **More tools > Allow local includes**, or **View > Allow local includes**.
+3. Select a folder containing this document and the intended included files.
+4. Preview and exports may now resolve bounded local includes inside that folder. Paths escaping it, missing files, cycles and size/depth limits are reported explicitly.
+5. Choose **Stop local includes** to revoke access, or close the document. Grants are not remembered between sessions.
+
+If publishing labels are defined in a local `zone-pivot-groups.yml`, allow the project folder so available definitions can be used. Otherwise selectors show the discovered variant IDs with an explanation.
+Lekh never downloads includes, images or publishing configuration from the internet.
+Features requiring a publishing site's complete build pipeline are not simulated as successful output; unsupported syntax remains identified and preserved.
+
 - **Visual + Source:** turn on the switch in the toolbar to edit Visual on the left and Source on the right. Both represent the same document; edits update the other pane. Click the side you want to edit; toolbar formatting follows it. Turning the switch off keeps Visual and retains scroll offsets. The switch supports Space when focused. A two-file pair shares this same switch, which controls only the active document and preserves the other document's mode.
 - **Single-editor views:** **More (...) > Visual only / Source only**, and **View > Visual / source** (Ctrl+/), retain the separate views. These mode changes reset undo history as before; simply showing Source alongside Visual does not recreate the editor. Visual edits can normalize Markdown syntax; use Source for exact syntax and unsupported constructs.
 - **Single-row toolbar:** headings, bold, italic, strikethrough, inline code, all three list types, quotes, links, images, tables, code blocks, horizontal rules, table-of-contents insertion/update, and Mermaid insertion are directly accessible when space permits. Icons expose names and shortcuts on hover. As the window narrows, commands that no longer fit move into **More tools and views (...)**, with readable labels, rather than producing a scrollbar. Widening the window returns them to the toolbar. More also contains additional views and help; arrow keys navigate and Escape returns focus to its button. All commands remain available from the native menus. Save and Export keep their labels.
@@ -149,7 +176,7 @@ Right-click inside the visual editor or Markdown source to access:
 
 Paragraph and Insert commands are also available under the native **Edit** menu.
 
-**Footnote, link reference, math block, and YAML** commands insert editable Markdown syntax in **Source mode**, as an initial implementation. From Visual mode they insert at the document's end (YAML goes at the top); from Source mode they use the current selection. YAML insertion refuses to duplicate an existing opening front-matter block. Footnotes and link references use unique reference numbers. Math, footnotes, and YAML do not have formatted rendering or structured export support yet; keep them in Source mode to preserve the syntax. Standard Markdown link references are resolved by the renderer/exporter.
+**Footnote, link reference, math block, and YAML** commands insert editable Markdown syntax in **Source mode**. From Visual mode they insert at the document's end (YAML goes at the top); from Source mode they use the current selection. YAML insertion refuses to duplicate an existing opening front-matter block. Footnotes and link references use unique reference numbers. Math and footnotes do not have formatted rendering or structured export support yet; keep them in Source mode to preserve the syntax. YAML is preserved in the metadata view and omitted from article-body exports. Standard Markdown link references are resolved by the renderer/exporter.
 
 **Table of contents** inserts a list enclosed by `<!-- lekh:toc -->` and `<!-- /lekh:toc -->`. Choose **Insert > Update table of contents** (also under **More formatting**) after changing headings. Update replaces only that marked block, preserving surrounding source; duplicate heading names get distinct anchors. Visual editing preserves the block as a single contents node. Update requires exactly one well-formed marked block outside code fences; unmarked lists must be replaced with a newly inserted marked contents list. Its links navigate within Visual, Preview/PDF, and exported Word documents; Word uses heading bookmarks for internal destinations.
 
@@ -221,13 +248,13 @@ Word output remains editable and reflows according to the receiving application'
 
 - Missing, unreadable, or unsupported export images cause an explicit error instead of silently disappearing.
 - Raw HTML is treated as text during export, not executed.
-- Math, footnotes, and YAML do not have formatted rendering or structured export support; use Source mode to preserve their Markdown syntax. Standard Markdown link references are resolved.
+- Math and footnotes do not have formatted rendering or structured export support; use Source mode to preserve their Markdown syntax. YAML remains metadata rather than article text. Standard Markdown link references are resolved.
 
 ## First-version boundaries
 
 Visual editing can normalize Markdown syntax and may not preserve unsupported constructs. Use **Source mode** for exact editing of YAML front matter, raw HTML, math, footnotes, or custom Markdown extensions. Simply opening, switching modes, and saving without edits preserves the original text.
 
-Not included yet: a folder workspace, cloud sync, automatic updates, custom export templates, manual advanced pagination controls, interactive Word form checkboxes, and LaTeX rendering. Task lists export as rendered boxes, not interactive form controls. Math, footnotes, and YAML do not have formatted rendering or structured export support.
+Not included yet: a folder workspace, cloud sync, automatic updates, custom export templates, manual advanced pagination controls, interactive Word form checkboxes, and LaTeX rendering. Task lists export as rendered boxes, not interactive form controls. Math and footnotes do not have formatted rendering or structured export support; metadata is not article body text.
 
 ## Privacy
 

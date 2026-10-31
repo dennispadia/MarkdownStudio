@@ -22,6 +22,7 @@ Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue]
 | **Responsive interface** | One formatting toolbar, More tools and views overflow, shrinking tabs, an Open documents list, and a collapsible sidebar. |
 | **Links and tables** | Edit link text/addresses in place, remove links without deleting text, choose table dimensions, and add/remove table rows and columns. |
 | **Code and diagrams** | Search the offline language catalog, highlight code, copy raw code, and insert editable Mermaid diagrams at the current selection. Code is displayed, never executed. |
+| **Publishing blocks** | Use **Blocks** in the toolbar for five colored callout types, tabbed examples, variant selectors, structured steps, described images, metadata and local includes. Existing compatible authoring syntax renders automatically, without a platform-specific mode. |
 | **Find/Replace** | Match case, Unicode whole words, regex, match counts, navigation, and replacement. |
 | **Writing assistance** | Optional offline English grammar checks powered by the bundled Harper engine. Review, apply, ignore, or ignore a suggestion throughout the current document. No text is sent online or changed automatically. |
 | **Word and PDF export** | Export the active document, including unsaved edits, with an explicit heading hierarchy, formatted links, aligned tables, nested lists, task boxes, syntax-colored code, supported images, and Mermaid diagrams. Export does not save the Markdown. |
@@ -39,7 +40,18 @@ Switching between Visual and Source resets that tab's undo history; switching ta
 - **Code and images:** syntax colors, blank lines, and tabs are preserved in code blocks. Supported images keep their aspect ratio and fit within page bounds.
 - **Print layout:** A4 pages with 20 mm margins and readable light print colors, regardless of the editor's Light/Dark theme.
 
-Word output remains editable and reflows in the receiving application; Word and PDF are **not pixel-identical**. Math, footnotes, and YAML do not have formatted rendering or structured export support. See [export details and limitations](docs/USER_GUIDE.md#images-and-exports).
+Word output remains editable and reflows in the receiving application; Word and PDF are **not pixel-identical**. Math and footnotes do not have formatted rendering or structured export support. YAML is preserved in the metadata view rather than exported as article text. See [export details and limitations](docs/USER_GUIDE.md#images-and-exports).
+
+### Publication-quality documents
+
+Lekh uses a reader-friendly document hierarchy and renders supported rich blocks consistently in Visual and read-only previews.
+Note, Tip, Important, Caution and Warning have distinct light/dark colors. Tabs and document-wide variant selectors are separate controls.
+Exports retain every tab and variant as labeled content rather than dropping inactive alternatives.
+
+Publishing blocks are protected in Visual: **Edit source** selects their original Markdown without flattening custom syntax.
+Metadata has a collapsed source view instead of becoming article body text. Unsupported directives remain visible.
+Local includes require a saved document and an explicit, per-document project-folder grant. No remote content is fetched, and access can be revoked from **More tools > Stop local includes**.
+Publishing systems can supply additional metadata or build-time configuration; Lekh is not a replacement for their final validation pipeline.
 
 ## Screenshots
 

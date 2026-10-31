@@ -36,6 +36,22 @@ test('assets storage requires a saved document and explicit valid storage choice
   }
 });
 
+test('project image access requires an explicit grant and cannot escape its real directory boundary', async () => {
+  await fixture(async (root, document) => {
+    const shared = path.join(root, 'shared');
+    await mkdir(shared);
+    const image = path.join(shared, 'diagram.png');
+    await writeFile(image, png);
+    await assert.rejects(readImage('../shared/diagram.png', document), /inside the Markdown/);
+    assert.deepEqual((await readImage('../shared/diagram.png', document, root)).data, png);
+    await assert.rejects(readImage('../shared/diagram.png', document, path.dirname(document)), /authorized project/);
+    await assert.rejects(readImage('diagram.png', document, shared), /document is outside/);
+    await assert.rejects(readImage(encodeURIComponent(image), document, root), /relative/);
+    await assert.rejects(readImage(encodeURIComponent('https://example.com/image.png'), document, root), /relative/);
+    await assert.rejects(readImage('../shared/diagram.png', document), /inside the Markdown/, 'Revoking the grant restores the original boundary');
+  });
+});
+
 test('assets are relative safe URLs with unique names, exact bytes and no overwritten files', async () => {
   await fixture(async (_root, document) => {
     const directory = path.join(path.dirname(document), 'assets');
