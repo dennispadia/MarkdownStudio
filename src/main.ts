@@ -290,11 +290,11 @@ let activeTab: DocumentTab | undefined;
 let responsiveFrame = 0;
 let untitledCount = 0;
 let contextImageSource: string | null = null;
-const draftKey = 'markdown-studio-draft-v1';
-const themeKey = 'markdown-studio-theme';
-const sidebarKey = 'markdown-studio-sidebar-hidden';
-const sidebarWidthKey = 'markdown-studio-sidebar-width';
-const recentExpandedKey = 'markdown-studio-recent-expanded';
+const draftKey = 'lekh-draft-v1';
+const themeKey = 'lekh-theme';
+const sidebarKey = 'lekh-sidebar-hidden';
+const sidebarWidthKey = 'lekh-sidebar-width';
+const recentExpandedKey = 'lekh-recent-expanded';
 let sidebarHidden = false;
 let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
 let recentExpanded = false;
@@ -551,7 +551,7 @@ async function applyTheme(value: Theme, persist = true): Promise<void> {
     try { localStorage.setItem(themeKey, theme); }
     catch (error) { notify(`Theme changed, but could not be remembered: ${String(error)}`, true); }
   }
-  unwrap(await window.studio.setTheme(theme));
+  unwrap(await window.lekh.setTheme(theme));
 }
 
 function createEditor(content: string, id = documentId, host = visual): Editor {
@@ -561,13 +561,13 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
         ...this.parent?.(),
         src: {
           default: null,
-          parseHTML: element => element.getAttribute('data-studio-source') ?? element.getAttribute('src'),
+          parseHTML: element => element.getAttribute('data-lekh-source') ?? element.getAttribute('src'),
         },
       };
     },
     renderHTML({ HTMLAttributes }) {
       const source = String(HTMLAttributes.src ?? '');
-      return ['img', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { src: imageDisplayURL(source, id), 'data-studio-source': source })];
+      return ['img', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { src: imageDisplayURL(source, id), 'data-lekh-source': source })];
     },
   });
   return new Editor({
@@ -575,7 +575,7 @@ function createEditor(content: string, id = documentId, host = visual): Editor {
   extensions: [
     StarterKit.configure({ trailingNode: false, codeBlock: false, link: { openOnClick: false, protocols: ['https', 'http', 'mailto'] } }),
     LanguageCodeBlock.configure({
-      copyCode: code => { void run(async () => { unwrap(await window.studio.writeClipboard(code)); notify('Code copied.'); }); },
+      copyCode: code => { void run(async () => { unwrap(await window.lekh.writeClipboard(code)); notify('Code copied.'); }); },
       reportError: message => notify(message, true),
     }),
     LocalImage.configure({ allowBase64: true }),
@@ -927,7 +927,7 @@ function addTab(id: string, content: string, name: string, file: string | null, 
 }
 
 async function newTab(): Promise<void> {
-  const id = unwrap(await window.studio.newDocument());
+  const id = unwrap(await window.lekh.newDocument());
   let name: string;
   do {
     untitledCount++;
@@ -1022,7 +1022,7 @@ async function closeGroup(ids: readonly string[]): Promise<void> {
   const index = tabs.findIndex(tab => tab.id === ids[0]);
   for (const id of ids) {
     const tab = tabs.find(tab => tab.id === id)!;
-    unwrap(await window.studio.closeDocument(id));
+    unwrap(await window.lekh.closeDocument(id));
     tab.editor.destroy();
     tab.pane.remove();
     tabs.splice(tabs.indexOf(tab), 1);
@@ -1042,7 +1042,7 @@ async function closeTab(id: string): Promise<void> {
   const pair = pairFor(pairs, id);
   const partner = pair ? (pair.leftId === id ? pair.rightId : pair.leftId) : null;
   const index = tabs.findIndex(tab => tab.id === id);
-  unwrap(await window.studio.closeDocument(id));
+  unwrap(await window.lekh.closeDocument(id));
   editor.destroy();
   activeTab!.pane.remove();
   tabs.splice(index, 1);
@@ -1057,7 +1057,7 @@ function finishClose(): void {
   clearTimeout(draftTimer);
   if (!recovery.length) localStorage.removeItem(draftKey);
   window.removeEventListener('beforeunload', storeDraft);
-  window.studio.close();
+  window.lekh.close();
 }
 
 function resetVisual(content: string): void {
@@ -1092,7 +1092,7 @@ function update(): void {
   element('filename').title = documentPath ?? documentName;
   element('dirty-indicator').textContent = dirty ? ' \u2022' : '';
   document.title = `${dirty ? '* ' : ''}${documentName} - ${productName}`;
-  window.studio.setDirty(tabs.some(tab => tab.markdown !== tab.savedMarkdown));
+  window.lekh.setDirty(tabs.some(tab => tab.markdown !== tab.savedMarkdown));
   const words = wordCount(markdown);
   element('word-count').textContent = `${words.toLocaleString()} words`;
   element('word-count').title = `${markdown.length.toLocaleString()} characters / ${Math.max(1, Math.ceil(words / 220))} min read`;
@@ -1201,7 +1201,7 @@ function updateToolbar(): void {
     : source.value.slice(sourceLineStart).match(/^ {0,3}(#{1,6})[ \t]+/)?.[1].length;
   element<HTMLSelectElement>('heading').value = String(level ?? 0);
   element('table-tools').hidden = mode !== 'visual' || !editor.isActive('table');
-  window.studio.setEditorContext({
+  window.lekh.setEditorContext({
     mode, heading: Number(level ?? 0), inTable: mode === 'visual' && editor.isActive('table'),
     active: mode === 'visual' ? Object.entries(names).filter(([, name]) => editor.isActive(name)).map(([command]) => command) : [],
   });
@@ -1286,7 +1286,7 @@ function insertContents(): void {
 
 async function save(saveAs = false): Promise<boolean> {
   const snapshot = markdown;
-  const result = unwrap(await window.studio.save(documentId, snapshot, saveAs));
+  const result = unwrap(await window.lekh.save(documentId, snapshot, saveAs));
   if (!result) return false;
   documentPath = result.path;
   documentName = result.path.split(/[\\/]/).at(-1)!;
@@ -1301,7 +1301,7 @@ async function save(saveAs = false): Promise<boolean> {
 let zoomRevision = 0;
 async function refreshZoom(command?: 'in' | 'out' | 'reset'): Promise<void> {
   const revision = ++zoomRevision;
-  const factor = unwrap(await window.studio.zoom(command));
+  const factor = unwrap(await window.lekh.zoom(command));
   if (revision !== zoomRevision) return;
   const percentage = Math.round(factor * 100);
   element('zoom-reset').textContent = `${percentage}%`;
@@ -1318,13 +1318,13 @@ window.addEventListener('resize', () => {
 
 async function mayDiscard(): Promise<boolean> {
   if (markdown === savedMarkdown) return true;
-  const choice = unwrap(await window.studio.confirmUnsaved(documentName));
+  const choice = unwrap(await window.lekh.confirmUnsaved(documentName));
   if (choice === 'cancel') return false;
   return choice === 'save' ? save() : true;
 }
 
 async function refreshRecent(): Promise<void> {
-  const files = unwrap(await window.studio.recent());
+  const files = unwrap(await window.lekh.recent());
   const recent = element('recent');
   recent.replaceChildren();
   for (const file of files) {
@@ -1341,7 +1341,7 @@ async function refreshRecent(): Promise<void> {
 }
 
 async function open(file?: string): Promise<void> {
-  const opened = unwrap(await window.studio.open(file));
+  const opened = unwrap(await window.lekh.open(file));
   if (!opened) return;
   addTab(opened.id, opened.content, opened.path.split(/[\\/]/).at(-1)!, opened.path);
   await refreshRecent();
@@ -1350,7 +1350,7 @@ async function open(file?: string): Promise<void> {
 let pendingExternalOpen = false;
 
 async function openPending(): Promise<void> {
-  const results = unwrap(await window.studio.openPending());
+  const results = unwrap(await window.lekh.openPending());
   const errors: string[] = [];
   for (const result of results) {
     if (!result.ok) { errors.push(result.error); continue; }
@@ -1427,7 +1427,7 @@ async function chooseImageStorage(image: string): Promise<void> {
   if (await choice !== 'insert') return;
   if (id !== documentId) throw new Error('The active document changed. Insert the image again in the intended document.');
   const storage = assets.checked ? 'assets' : 'embedded';
-  const value = unwrap(await window.studio.storeImage(id, image, storage));
+  const value = unwrap(await window.lekh.storeImage(id, image, storage));
   insertEmbeddedImage(value);
 }
 
@@ -1530,7 +1530,7 @@ async function dispatch(action: string): Promise<void> {
     case 'preview': togglePreview(); break;
     case 'unsplit': unsplit(); break;
     case 'paste-image': {
-      const image = unwrap(await window.studio.readClipboardImage());
+      const image = unwrap(await window.lekh.readClipboardImage());
       if (!image) throw new Error('The clipboard has no image to paste. Copy an image or take a screenshot first.');
       await chooseImageStorage(image);
       break;
@@ -1538,12 +1538,12 @@ async function dispatch(action: string): Promise<void> {
     case 'copy-image': {
       const source = contextImageSource ?? editor.getAttributes('image').src;
       if (typeof source !== 'string' || !source) throw new Error('Select an image to copy.');
-      unwrap(await window.studio.copyImage(documentId, source));
+      unwrap(await window.lekh.copyImage(documentId, source));
       notify('Image copied to the clipboard.');
       break;
     }
     case 'copy-document':
-      unwrap(await window.studio.writeClipboard(markdown));
+      unwrap(await window.lekh.writeClipboard(markdown));
       break;
     case 'copy-markdown': {
       let selected: string;
@@ -1555,11 +1555,11 @@ async function dispatch(action: string): Promise<void> {
         selected = editor.markdown.serialize({ type: 'doc', content: editor.state.doc.slice(from, to).content.toJSON() });
       }
       if (!selected) throw new Error('Select text to copy as Markdown.');
-      unwrap(await window.studio.writeClipboard(selected));
+      unwrap(await window.lekh.writeClipboard(selected));
       break;
     }
     case 'paste-markdown': {
-      const text = unwrap(await window.studio.readClipboard());
+      const text = unwrap(await window.lekh.readClipboard());
       if (!text) throw new Error('The clipboard has no text to paste.');
       if (mode === 'source') {
         source.setRangeText(text, source.selectionStart, source.selectionEnd, 'end');
@@ -1579,7 +1579,7 @@ async function dispatch(action: string): Promise<void> {
     case 'zoom-out': await refreshZoom('out'); break;
     case 'zoom-reset': await refreshZoom('reset'); break;
     case 'clear-recent':
-      unwrap(await window.studio.clearRecent());
+      unwrap(await window.lekh.clearRecent());
       await refreshRecent();
       notify('Recent file history cleared. Your documents have not been deleted.');
       break;
@@ -1604,7 +1604,7 @@ async function dispatch(action: string): Promise<void> {
     }
     case 'export-docx':
     case 'export-pdf': {
-      const file = unwrap(await window.studio.exportDocument(documentId, markdown, action === 'export-pdf' ? 'pdf' : 'docx'));
+      const file = unwrap(await window.lekh.exportDocument(documentId, markdown, action === 'export-pdf' ? 'pdf' : 'docx'));
       if (file) notify(`Exported successfully: ${file}`);
       break;
     }
@@ -1645,7 +1645,7 @@ async function dispatch(action: string): Promise<void> {
     case 'replace-all': await replaceFound(true); break;
     case 'link': showLinkDialog(); break;
     case 'image': {
-      const image = unwrap(await window.studio.insertImage());
+      const image = unwrap(await window.lekh.insertImage());
       if (image) await chooseImageStorage(image);
       break;
     }
@@ -1685,7 +1685,7 @@ async function dispatch(action: string): Promise<void> {
     case 'recover':
       while (recovery.length) {
         const draft = recovery[0];
-        const id = unwrap(await window.studio.newDocument());
+        const id = unwrap(await window.lekh.newDocument());
         addTab(id, draft.content, `Recovered - ${draft.name}`, null, false);
         recovery.shift();
       }
@@ -1772,7 +1772,7 @@ document.addEventListener('click', event => {
     activateEventPane(event);
     void run(async () => {
       const href = link.getAttribute('href') ?? '';
-      const navigate = event.ctrlKey || event.metaKey || Boolean(link.closest('[data-studio-contents], .contents-node'));
+      const navigate = event.ctrlKey || event.metaKey || Boolean(link.closest('[data-lekh-contents], .contents-node'));
       if (href.startsWith('#') && (navigate || link.closest('.document-preview'))) {
         const anchor = decodeURIComponent(href.slice(1));
         const used = new Map<string, number>();
@@ -1781,7 +1781,7 @@ document.addEventListener('click', event => {
         const heading = index < 0 ? undefined : container.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[index];
         if (!heading) throw new Error('That heading was not found. Reinsert the table of contents after changing headings.');
         heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else if (navigate) unwrap(await window.studio.openExternal(href));
+      } else if (navigate) unwrap(await window.lekh.openExternal(href));
       else if (link.closest('.document-preview')) notify('Switch to Visual to edit this link. Ctrl+click opens it.');
       else showLinkDialog(link);
     });
@@ -1958,9 +1958,9 @@ element('canvas').addEventListener('error', event => {
   if (event.target instanceof HTMLImageElement) notify('An image could not be displayed. Relative images must be inside the saved document\'s folder. Use Insert image to embed it instead.', true);
 }, true);
 element('canvas').addEventListener('contextmenu', event => {
-  contextImageSource = event.target instanceof HTMLImageElement ? event.target.getAttribute('data-studio-source') : null;
+  contextImageSource = event.target instanceof HTMLImageElement ? event.target.getAttribute('data-lekh-source') : null;
   const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('.tiptap a') : null;
-  if (!busy && link && !link.closest('[data-studio-contents], .contents-node')) {
+  if (!busy && link && !link.closest('[data-lekh-contents], .contents-node')) {
     const range = getMarkRange(editor.state.doc.resolve(editor.view.posAtDOM(link, 0)), editor.schema.marks.link);
     if (range) editor.commands.setTextSelection(range);
   }
@@ -1973,12 +1973,12 @@ document.addEventListener('contextmenu', event => {
   contextPoint = event.clientX || event.clientY ? { x: event.clientX, y: event.clientY }
     : { x: (bounds?.left ?? 0) + 12, y: (bounds?.top ?? 0) + 12 };
 }, true);
-window.studio.onContextMenu(menu => {
+window.lekh.onContextMenu(menu => {
   const origin = contextTarget;
   contextTarget = null;
   const report = (error: unknown) => notify(error instanceof Error ? error.message : String(error), true);
   if (!origin || busy) {
-    void window.studio.contextMenuCommand(menu.id, 'native').then(unwrap).catch(report);
+    void window.lekh.contextMenuCommand(menu.id, 'native').then(unwrap).catch(report);
     return;
   }
   closeDropdowns();
@@ -1989,7 +1989,7 @@ window.studio.onContextMenu(menu => {
       notify('The active editor changed. Open the context menu again in the intended document.', true);
       return;
     }
-    void window.studio.contextMenuCommand(menu.id, command).then(unwrap).catch(report);
+    void window.lekh.contextMenuCommand(menu.id, command).then(unwrap).catch(report);
   });
 });
 element('canvas').addEventListener('paste', event => {
@@ -2041,7 +2041,7 @@ element('canvas').addEventListener('keydown', event => {
   event.preventDefault();
   event.stopPropagation();
   if (busy) notify('Please wait for the current operation to finish.');
-  else window.studio.paste();
+  else window.lekh.paste();
 }, true);
 function copySelectedImage(event: ClipboardEvent, cut: boolean): void {
   if (mode !== 'visual') return;
@@ -2050,7 +2050,7 @@ function copySelectedImage(event: ClipboardEvent, cut: boolean): void {
   if (node?.type.name !== 'image' || to !== from + node.nodeSize) return;
   event.preventDefault();
   void run(async () => {
-    unwrap(await window.studio.copyImage(documentId, String(node.attrs.src)));
+    unwrap(await window.lekh.copyImage(documentId, String(node.attrs.src)));
     if (cut) editor.chain().focus().deleteSelection().run();
   });
 }
@@ -2192,7 +2192,7 @@ document.addEventListener('keydown', event => {
   void run(async () => format(shortcut.command));
 }, true);
 window.addEventListener('beforeunload', storeDraft);
-window.studio.onAction(action => {
+window.lekh.onAction(action => {
   if (action === 'open-pending') {
     pendingExternalOpen = true;
     if (!busy) { pendingExternalOpen = false; void run(openPending); }
@@ -2210,7 +2210,7 @@ element('tabs').addEventListener('keydown', event => {
   });
 });
 void run(async () => {
-  documentId = unwrap(await window.studio.newDocument());
+  documentId = unwrap(await window.lekh.newDocument());
   activeTab = {
     id: documentId, markdown, savedMarkdown, name: documentName, path: null, mode,
     editor, visual, undo: sourceUndo, redo: sourceRedo, selection: [0, 0], sourceScroll: 0, canvasScroll: 0,
@@ -2228,7 +2228,7 @@ void run(async () => {
   await openPending();
   const initial = tabs.find(tab => tab.id === initialPane.pane.dataset.documentId);
   if (tabs.length > 1 && initial && initial !== activeTab && !initial.path && initial.markdown === '' && initial.savedMarkdown === '') {
-    unwrap(await window.studio.closeDocument(initial.id));
+    unwrap(await window.lekh.closeDocument(initial.id));
     initial.editor.destroy();
     initial.pane.remove();
     tabs.splice(tabs.indexOf(initial), 1);

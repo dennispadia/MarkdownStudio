@@ -220,7 +220,7 @@ namespace Lekh.Setup
                     break;
                 case "open":
                     label = "BEFORE WE BEGIN"; title = "Save your work first.";
-                    body = "Lekh or Markdown Studio is open. Save your edits and close the app,\nthen check again to continue.";
+                    body = "Lekh is open. Save your edits and close the app,\nthen check again to continue.";
                     note = "Setup will never force-close the editor or discard unsaved work.";
                     action = "Check again"; secondaryAction = "Not now"; break;
                 case "preparing":

@@ -53,7 +53,7 @@ namespace Lekh.Setup
 
     internal static class SetupPolicy
     {
-        public const string UpgradeCode = "E2FD477D-ED35-561D-8A35-B75851090FE9";
+        public const string UpgradeCode = "DCBCF7FA-11DA-4F35-8D27-D066EEC6C582";
         public const string InstallProperties = "REBOOT=ReallySuppress MSIRESTARTMANAGERCONTROL=DisableShutdown";
         public static string AppPath
         {
@@ -75,16 +75,12 @@ namespace Lekh.Setup
         public static bool IsInstalledApp(string path)
         {
             string full = Path.GetFullPath(path);
-            string legacy = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                BuildInfo.InstallDirectory, "Markdown Studio.exe");
-            return String.Equals(full, AppPath, StringComparison.OrdinalIgnoreCase) ||
-                String.Equals(full, legacy, StringComparison.OrdinalIgnoreCase);
+            return String.Equals(full, AppPath, StringComparison.OrdinalIgnoreCase);
         }
         public static bool AppIsOpen()
         {
             int session = Process.GetCurrentProcess().SessionId;
-            foreach (string name in new[] { Path.GetFileNameWithoutExtension(BuildInfo.ExecutableName), "Markdown Studio" })
-            foreach (Process process in Process.GetProcessesByName(name))
+            foreach (Process process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(BuildInfo.ExecutableName)))
             {
                 using (process)
                 {

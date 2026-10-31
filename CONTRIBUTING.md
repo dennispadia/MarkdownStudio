@@ -1,30 +1,17 @@
-# Forking and customization
+# Contributing to Lekh
 
-This is an MIT-licensed open-source project for self-service use and independent forks. **Upstream contributions and support are not being solicited.** Please work in your fork rather than expecting feature requests, issues, or pull requests to be handled here.
+**[GitHub issues](https://github.com/dennispadia/lekh/issues)** are welcome for bugs, enhancements, and requests. Describe the workflow or reproduction steps and avoid private documents or credentials. Responses, resolutions, and future maintenance are not guaranteed; see [SUPPORT.md](SUPPORT.md).
 
-## Suggested workflow
+## Development workflow
 
-1. Fork the repository on GitHub and clone your fork.
-2. Follow [BUILDING.md](docs/BUILDING.md).
-3. Make one focused change at a time, optionally with an AI coding assistant.
-4. Run unit tests, real desktop tests, and MSI validation before distributing your version.
+1. Follow [BUILDING.md](docs/BUILDING.md).
+2. Make one focused change at a time, preserving file saving, draft recovery, per-tab undo, split-pane routing, and export behavior.
+3. Add focused regression tests and run the relevant existing tests.
+4. For desktop or distribution changes, also run the desktop suite and installer verification before proposing a release.
 5. Keep the MIT license and all applicable third-party notices.
 
-## Give a distributed fork its own identity
+## Independently distributed derivatives
 
-Before sharing installers for a renamed or independently maintained fork, change:
+MIT permits modification and redistribution. An independently maintained derivative needs its own npm name, product name, application ID, MSI upgrade code, profile directory, renderer storage keys, image protocol, diagram partition, preload bridge, document markers, shortcut/artifact names, and artwork where appropriate.
 
-- `name`, `author`, and `build.productName` in `package.json`.
-- `build.appId` and `build.msi.upgradeCode` in `package.json`. The explicit MSI upgrade code retains the original product's identity: **do not reuse either identifier**, or a fork can replace the original installation.
-- The Electron `app.setAppUserModelId` value in `electron/main.ts` to match the new app ID.
-- The product constants and `userDataDirectory` in `lib/branding.ts`. The original profile directory is deliberately retained across the Lekh rebrand; an independent fork must use its own directory.
-- Installer/shortcut/artifact names, the icon artwork where appropriate, and release documentation.
-- Tests and distribution scripts that intentionally verify the original product identity.
-
-Changing only the product name does **not** separate this application's explicitly retained user-data profile. Change the profile directory too. Test your fork alongside the original to ensure neither overwrites the other's application files, settings, or recovery data.
-
-## Useful AI task prompt
-
-> In my fork of Lekh, implement [a specific feature]. Read the architecture and build guide first. Preserve existing file-saving, draft recovery, per-tab undo, split-pane routing, and export behavior. Add focused regression tests, run the existing tests, and explain the changes and remaining limitations. Do not publish or install anything without my approval.
-
-You are responsible for reviewing AI output and maintaining your fork. See [SUPPORT.md](SUPPORT.md).
+Do not reuse Lekh's `com.lekh.desktop` application ID, `%APPDATA%\Lekh` profile, `%LOCALAPPDATA%\lekh` installation directory, or `DCBCF7FA-11DA-4F35-8D27-D066EEC6C582` MSI upgrade code for another product. Keep those identities stable for future releases of Lekh itself. Update installer policy, verification scripts, tests, and documentation together when creating a separate product, and verify side-by-side installation without overwriting either product's data.

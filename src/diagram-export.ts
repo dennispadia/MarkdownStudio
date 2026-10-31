@@ -1,6 +1,6 @@
 import { mermaidPNG } from './diagrams.js';
 
 declare global {
-  interface Window { studioRenderDiagram: (source: string) => Promise<string> }
+  interface Window { lekhRenderDiagram: (source: string) => Promise<string> }
 }
-window.studioRenderDiagram = mermaidPNG;
+window.lekhRenderDiagram = mermaidPNG;

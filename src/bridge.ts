@@ -21,7 +21,7 @@ export interface EditorContextMenu {
   y: number;
   items: ContextMenuItem[];
 }
-export interface StudioAPI {
+export interface LekhAPI {
   open: (recentPath?: string) => Promise<Result<OpenedFile | null>>;
   openPending: () => Promise<Result<Result<OpenedFile>[]>>;
   save: (id: string, content: string, saveAs: boolean) => Promise<Result<{ path: string } | null>>;
@@ -50,6 +50,6 @@ export interface StudioAPI {
 }
 
 declare global {
-  interface Window { studio: StudioAPI }
+  interface Window { lekh: LekhAPI }
 }
 import type { Theme } from '../lib/themes.js';

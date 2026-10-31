@@ -60,7 +60,7 @@ test('only web and email links may open external applications', () => {
 
 test('local image URLs encode reserved characters without changing Markdown source', () => {
   const url = new URL(imageDisplayURL('assets/my photo#1.png'));
-  assert.equal(url.protocol, 'studio-image:');
+  assert.equal(url.protocol, 'lekh-image:');
   assert.equal(url.searchParams.get('source'), 'assets/my photo#1.png');
   assert.equal(imageDisplayURL('data:image/png;base64,abc='), 'data:image/png;base64,abc=');
 });
@@ -96,7 +96,7 @@ test('preview images use document-scoped local URLs, including nested and remote
   const first = documentPreviewHTML(markdown, 'first');
   const second = documentPreviewHTML(markdown, 'second');
   assert.notEqual(first, second);
-  assert.equal((first.match(/src="studio-image:\/\/local\/image\?/g) ?? []).length, 3);
+  assert.equal((first.match(/src="lekh-image:\/\/local\/image\?/g) ?? []).length, 3);
   assert.equal((first.match(/document=first/g) ?? []).length, 3);
   assert.match(first, /source=https%3A%2F%2Fexample.com%2Fphoto.png/);
   assert.doesNotMatch(first, /src="https:/);

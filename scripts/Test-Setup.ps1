@@ -325,15 +325,15 @@ function Test-HostedInstallation {
         }
         if ((Read-MsiProperty $database 'ProductName') -cne $manifest.build.productName -or
             (Read-MsiProperty $database 'ProductVersion') -notin @($manifest.version, "$($manifest.version).0") -or
-            (Read-MsiProperty $database 'UpgradeCode').Trim('{}') -ne 'E2FD477D-ED35-561D-8A35-B75851090FE9' -or
+            (Read-MsiProperty $database 'UpgradeCode').Trim('{}') -ne 'DCBCF7FA-11DA-4F35-8D27-D066EEC6C582' -or
             (Read-MsiProperty $database 'MSIINSTALLPERUSER') -ne '1' -or
             (Read-MsiProperty $database 'ARPSYSTEMCOMPONENT') -eq '1' -or
             -not [string]::IsNullOrEmpty((Read-MsiProperty $database 'ALLUSERS'))) {
-            throw 'Hosted installation requires the expected versioned, Apps-visible per-user MSI with the original upgrade identity.'
+            throw 'Hosted installation requires the expected versioned, Apps-visible per-user MSI with the independent Lekh upgrade identity.'
         }
         [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
         $database = $null
-        $installDirectory = Join-Path $env:LOCALAPPDATA 'markdown-studio'
+        $installDirectory = Join-Path $env:LOCALAPPDATA 'lekh'
         $executable = Join-Path $installDirectory 'Lekh - Markdown editor.exe'
         if (Test-Path -LiteralPath $installDirectory) {
             throw 'Hosted installation requires a clean runner; refusing to replace or uninstall an existing application.'
@@ -343,7 +343,7 @@ function Test-HostedInstallation {
                 throw "Existing exact product registration in context $context; refusing destructive verification."
             }
         }
-        $profileDirectory = Join-Path $env:APPDATA 'Markdown Studio'
+        $profileDirectory = Join-Path $env:APPDATA 'Lekh'
         New-Item -ItemType Directory -Path $profileDirectory -Force | Out-Null
         $sentinel = Join-Path $profileDirectory ("setup-profile-sentinel-" + [guid]::NewGuid().ToString('N') + '.txt')
         $sentinelContent = 'Preserve user profile: ' + [guid]::NewGuid().ToString('N')

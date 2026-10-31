@@ -57,7 +57,7 @@ export function renderMermaidSVG(source: string, active: () => boolean = () => t
     host.style.cssText = 'position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none';
     document.body.append(host);
     try {
-      const { svg } = await mermaid.render(`studio-mermaid-${++sequence}`, clean, host);
+      const { svg } = await mermaid.render(`lekh-mermaid-${++sequence}`, clean, host);
       const result = safeSVG(svg);
       result.style.maxWidth = '100%';
       result.style.height = 'auto';

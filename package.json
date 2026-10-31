@@ -1,6 +1,6 @@
 {
-  "name": "markdown-studio",
-  "version": "0.7.1",
+  "name": "lekh",
+  "version": "0.8.0",
   "private": true,
   "description": "A friendly, local-first Markdown desktop editor for Windows",
   "author": "Lekh contributors",
@@ -52,7 +52,7 @@
     "vite": "^7.1.12"
   },
   "build": {
-    "appId": "com.markdownstudio.desktop",
+    "appId": "com.lekh.desktop",
     "productName": "Lekh - Markdown editor",
     "directories": {
       "output": "release"
@@ -86,7 +86,7 @@
     ],
     "msiProjectCreated": "scripts\\configure-msi.cjs",
     "msi": {
-      "upgradeCode": "E2FD477D-ED35-561D-8A35-B75851090FE9",
+      "upgradeCode": "DCBCF7FA-11DA-4F35-8D27-D066EEC6C582",
       "artifactName": "Lekh-Markdown-editor-${version}-${arch}.${ext}",
       "oneClick": true,
       "perMachine": false,

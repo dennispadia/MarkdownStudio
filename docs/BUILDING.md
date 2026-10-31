@@ -1,5 +1,7 @@
 # Building and validating Lekh
 
+This checkout is **0.8.0 development, not published**. The unchanged [0.7.1 stable release](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) is a separate downloadable build; fresh identities below apply only to this checkout and future verified releases.
+
 ## Requirements
 
 - Windows 10/11 x64.
@@ -42,13 +44,13 @@ Close running copies before rebuilding. Do not run two packaging/build commands 
 
 The official workflow additionally runs `verify:setup -- -InstallOnHostedRunner` only on a clean GitHub-hosted runner. That opt-in path performs a real fresh installation through the setup UI, verifies the exact current-user product name/version/cache through Windows Installer APIs, then uninstalls only that exact product and checks the recovery-profile sentinel remains. It also exercises both animation preferences and restores the runner's original preference in `finally`. Default local verification neither installs/uninstalls nor changes your Windows animation setting; reduced-motion mode remains static. Genuine old-version upgrade and repair coverage is still pending.
 
-The public download is the premium **EXE**, not the internal MSI. Run `package:msi`, `verify:msi`, `build:setup`, and `verify:setup` in that order. Setup is offline, non-elevating, and uses the existing Windows Installer engine and upgrade identity. No Electron editor code is loaded into the setup UI. The application executable remains `Lekh - Markdown editor.exe`.
+The intended public download is the premium **EXE**, not the internal MSI. Run `package:msi`, `verify:msi`, `build:setup`, and `verify:setup` in that order. Setup is offline, non-elevating, and uses Windows Installer with Lekh's independent upgrade identity. No Electron editor code is loaded into the setup UI. The application executable is `Lekh - Markdown editor.exe`.
 
 The three origin-story chapters type beside a moving quill and advance two seconds after the final text element, looping 1/3, 2/3, 3/3. Previous/Next and Pause/Resume are keyboard-accessible. Windows' animation preference disables typing and autoplay; minimizing or hiding setup stops animation, and completion keeps the current chapter. Complete story text is available through the chapter's accessibility name immediately. Installation is never delayed for the story.
 
-Setup asks you to save and close an already-running installed Lekh or Markdown Studio. It does not terminate processes or restart Windows. Cancellation requests Windows Installer rollback, and setup stays open until the native operation finishes. Stage percentages come from Windows Installer (which may reset or reverse during rollback), not a simulated overall timer. Errors expose native codes and local logs under `%LOCALAPPDATA%\Lekh\SetupLogs`.
+Setup asks you to save and close an already-running installed Lekh. It checks only Lekh's executable at its install path, not another product's processes. It does not terminate processes or restart Windows. Cancellation requests Windows Installer rollback, and setup stays open until the native operation finishes. Stage percentages come from Windows Installer (which may reset or reverse during rollback), not a simulated overall timer. Errors expose native codes and local logs under `%LOCALAPPDATA%\Lekh\SetupLogs`.
 
-A successful installation retains its verified internal MSI under `%LOCALAPPDATA%\Lekh\SetupCache` as Windows Installer's offline repair source. Failed or cancelled attempts remove their extracted payload. This cache is not a second public download; do not remove it while the product is installed if you need offline repair. Windows Settings continues to manage uninstall. Logs/cache and the editor's existing `%APPDATA%\Markdown Studio` preferences/recovery profile are separate from Markdown documents.
+A successful installation retains its verified internal MSI under `%LOCALAPPDATA%\Lekh\SetupCache` as Windows Installer's offline repair source. Failed or cancelled attempts remove their extracted payload. This cache is not a second public download; do not remove it while the product is installed if you need offline repair. Windows Settings continues to manage uninstall. Application files are in `%LOCALAPPDATA%\lekh`; the fresh `%APPDATA%\Lekh` preferences/recovery profile and setup logs/cache are separate from Markdown documents. No other product's installation or data is migrated or removed.
 
 The desktop suite launches the application with a Markdown path, then starts real
 secondary processes against an isolated profile. It checks startup loading,
@@ -64,21 +66,21 @@ If you encounter this error, use a Windows build environment where your organiza
 
 The workflow uses Windows PowerShell, matching the npm distribution scripts. Verification and checksum scripts explicitly load their host's Utility module so `Get-FileHash` remains available even when launched from PowerShell 7 with an inherited module search path.
 
-The installer is intentionally per-user only, uses LocalAppData rather than Program Files, creates desktop/Start menu shortcuts, and does not launch the app automatically. `build.msi.upgradeCode` explicitly retains the original upgrade identity, formerly derived from `build.appId`; keep both stable for original-product updates and change both for independent forks. The narrowly checked `configure-msi.cjs` hook adjusts the builder's dual-scope template to enforce the non-elevated scope and fails if an upstream template changes.
+The installer is intentionally per-user only, uses LocalAppData rather than Program Files, creates desktop/Start menu shortcuts, and does not launch the app automatically. Keep `build.appId` (`com.lekh.desktop`) and the independent `build.msi.upgradeCode` (`DCBCF7FA-11DA-4F35-8D27-D066EEC6C582`) stable for future Lekh upgrades. The same GUID is pinned in installer policy, verification scripts, and tests; update all together only when defining a genuinely separate product. The narrowly checked `configure-msi.cjs` hook adjusts the builder's dual-scope template to enforce non-elevated scope and fails if an upstream template changes.
 
-The npm package name and AppUserModelId remain compatibility identifiers. `lib/branding.ts` explicitly retains the original `Markdown Studio` user-data directory for both Electron and Chromium storage; `--user-data-dir` still overrides both for isolated testing. Existing renderer storage keys, diagram partition, and table-of-contents document markers are unchanged. Branding uses Windows-installed Segoe UI Light and Nirmala UI, not redistributed font files.
+The npm package name is `lekh`. `lib/branding.ts` defines the independent `Lekh` user-data directory for Electron and Chromium storage; `--user-data-dir` overrides both for isolated testing. Renderer storage uses the `lekh-` prefix, the image protocol is `lekh-image`, the diagram partition is `lekh-diagrams`, the preload bridge is `window.lekh`, and table-of-contents markers use `lekh:toc`. No compatibility aliases are provided. Branding uses Windows-installed Segoe UI Light and Nirmala UI, not redistributed font files.
 
 ## Screenshots
 
 To regenerate the README screenshots from the actual application with sample documents:
 
 ```powershell
-$env:STUDIO_PUBLIC_SCREENSHOTS = '1'
+$env:LEKH_PUBLIC_SCREENSHOTS = '1'
 npm.cmd run test:desktop
-Remove-Item Env:\STUDIO_PUBLIC_SCREENSHOTS
+Remove-Item Env:\LEKH_PUBLIC_SCREENSHOTS
 ```
 
-They are written to `docs\images\lekh-light.png` and `docs\images\lekh-dark-split.png`. Review them before committing. Historical screenshots are retained; normal test runs do not overwrite these images.
+They are written to `docs\images\lekh-light.png` and `docs\images\lekh-dark-split.png`. Review them before committing. Only current Lekh screenshots are retained; normal test runs do not overwrite these images.
 
 ## Project map
 

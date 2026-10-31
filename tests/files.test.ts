@@ -7,7 +7,7 @@ import { atomicWrite, readMarkdown } from '../lib/files.js';
 import { readImage } from '../lib/images.js';
 
 test('atomic writes replace content and leave no temporary files', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'markdown-studio-unit-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'lekh-unit-'));
   try {
     const file = path.join(root, 'test.md');
     await atomicWrite(file, '# First');
@@ -22,7 +22,7 @@ test('atomic writes replace content and leave no temporary files', async () => {
 });
 
 test('reading refuses binary files and invalid UTF-8 rather than corrupting them', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'markdown-studio-unit-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'lekh-unit-'));
   try {
     const file = path.join(root, 'bad.md');
     await writeFile(file, Buffer.from([0, 1, 2]));
@@ -35,7 +35,7 @@ test('reading refuses binary files and invalid UTF-8 rather than corrupting them
 });
 
 test('relative images stay within the document folder, including resolved paths', async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'markdown-studio-unit-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'lekh-unit-'));
   try {
     const documentFolder = path.join(root, 'docs');
     await mkdir(documentFolder);

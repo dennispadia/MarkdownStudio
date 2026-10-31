@@ -93,3 +93,127 @@ test('PDF and Word export syntax colors without editor controls or altered code'
       text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')).join(''));
   assert.deepEqual(lines, ['const answer = 42;', ' ', '  console.log("Hello & <world>");']);
 });
+
+test('Word defines rich typography instead of relying on the consumer default heading styles', async () => {
+  const zip = unzipEntries(await toDocx('# Title\n\n## Section\n\n### Detail\n\n#### Four\n\n##### Five\n\n###### Six\n\nBody text.', async () => { throw new Error('Unexpected image'); }));
+  const styles = zip.get('word/styles.xml')!.toString();
+  assert.match(styles, /<w:docDefaults>[\s\S]*w:ascii="Segoe UI"[\s\S]*w:sz w:val="22"/);
+  for (const [index, size] of [51, 32, 26, 23, 22, 20].entries()) {
+    const heading = styles.match(new RegExp(`<w:style[^>]*w:styleId="Heading${index + 1}"[\\s\\S]*?</w:style>`))?.[0];
+    assert.ok(heading, `Heading ${index + 1} has an explicit style`);
+    assert.match(heading, new RegExp(`<w:sz w:val="${size}"`));
+    assert.match(heading, /<w:b\/>/);
+    assert.match(heading, /<w:keepNext\/>/);
+    assert.match(heading, /w:color w:val="263238"/);
+  }
+  const xml = zip.get('word/document.xml')!.toString();
+  assert.doesNotMatch(xml, /<w:b w:val="false"/, 'Plain heading runs must not override their bold style');
+  assert.match(xml, /w:pgSz w:w="11906" w:h="16838"/);
+  assert.match(xml, /w:pgMar[^>]*w:top="1134"[^>]*w:right="1134"[^>]*w:bottom="1134"[^>]*w:left="1134"/);
+  assert.match(xml, /<w:widowControl\/>/);
+});
+
+test('Word tables retain alignment, page-bounded grids, header shading and repeating unsplit rows', async () => {
+  const markdown = '| Item | Centre | Amount |\n| :--- | :---: | ---: |\n| **A** | *B* | 12.50 |\n';
+  const zip = unzipEntries(await toDocx(markdown, async () => { throw new Error('Unexpected image'); }));
+  const xml = zip.get('word/document.xml')!.toString();
+  assert.match(xml, /<w:tblLayout w:type="fixed"/);
+  assert.match(xml, /<w:tblW w:type="dxa" w:w="9638"/);
+  const widths = [...xml.matchAll(/<w:gridCol w:w="(\d+)"/g)].map(match => Number(match[1]));
+  assert.equal(widths.length, 3);
+  assert.ok(widths.every(width => width > 3000 && width < 3300));
+  assert.ok(Math.abs(widths.reduce((sum, width) => sum + width, 0) - 9638) < 3);
+  assert.match(xml, /<w:tblHeader\/>/);
+  assert.equal((xml.match(/<w:cantSplit\/>/g) ?? []).length, 2);
+  assert.match(xml, /w:fill="F1F5F5"/);
+  assert.match(xml, /<w:jc w:val="center"/);
+  assert.match(xml, /<w:jc w:val="right"/);
+  assert.match(xml, /<w:vAlign w:val="top"/);
+  assert.match(xml, /<w:tblCellMar>/);
+});
+
+test('Word preserves nested emphasis and styled, navigable external and internal links', async () => {
+  const markdown = '# A heading\n\n**Outer *inner* outer** and [**bold link**](https://example.com).\n\n[Jump](#a-heading)\n\n## A heading\n\n[Second](#a-heading-1)';
+  const zip = unzipEntries(await toDocx(markdown, async () => { throw new Error('Unexpected image'); }));
+  const xml = zip.get('word/document.xml')!.toString();
+  assert.match(xml, /<w:r><w:rPr><w:b\/>[\s\S]*?<w:i\/>[\s\S]*?<w:t[^>]*>inner<\/w:t>/);
+  const link = xml.match(/<w:hyperlink[^>]*r:id[^>]*>[\s\S]*?<\/w:hyperlink>/)?.[0];
+  assert.ok(link);
+  assert.match(link, /<w:b\/>/);
+  assert.match(link, /w:color w:val="227C78"/);
+  assert.match(link, /<w:u w:val="single"/);
+  const bookmarks = [...xml.matchAll(/<w:bookmarkStart[^>]*w:name="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(bookmarks.length, 2);
+  assert.notEqual(bookmarks[0], bookmarks[1]);
+  for (const name of bookmarks) assert.ok(xml.includes(`w:anchor="${name}"`), 'Every internal link targets a real heading bookmark');
+});
+
+test('a malformed or missing heading fragment preserves readable text without aborting Word export', async () => {
+  const markdown = '# Example\n\n[Malformed](#foo%bar) [Missing](#not-here)\n\nDocument text.\n\n## Caf\u00e9\n\n[Unicode](#caf%C3%A9)';
+  const zip = unzipEntries(await toDocx(markdown, async () => { throw new Error('Unexpected image'); }));
+  const xml = zip.get('word/document.xml')!.toString();
+  for (const label of ['Malformed', 'Missing', 'Document text.', 'Unicode']) assert.ok(xml.includes(`>${label}</w:t>`));
+  assert.equal((xml.match(/<w:hyperlink/g) ?? []).length, 1, 'Only the valid, existing Unicode heading is linked');
+});
+
+test('Word retains list continuations after nested children, independent numbering and task checkboxes', async () => {
+  const markdown = '3. First\n\n   Before child.\n\n   - Child\n\n   After child.\n\n4. Second\n\nBetween lists.\n\n7. Restart\n\n- [ ] Pending\n- [x] Complete\n';
+  const zip = unzipEntries(await toDocx(markdown, async () => { throw new Error('Unexpected image'); }));
+  const xml = zip.get('word/document.xml')!.toString();
+  const paragraphs = [...xml.matchAll(/<w:p>[\s\S]*?<\/w:p>/g)].map(match => match[0]);
+  for (const text of ['Before child.', 'After child.']) {
+    const continuation = paragraphs.find(paragraph => paragraph.includes(`>${text}</w:t>`));
+    assert.ok(continuation);
+    assert.match(continuation, /w:ind w:left="360"/);
+    assert.doesNotMatch(continuation, /<w:numPr>/, 'Continuation paragraphs must not acquire another list marker');
+  }
+  const numbering = zip.get('word/numbering.xml')!.toString();
+  assert.match(numbering, /w:start w:val="3"/);
+  assert.match(numbering, /w:start w:val="7"/);
+  assert.match(xml, /\u2610/);
+  assert.match(xml, /\u2611/);
+  assert.doesNotMatch(xml, /\[ \]|\[x\]/);
+  assert.match(xml, /<w:tab\/>/);
+});
+
+test('Word scales images to the A4 content width without enlarging small images or changing aspect ratio', async () => {
+  const dimensionsOnly = Buffer.from(png);
+  dimensionsOnly.writeUInt32BE(2000, 16);
+  dimensionsOnly.writeUInt32BE(1000, 20);
+  const zip = unzipEntries(await toDocx('![Wide](wide.png)', async () => ({ data: dimensionsOnly, mime: 'image/png' })));
+  const xml = zip.get('word/document.xml')!.toString();
+  const extent = xml.match(/<wp:extent cx="(\d+)" cy="(\d+)"/);
+  assert.ok(extent);
+  const width = Number(extent[1]) / 9525;
+  const height = Number(extent[2]) / 9525;
+  assert.ok(width <= 9638 / 15 + 1);
+  assert.ok(Math.abs(width / height - 2) < .01);
+});
+
+test('Word preserves code tabs, whitespace, blank lines and quote/list indentation', async () => {
+  const markdown = '> 1. Code\n>\n>    ```text\n>    \tfirst\n>\n>      second\n>    ```\n';
+  const zip = unzipEntries(await toDocx(markdown, async () => { throw new Error('Unexpected image'); }));
+  const xml = zip.get('word/document.xml')!.toString();
+  assert.match(xml, /<w:tab\/>/);
+  assert.match(xml, /xml:space="preserve">  second<\/w:t>/);
+  assert.match(xml, /w:ind w:left="720"/);
+  assert.match(xml, /w:fill="F3F6F6"/);
+  assert.match(xml, /w:spacing[^>]*w:line="300"/);
+});
+
+test('PDF uses visual-style hierarchy, bounded tables, task state and a clean printable page', async () => {
+  const html = await toPrintHTML('# Title\n\n## Section\n\n#### Small heading\n\n- [ ] Pending\n- [X] Complete\n\n| A | B |\n| :---: | ---: |\n| C | D |\n\n> Quote\n', null);
+  assert.match(html, /body \{ margin: 0;/);
+  assert.match(html, /body > :first-child \{ margin-top: 0;/);
+  assert.match(html, /h1 \{ font-size: 25.5pt/);
+  assert.match(html, /h4 \{ font-size: 11.5pt/);
+  assert.match(html, /table-layout: fixed/);
+  assert.match(html, /thead \{ display: table-header-group/);
+  assert.match(html, /class="task-item"/);
+  assert.match(html, /aria-label="Incomplete task">&#x2610;/);
+  assert.match(html, /aria-label="Completed task">&#x2611;/);
+  assert.match(html, /style="text-align:center"/);
+  assert.match(html, /style="text-align:right"/);
+  assert.doesNotMatch(html, /\[ \] Pending|\[X\] Complete/);
+  assert.match(html, /<blockquote>/);
+});

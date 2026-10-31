@@ -2,15 +2,15 @@
 
 A local-first Windows desktop application for writing Markdown with a friendly visual editor and exporting to Word and PDF.
 
-**Version note:** the layout, blank startup, and editable Visual + Source switch described below were introduced in 0.6.3. Version 0.6.2 uses the previous layout and separate Visual/Source controls.
+**Version note:** this guide describes development version **0.8.0**, which has not been published. The [current stable 0.7.1 release](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) remains unchanged and does not have the fresh identities described here.
 
 ## Open the application
 
-Download the verified Windows x64 installer linked from the [README](../README.md#install-on-windows). The premium Lekh setup EXE embeds its offline MSI engine; choose **Install Lekh**, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without requesting administrator access. Save and close any installed Lekh or Markdown Studio first; setup does not force-close the editor. The origin story supports Pause/Resume and Previous/Next, respects Windows' animation preference, and never delays installation.
+For a published installer, use the stable link in the [README](../README.md#install-on-windows). To use this development version, build from source. A verified Lekh setup EXE built from this checkout embeds its offline MSI engine; choose **Install Lekh**, then open **Lekh** from your desktop or Start menu. It installs for your current Windows user without requesting administrator access. Save and close any installed Lekh first; setup does not force-close the editor. The origin story supports Pause/Resume and Previous/Next, respects Windows' animation preference, and never delays installation.
 
 For a source checkout, double-click **Launch.cmd** in the project root. The developer build is **release\win-unpacked\Lekh - Markdown editor.exe**; keep that entire folder together.
 
-Lekh retains the original `%APPDATA%\Markdown Studio` profile, including preferences, recent files, and recovery drafts. Its MSI upgrade identity is unchanged. Close the app before upgrading; because the executable filename changes, you may need to choose Lekh again for `.md` files and repin Windows shortcuts.
+Lekh uses a fresh standalone `%APPDATA%\Lekh` profile for preferences, recent files, Chromium storage, and recovery drafts. Application files install to `%LOCALAPPDATA%\lekh`. **Existing drafts and preferences are not automatically imported; saved Markdown files can be opened normally.** It does not import another product's profile, use migration aliases, or uninstall another product. Its independent MSI upgrade code stays stable for future Lekh releases. Close Lekh before upgrading and choose it explicitly for `.md` file associations if desired.
 
 No Microsoft Word, Pandoc, account, or internet connection is required to edit or export documents after setup. Images hosted on websites are deliberately not downloaded.
 
@@ -135,7 +135,7 @@ Paragraph and Insert commands are also available under the native **Edit** menu.
 
 **Footnote, link reference, math block, and YAML** commands insert editable Markdown syntax in **Source mode**, as an initial implementation. From Visual mode they insert at the document's end (YAML goes at the top); from Source mode they use the current selection. YAML insertion refuses to duplicate an existing opening front-matter block. Footnotes and link references use unique reference numbers. Math, footnotes, and YAML do not have formatted rendering or structured export support yet; keep them in Source mode to preserve the syntax. Standard Markdown link references are resolved by the renderer/exporter.
 
-**Table of contents** inserts a list enclosed by `<!-- markdown-studio:toc -->` and `<!-- /markdown-studio:toc -->`. Choose **Insert > Update table of contents** (also under **More formatting**) after changing headings. Update replaces only that marked block, preserving surrounding source; duplicate heading names get distinct anchors. Visual editing preserves the block as a single contents node. Update requires exactly one well-formed marked block outside code fences; older unmarked lists must be replaced with a newly inserted marked contents list. Its links navigate within Visual and Preview/PDF; Word retains readable list text.
+**Table of contents** inserts a list enclosed by `<!-- lekh:toc -->` and `<!-- /lekh:toc -->`. Choose **Insert > Update table of contents** (also under **More formatting**) after changing headings. Update replaces only that marked block, preserving surrounding source; duplicate heading names get distinct anchors. Visual editing preserves the block as a single contents node. Update requires exactly one well-formed marked block outside code fences; unmarked lists must be replaced with a newly inserted marked contents list. Its links navigate within Visual, Preview/PDF, and exported Word documents; Word uses heading bookmarks for internal destinations.
 
 ### Mermaid diagrams
 
@@ -174,7 +174,7 @@ Supported diagram families are flowchart, sequence, class, state, entity-relatio
 - You are asked to **Save, Discard, or Cancel** before closing a tab with unsaved edits. App exit checks all modified tabs.
 - Saves use a temporary file in the destination folder followed by a rename. If a save fails, an error is displayed.
 - If another application changes or deletes the current file, Save refuses to overwrite it. Use **Save As** with a different name to preserve your version, then compare it with the original.
-- Local recovery drafts for **all unsaved tabs** are stored after roughly 700 ms of inactivity. On your next launch, use **Recover drafts** to restore each one in a new, unsaved tab. Save them to keep them. Recovery also supports drafts from the earlier single-file version.
+- Local recovery drafts for **all unsaved tabs** are stored after roughly 700 ms of inactivity. On your next launch, use **Recover drafts** to restore each one in a new, unsaved tab. Save them to keep them.
 - If recovery storage is full or unavailable, the application reports the problem. A pending recovery draft is retained until you recover or dismiss it.
 - **Recovery is not autosave or a backup.** Save regularly and back up important documents. Recovery holds the current unsaved documents per application profile, not a document archive. The browser's storage quota applies to their combined size.
 - Markdown files are limited to **10 MB** and must be valid UTF-8 text.
@@ -189,22 +189,39 @@ Embedded pasted images remain inside the saved Markdown file and can be reopened
 
 Existing relative image paths, such as `assets/photo.png`, are supported when the image is inside the saved Markdown file's folder or one of its subfolders. Access outside that folder, absolute file paths, and remote downloads are blocked. To use an image elsewhere, insert it using the toolbar. Moving a document with relative images requires copying its image folders, too; Save As warns when changing folders.
 
-- **Word:** headings, bold/italic/strikethrough, inline and fenced code, lists, quotes, links, tables, and PNG/JPEG/GIF images. Image aspect ratios are preserved. WebP images must be converted to PNG or JPEG before Word export.
-- **PDF:** A4 pages with 20 mm margins, readable typography, tables, code, links, and embedded images, including WebP. Page breaks are automatic.
+### DOCX and PDF formatting
+
+Export uses the active document's current contents, including unsaved edits, and creates a separate file without saving the Markdown. Both formats use a readable **light print palette regardless of the editor theme**, so Dark mode does not produce dark pages.
+
+- **Heading hierarchy and typography:** Lekh explicitly defines Segoe UI Heading 1–6 sizes, weights, spacing, and colors, rather than relying on a receiving application's default heading styles. Body text, quotes, and code have their own print formatting.
+- **Inline formatting and links:** bold, italic, and strikethrough are preserved. Hyperlinks are colored and underlined. Internal heading links, including generated table-of-contents links, are clickable; Word uses heading bookmarks for their destinations.
+- **Tables:** fixed, page-width layouts preserve left/center/right Markdown column alignments. Header rows are shaded and repeat when a table continues onto another page.
+- **Lists and tasks:** nested lists preserve their structure, continuation paragraphs, and ordered-list starting numbers. Task lists render checked/unchecked boxes, not interactive Word form controls.
+- **Code:** inline and fenced code retain print-friendly formatting. Fenced code preserves syntax colors, blank lines, and tabs without including editor buttons or language pickers.
+- **Images and diagrams:** supported images and Mermaid diagram images preserve their aspect ratio and are constrained to the available page area. Word supports PNG/JPEG/GIF; convert WebP to PNG or JPEG before Word export. PDF also supports WebP.
+- **Pages and accessibility:** exports use A4 pages with 20 mm margins. PDF includes document bookmarks and tagged accessibility, with readable print typography and automatic page breaks.
+
+Word output remains editable and reflows according to the receiving application's fonts and layout engine. DOCX and PDF are **not pixel-identical**, and page breaks may differ. Check the exported document before sharing, especially long tables, code, and complex nested content.
+
 - Missing, unreadable, or unsupported export images cause an explicit error instead of silently disappearing.
 - Raw HTML is treated as text during export, not executed.
+- Math, footnotes, and YAML do not have formatted rendering or structured export support; use Source mode to preserve their Markdown syntax. Standard Markdown link references are resolved.
 
 ## First-version boundaries
 
 Visual editing can normalize Markdown syntax and may not preserve unsupported constructs. Use **Source mode** for exact editing of YAML front matter, raw HTML, math, footnotes, or custom Markdown extensions. Simply opening, switching modes, and saving without edits preserves the original text.
 
-Not included yet: a folder workspace, cloud sync, automatic updates, custom export templates, advanced pagination, interactive Word form checkboxes, and LaTeX rendering. Task lists export as readable text, not interactive form controls. Paired side-by-side editing, syntax highlighting, Source + Preview, enhanced search, refreshable contents, image storage choice, and Mermaid diagrams are included in the published Lekh 0.7.0 installer.
+Not included yet: a folder workspace, cloud sync, automatic updates, custom export templates, manual advanced pagination controls, interactive Word form checkboxes, and LaTeX rendering. Task lists export as rendered boxes, not interactive form controls. Math, footnotes, and YAML do not have formatted rendering or structured export support.
 
 ## Privacy
 
 The app does not upload documents or collect analytics. Local images are read only as needed. Opening a web/email link requires confirmation and uses your default external application, which may access the internet. Development/setup tools need network access for downloads.
 
-Recent file paths, theme preference, and recovery data are stored in the application's local Electron user-data profile. Documents themselves remain where you choose to save them.
+Recent file paths, theme preference, and recovery data are stored in `%APPDATA%\Lekh`. Documents themselves remain where you choose to save them.
+
+## Bugs, enhancements, and requests
+
+[Open a GitHub issue](https://github.com/dennispadia/lekh/issues) with reproduction steps or a description of the desired workflow. Do not include private documents or credentials. Responses, resolutions, and future maintenance are not guaranteed. Lekh is provided as-is without warranty under MIT; see [SUPPORT.md](../SUPPORT.md).
 
 ## Development and validation
 

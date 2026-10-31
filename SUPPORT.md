@@ -1,18 +1,13 @@
 # Support policy
 
-Lekh is shared **as-is, without support**.
+Questions about a bug, an enhancement, or another request are welcome through **[GitHub issues](https://github.com/dennispadia/lekh/issues)**.
 
-- There is no help desk, troubleshooting service, response-time commitment, or promised maintenance.
-- Bug reports, feature requests, pull requests, and security reports are not guaranteed to be read, answered, or acted on.
-- No future release, compatibility update, or security fix is promised.
-- Do not rely on this repository for urgent assistance or critical workflows.
+- For bugs, include the Lekh version, Windows version, reproduction steps, expected behavior, and actual behavior.
+- For enhancements and requests, explain the writing workflow and desired outcome.
+- Use a small, non-sensitive sample if needed. Do not post private documents, credentials, or personal data.
+- There is no guaranteed response time, resolution, release date, or future maintenance commitment.
+- Do not rely on an issue for urgent assistance or critical workflows.
 
-## Make it your own
+Lekh is provided **as-is, without warranty**, under the [MIT license](LICENSE). Keep backups of important documents; recovery drafts are not backups.
 
-You are welcome to fork the repository, modify it, and distribute your version under the [MIT license](LICENSE). Use the [user guide](docs/USER_GUIDE.md) and [build instructions](docs/BUILDING.md) to get started.
-
-You can ask an AI coding assistant to explain the code, fix a problem, or add features **in your fork**. Review its changes and test them yourself, especially document saving, recovery, exports, and installer behavior. AI-generated changes are not a guarantee of correctness or security.
-
-Keep backups of important documents. Recovery drafts are not backups.
-
-If you distribute a fork, clearly identify it as your version and define your own support policy. See [forking guidance](CONTRIBUTING.md).
+See the [user guide](docs/USER_GUIDE.md) for usage and [contribution guide](CONTRIBUTING.md) for development.

@@ -96,7 +96,7 @@ jobs:
               const body = `Windows x64, offline native setup with an embedded per-user installer. No Node.js, Word or Pandoc required.\n\n` +
                 `**Unsigned software:** Windows may warn about or block installation. Verify SHA256SUMS.txt and follow your organization's policies; do not disable security protections.\n\n` +
                 `[Verified build, offline setup engine/payload, animated native previews, complete extracted-app desktop tests, and fresh per-user install/uninstall on a GitHub-hosted Windows runner](${process.env.BUILD_URL}). Genuine old-version upgrade and repair have not yet been verified.\n\n` +
-                `Shared as-is under MIT, with no support or promised maintenance. Independent forks and AI-assisted customization are welcome.`;
+                `Bugs, enhancements, and requests are welcome through [GitHub issues](https://github.com/dennispadia/lekh/issues). Response times, resolutions, and future maintenance are not guaranteed. Shared as-is without warranty under MIT.`;
               ({ data: release } = await github.rest.repos.createRelease({
                 ...repo, tag_name: tag, target_commitish: process.env.RELEASE_SHA,
                 name: `Lekh ${version}`, body, draft: true, prerelease: false,

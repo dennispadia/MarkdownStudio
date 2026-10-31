@@ -1,7 +1,7 @@
 import { headingAnchor, headings, parser } from './markdown.js';
 
-export const TOC_START = '<!-- markdown-studio:toc -->';
-export const TOC_END = '<!-- /markdown-studio:toc -->';
+export const TOC_START = '<!-- lekh:toc -->';
+export const TOC_END = '<!-- /lekh:toc -->';
 
 export function tableOfContents(markdown: string): string {
   const outline = headings(markdown);
@@ -21,8 +21,8 @@ export function updateTableOfContents(markdown: string): string {
   const code = parser.parse(markdown, {}).filter(token => ['fence', 'code_block'].includes(token.type) && token.map)
     .map(token => [offsets[token.map![0]], offsets[token.map![1]] ?? markdown.length]);
   const outsideCode = (match: RegExpMatchArray) => !code.some(([from, to]) => match.index! >= from && match.index! < to);
-  const starts = [...markdown.matchAll(/^<!-- markdown-studio:toc -->\r?$/gm)].filter(outsideCode);
-  const ends = [...markdown.matchAll(/^<!-- \/markdown-studio:toc -->\r?$/gm)].filter(outsideCode);
+  const starts = [...markdown.matchAll(/^<!-- lekh:toc -->\r?$/gm)].filter(outsideCode);
+  const ends = [...markdown.matchAll(/^<!-- \/lekh:toc -->\r?$/gm)].filter(outsideCode);
   if (starts.length !== 1 || ends.length !== 1 || starts[0].index >= ends[0].index) {
     throw new Error('Update requires exactly one marked Lekh table of contents. Insert a new one if your contents list has no markers.');
   }

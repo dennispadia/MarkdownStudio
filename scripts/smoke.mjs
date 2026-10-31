@@ -28,7 +28,7 @@ function testPNG(width, height) {
 }
 
 const root = process.cwd();
-const temporary = await mkdtemp(path.join(os.tmpdir(), 'markdown-studio-desktop-'));
+const temporary = await mkdtemp(path.join(os.tmpdir(), 'lekh-desktop-'));
 const executable = process.argv[2] ?? createRequire(import.meta.url)('electron');
 const packaged = Boolean(process.argv[2]);
 const startupFile = path.join(temporary, 'Startup résumé 日本語.md');
@@ -298,7 +298,7 @@ try {
   await waitFor(async () => ui("document.querySelector('#zoom-reset').textContent === '100%'"), 'reset percentage');
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
   assert.equal(await ui("document.querySelector('#visual-editor').textContent"), beforeZoomText, 'Zoom does not modify document text');
-  assert.equal(await ui("window.studio.zoom('invalid').then(result => result.ok)"), false, 'Invalid zoom commands are rejected');
+  assert.equal(await ui("window.lekh.zoom('invalid').then(result => result.ok)"), false, 'Invalid zoom commands are rejected');
   console.log('PASS: zoom controls and percentage, native menu/keyboard synchronization, 50%-300% bounds, visible reset, and unchanged document text');
   const raw = '# Exact source\r\n\r\nUnusual   spacing & Unicode: \u4f60\u597d\r\n\r\n- [ ] A task\r\n';
   const file = path.join(temporary, 'original.md');
@@ -352,14 +352,14 @@ try {
   await waitFor(async () => ui("document.querySelector('#source-editor').value.includes('Typed visually')"), 'Visual typing synchronizes Source');
   await sourceEdit(dualRaw.replace('Keep editing here.', 'A **source edit** appears visually.'));
   assert.equal(await ui("document.querySelector('#visual-editor strong').textContent"), 'source edit');
-  if (process.env.STUDIO_APPROVED_SCREENSHOT) {
+  if (process.env.LEKH_APPROVED_SCREENSHOT) {
     await menuAction('theme:dark');
     await ui("document.querySelector('#notification').click();document.activeElement.blur()");
     const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(process.env.STUDIO_APPROVED_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
+    await writeFile(process.env.LEKH_APPROVED_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
     await action('sidebar');
     const collapsed = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_APPROVED_SCREENSHOT), 'approved-interface-collapsed.png'), Buffer.from(collapsed.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_APPROVED_SCREENSHOT), 'approved-interface-collapsed.png'), Buffer.from(collapsed.data, 'base64'));
     await action('sidebar');
     await menuAction('theme:light');
   }
@@ -537,11 +537,11 @@ try {
   await menuAction('insert:toc-update');
   assert.match(await ui("document.querySelector('#source-editor').value"), /\[Added later\]\(#added-later\)/);
   await action('visual');
-  assert.equal(await ui("document.querySelectorAll('[data-studio-contents]').length"), 1);
-  const contentsSource = await ui("document.querySelector('#source-editor').value.match(/<!-- markdown-studio:toc -->[\\s\\S]*?<!-- \\/markdown-studio:toc -->/)[0]");
+  assert.equal(await ui("document.querySelectorAll('[data-lekh-contents]').length"), 1);
+  const contentsSource = await ui("document.querySelector('#source-editor').value.match(/<!-- lekh:toc -->[\\s\\S]*?<!-- \\/lekh:toc -->/)[0]");
   assert.equal(await ui(`(() => {
     const target = document.querySelector('.tiptap');
-    const wrapper = new DOMParser().parseFromString(target.editor.getHTML(), 'text/html').querySelector('[data-studio-contents]');
+    const wrapper = new DOMParser().parseFromString(target.editor.getHTML(), 'text/html').querySelector('[data-lekh-contents]');
     const clipboard = new DataTransfer();
     clipboard.setData('text/html', wrapper.outerHTML);
     clipboard.setData('text/plain', wrapper.textContent);
@@ -550,15 +550,15 @@ try {
     target.dispatchEvent(event);
     return event.defaultPrevented;
   })()`), true, 'the editor handles the HTML clipboard paste');
-  assert.equal(await ui("document.querySelectorAll('[data-studio-contents]').length"), 2, 'contents HTML clipboard paste inserts another TOC');
-  assert.equal(await ui("Array.from(document.querySelectorAll('[data-studio-contents]')).every(node => node.querySelector('a[href=\"#added-later\"]'))"), true, 'TOC clipboard parsing retains the Markdown payload and links');
+  assert.equal(await ui("document.querySelectorAll('[data-lekh-contents]').length"), 2, 'contents HTML clipboard paste inserts another TOC');
+  assert.equal(await ui("Array.from(document.querySelectorAll('[data-lekh-contents]')).every(node => node.querySelector('a[href=\"#added-later\"]'))"), true, 'TOC clipboard parsing retains the Markdown payload and links');
   await action('undo');
-  assert.equal(await ui("document.querySelectorAll('[data-studio-contents]').length"), 1);
+  assert.equal(await ui("document.querySelectorAll('[data-lekh-contents]').length"), 1);
   await ui("document.querySelector('.tiptap').focus()");
   await nativeShortcut('End', ['control']);
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].webContents.insertText('Visual edit')");
   await action('source');
-  assert.match(await ui("document.querySelector('#source-editor').value"), /<!-- markdown-studio:toc -->/);
+  assert.match(await ui("document.querySelector('#source-editor').value"), /<!-- lekh:toc -->/);
   await menuAction('insert:toc-update');
   const contentsPrefix = '\n\n# Padded   heading\n\n\n';
   const contentsSuffix = '\n\nparagraph   with   spaces  \n\n';
@@ -624,7 +624,7 @@ try {
   assert.ok(assetPath, 'Assets choice writes a relative Markdown image');
   assert.deepEqual(await readFile(path.join(path.dirname(copied), assetPath)), testPNG(1,1));
   await action('visual');
-  await waitFor(async () => ui("Array.from(document.querySelectorAll('.tiptap img')).some(image => image.complete && image.naturalWidth === 1 && image.getAttribute('data-studio-source')?.startsWith('assets/'))"), 'new asset displays through scoped protocol');
+  await waitFor(async () => ui("Array.from(document.querySelectorAll('.tiptap img')).some(image => image.complete && image.naturalWidth === 1 && image.getAttribute('data-lekh-source')?.startsWith('assets/'))"), 'new asset displays through scoped protocol');
   await ui("window.smokeImageStorage='cancel'");
   await action('image');
   await action('source');
@@ -693,7 +693,7 @@ try {
   await action('source');
   await sourceEdit(content + '\n![Local image](pixel.png)\n');
   await action('visual');
-  await waitFor(async () => ui("Array.from(document.querySelectorAll('.tiptap img')).some(image => image.complete && image.naturalWidth === 1 && image.src.startsWith('studio-image:'))"), 'relative image protocol');
+  await waitFor(async () => ui("Array.from(document.querySelectorAll('.tiptap img')).some(image => image.complete && image.naturalWidth === 1 && image.src.startsWith('lekh-image:'))"), 'relative image protocol');
   console.log('PASS: relative local images display through the scoped image protocol');
   const imageTab = await activeTab();
   const otherFolder = path.join(temporary, 'other');
@@ -845,7 +845,7 @@ try {
   assert.equal(await ui("getComputedStyle(document.querySelector('.primary')).backgroundColor"), 'rgb(128, 191, 184)');
   assert.equal(await ui("document.querySelector('#theme-toggle span').textContent"), 'Dark');
   assert.equal(await ui("document.querySelector('#theme-toggle').getAttribute('aria-label')"), 'Switch to light theme');
-  assert.equal(await ui("localStorage.getItem('markdown-studio-theme')"), 'dark');
+  assert.equal(await ui("localStorage.getItem('lekh-theme')"), 'dark');
   assert.equal(await main.evaluate("smokeElectron.Menu.getApplicationMenu().getMenuItemById('theme-dark').checked"), true);
   assert.equal(await main.evaluate("Boolean(smokeElectron.Menu.getApplicationMenu().getMenuItemById('theme-github-dark'))"), false);
   assert.equal(await main.evaluate("smokeElectron.nativeTheme.themeSource"), 'dark');
@@ -884,7 +884,7 @@ try {
   await browser.call('Input.dispatchMouseEvent', {type:'mousePressed',x:sidebarDrag.x,y:sidebarDrag.y,button:'left',buttons:1,clickCount:1}, sessionId);
   await browser.call('Input.dispatchMouseEvent', {type:'mouseMoved',x:sidebarDrag.x+100,y:sidebarDrag.y,button:'left',buttons:1}, sessionId);
   await browser.call('Input.dispatchMouseEvent', {type:'mouseReleased',x:sidebarDrag.x+100,y:sidebarDrag.y,button:'left',buttons:0,clickCount:1}, sessionId);
-  await waitFor(async () => ui("localStorage.getItem('markdown-studio-sidebar-width') === '320'"), 'sidebar drag remembered');
+  await waitFor(async () => ui("localStorage.getItem('lekh-sidebar-width') === '320'"), 'sidebar drag remembered');
   assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 320);
   assert.equal(await ui("document.body.classList.contains('resizing-sidebar')"), false);
   await ui("document.querySelector('#sidebar-resizer').focus()");
@@ -896,14 +896,14 @@ try {
   assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 480);
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(850,600)");
   await waitFor(async () => ui("document.querySelector('#sidebar').getBoundingClientRect().width <= window.innerWidth - 480"), 'sidebar constrained in narrow window');
-  assert.equal(await ui("localStorage.getItem('markdown-studio-sidebar-width')"), '480', 'Window resizing retains preferred width');
+  assert.equal(await ui("localStorage.getItem('lekh-sidebar-width')"), '480', 'Window resizing retains preferred width');
   await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
   await waitFor(async () => ui("document.querySelector('#sidebar').getBoundingClientRect().width === 480"), 'sidebar preferred width restored');
   await ui("document.querySelector('#sidebar-resizer').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))");
   assert.equal(await ui("document.querySelector('#sidebar').getBoundingClientRect().width"), 220);
   await ui("document.querySelector('#sidebar-resizer').focus()");
   await nativeShortcut('Right', [], false);
-  await waitFor(async () => ui("localStorage.getItem('markdown-studio-sidebar-width') === '230'"), 'sidebar reset and subsequent resize');
+  await waitFor(async () => ui("localStorage.getItem('lekh-sidebar-width') === '230'"), 'sidebar reset and subsequent resize');
   await menuAction('focus');
   await action('sidebar');
   assert.equal(await ui("document.body.classList.contains('focus-mode')"), false);
@@ -911,7 +911,7 @@ try {
   console.log('PASS: compact header, collapsed action rail, shortcuts, accessible state, and focus-mode restoration');
   await nativeShortcut('B', ['control', 'shift']);
   await waitFor(async () => ui("document.body.classList.contains('sidebar-hidden')"), 'native sidebar shortcut');
-  assert.equal(await ui("localStorage.getItem('markdown-studio-sidebar-hidden')"), 'true');
+  assert.equal(await ui("localStorage.getItem('lekh-sidebar-hidden')"), 'true');
   await action('help');
   assert.equal(await ui("document.querySelector('#help-dialog').open"), true);
   await ui("document.querySelector('#help-dialog').close()");
@@ -940,8 +940,8 @@ try {
   await action('new');
   await sourceEdit('# Recoverable second draft\n\nSecond unsaved words');
   const recoveredName = await ui("document.querySelector('#filename').textContent");
-  await waitFor(async () => ui("JSON.parse(localStorage.getItem('markdown-studio-draft-v1'))?.documents.length === 2"), 'both recovery drafts persisted');
-  await ui("localStorage.setItem('markdown-studio-sidebar-width','invalid')");
+  await waitFor(async () => ui("JSON.parse(localStorage.getItem('lekh-draft-v1'))?.documents.length === 2"), 'both recovery drafts persisted');
+  await ui("localStorage.setItem('lekh-sidebar-width','invalid')");
   await browser.call('Page.reload', {}, sessionId);
   await waitFor(async () => ui("document.querySelector('#recovery-banner') && !document.querySelector('#recovery-banner').hidden && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'draft recovery');
   assert.equal(await ui("document.body.classList.contains('sidebar-hidden')"), true, 'Sidebar preference survives reload');
@@ -950,7 +950,7 @@ try {
   assert.match(await ui("document.querySelector('#notification').textContent"), /Sidebar width could not be read/);
   await ui("document.querySelector('#sidebar-resizer').focus()");
   await nativeShortcut('Right', [], false);
-  await waitFor(async () => ui("localStorage.getItem('markdown-studio-sidebar-width') === '230'"), 'valid sidebar width saved');
+  await waitFor(async () => ui("localStorage.getItem('lekh-sidebar-width') === '230'"), 'valid sidebar width saved');
   await ui("globalThis.smokeBeforeWidthReload = true");
   await browser.call('Page.reload', {}, sessionId);
   await waitFor(async () => ui("!globalThis.smokeBeforeWidthReload && document.querySelector('#sidebar-resizer') && document.querySelector('#app')?.getAttribute('aria-busy') === 'false'"), 'sidebar width reload');
@@ -966,12 +966,12 @@ try {
   await main.evaluate(`smokeSavePath = ${JSON.stringify(path.join(temporary, 'recovered.md'))}`);
   await action('save');
   assert.match(await readFile(path.join(temporary, 'recovered.md'), 'utf8'), /Second unsaved words/);
-  assert.equal(await ui("JSON.parse(localStorage.getItem('markdown-studio-draft-v1')).documents.length"), 1);
+  assert.equal(await ui("JSON.parse(localStorage.getItem('lekh-draft-v1')).documents.length"), 1);
   await menuAction('previous-tab');
   assert.match(await ui("document.querySelector('.tiptap').textContent"), /First unsaved words/);
   await main.evaluate(`smokeSavePath = ${JSON.stringify(path.join(temporary, 'recovered-first.md'))}`);
   await action('save');
-  assert.equal(await ui("localStorage.getItem('markdown-studio-draft-v1')"), null);
+  assert.equal(await ui("localStorage.getItem('lekh-draft-v1')"), null);
   console.log('PASS: all unsaved tabs recover separately, and saving one retains the other draft');
 
   await main.evaluate(`
@@ -1052,10 +1052,10 @@ try {
   await showContext();
   assert.equal(await ui("document.querySelectorAll('#editor-context-menu .context-tools button').length"), 12, 'All twelve editing commands are directly accessible');
   assert.deepEqual(await ui("[...document.querySelectorAll('#editor-context-menu .context-tools button')].map(button => button.textContent)"), ['Cut', 'Copy', 'Paste', 'Delete', 'Bold', 'Italic', 'Code', 'Link', 'Quote', 'Numbered', 'Bullets', 'Tasks']);
-  assert.equal((await ui("window.studio.contextMenuCommand('invalid-menu', 'invalid-command')")).ok, false, 'Invalid native context commands are rejected');
-  if (process.env.STUDIO_SCREENSHOT) {
+  assert.equal((await ui("window.lekh.contextMenuCommand('invalid-menu', 'invalid-command')")).ok, false, 'Invalid native context commands are rejected');
+  if (process.env.LEKH_SCREENSHOT) {
     const screenshot = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'compact-context-menu-desktop.png'), Buffer.from(screenshot.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'compact-context-menu-desktop.png'), Buffer.from(screenshot.data, 'base64'));
   }
   assert.equal(await main.evaluate("smokeMenuItem(['Table']).enabled"), true, 'Table menu is available before a table exists');
   assert.equal(await main.evaluate("smokeMenuItem(['Table', 'Insert table...']).enabled"), true);
@@ -1086,9 +1086,9 @@ try {
   assert.equal(await ui("document.querySelector('#table-dialog').open"), true);
   assert.equal(await ui("document.querySelector('#table-columns').value"), '3');
   assert.equal(await ui("document.querySelector('#table-rows').value"), '4');
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     const screenshot = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'insert-table-dialog.png'), Buffer.from(screenshot.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'insert-table-dialog.png'), Buffer.from(screenshot.data, 'base64'));
   }
   await ui("document.querySelector('#table-columns').value='5'; document.querySelector('#table-rows').value='7'; document.querySelector('#table-dialog button[value=insert]').click()");
   await waitFor(async () => ui("!document.querySelector('#table-dialog').open && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'chosen visual table dimensions');
@@ -1397,7 +1397,7 @@ try {
   await showContext();
   await contextAction(['Paste']);
   await waitFor(async () => ui("document.querySelector('.tiptap img')?.naturalWidth === 24"), 'right-click image paste');
-  assert.ok(await ui("document.querySelector('.tiptap img').getAttribute('data-studio-source').startsWith('data:image/png;base64,')"));
+  assert.ok(await ui("document.querySelector('.tiptap img').getAttribute('data-lekh-source').startsWith('data:image/png;base64,')"));
   await showContext('.tiptap img');
   await contextAction(['Copy image']);
   assert.deepEqual(await main.evaluate('smokeClipboardImage.getSize()'), { width: 24, height: 16 });
@@ -1551,10 +1551,10 @@ try {
     assert.ok(bytes.length > 1000);
     assert.equal(bytes.subarray(0, format === 'pdf' ? 5 : 2).toString(), format === 'pdf' ? '%PDF-' : 'PK');
   }
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     await ui("document.querySelector('.code-language').click()");
     const screenshot = await browser.call('Page.captureScreenshot', { format:'png' }, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'code-language-picker.png'), Buffer.from(screenshot.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'code-language-picker.png'), Buffer.from(screenshot.data, 'base64'));
     await ui("document.querySelector('.code-language-picker:popover-open').hidePopover()");
   }
   await menuAction('close-tab');
@@ -1590,7 +1590,7 @@ try {
   const collapsedOutlineHeight = await ui("document.querySelector('#outline').getBoundingClientRect().height");
   await ui("document.querySelector('#recent-toggle').click()");
   assert.equal(await ui("document.querySelector('#recent').hidden"), false);
-  assert.equal(await ui("localStorage.getItem('markdown-studio-recent-expanded')"), 'true');
+  assert.equal(await ui("localStorage.getItem('lekh-recent-expanded')"), 'true');
   assert.ok(await ui("document.querySelector('#outline').getBoundingClientRect().height") < collapsedOutlineHeight, 'Collapsing history gives space back to the outline');
   assert.equal(await ui("getComputedStyle(document.querySelector('#recent')).overflowY"), 'auto');
   assert.ok(await ui("document.querySelector('#recent').getBoundingClientRect().height") <= 180);
@@ -1600,7 +1600,7 @@ try {
   await action('clear-recent');
   assert.equal(await ui("document.querySelector('#notification').classList.contains('error')"), true);
   assert.equal(await ui("document.querySelectorAll('#recent button').length"), recentCount);
-  assert.equal(await ui("window.studio.recent().then(result => result.value.length)"), recentCount);
+  assert.equal(await ui("window.lekh.recent().then(result => result.value.length)"), recentCount);
   await rmdir(historyPath);
   await rename(historyBackup, historyPath);
   const beforeClear = await ui("JSON.stringify({tabs:Array.from(document.querySelectorAll('.document-tab'), tab => tab.dataset.documentId),active:document.querySelector('.document-tab.selected').dataset.documentId,text:document.querySelector('.tiptap').textContent})");
@@ -1618,23 +1618,23 @@ try {
   await menuAction('clear-recent');
   console.log('PASS: clear recent history persists, preserves documents/tabs, repopulates on open, and reports write failures without clearing memory or UI');
 
-  await ui("localStorage.setItem('markdown-studio-theme', 'github-dark'); window.addEventListener('beforeunload', () => localStorage.setItem('markdown-studio-draft-v1', JSON.stringify({content:'# Legacy recovery',name:'legacy.md'})), {once:true})");
+  await ui("localStorage.setItem('lekh-theme', 'invalid-theme'); window.addEventListener('beforeunload', () => localStorage.setItem('lekh-draft-v1', JSON.stringify({content:'# Single draft recovery',name:'single-draft.md'})), {once:true})");
   await browser.call('Page.reload', {}, sessionId);
-  await waitFor(async () => ui("document.querySelector('#recovery-banner') && !document.querySelector('#recovery-banner').hidden && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'legacy recovery banner');
-  assert.equal(await ui("document.documentElement.dataset.theme"), 'dark');
-  assert.equal(await ui("document.querySelector('#theme-toggle span').textContent"), 'Dark');
+  await waitFor(async () => ui("document.querySelector('#recovery-banner') && !document.querySelector('#recovery-banner').hidden && document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'single draft recovery banner');
+  assert.equal(await ui("document.documentElement.dataset.theme"), 'light');
+  assert.equal(await ui("document.querySelector('#theme-toggle span').textContent"), 'Light');
   assert.equal(await ui("document.querySelector('#recent-toggle').getAttribute('aria-expanded')"), 'true', 'Recent Files preference survives reload');
   await ui("document.querySelector('#recent-toggle').click()");
-  assert.equal(await ui("localStorage.getItem('markdown-studio-recent-expanded')"), 'false');
-  assert.equal(await ui("localStorage.getItem('markdown-studio-theme')"), 'dark');
-  assert.equal(await brandSource(), darkBrandIcon, 'The remembered dark theme restores its high-contrast sidebar icon');
+  assert.equal(await ui("localStorage.getItem('lekh-recent-expanded')"), 'false');
+  assert.equal(await ui("localStorage.getItem('lekh-theme')"), 'light');
+  assert.equal(await brandSource(), lightBrandIcon, 'An invalid stored theme restores the default light theme and icon');
   assert.equal(await ui("document.querySelectorAll('#recent button').length"), 0);
   await action('recover');
-  assert.equal(await ui("document.querySelector('.tiptap h1').textContent"), 'Legacy recovery');
+  assert.equal(await ui("document.querySelector('.tiptap h1').textContent"), 'Single draft recovery');
   await main.evaluate('smokeChoice = 1');
   await menuAction('close-tab');
   assert.equal(await tabCount(), 1);
-  console.log('PASS: legacy single-document recovery, migration from GitHub Dark to Dark, and cleared recent history survive reload');
+  console.log('PASS: single-document recovery, invalid-theme fallback, and cleared recent history survive reload');
 
   const splitPaths = [];
   const splitIds = [];
@@ -1679,9 +1679,9 @@ try {
   await waitFor(async () => ui("Array.from(document.querySelectorAll('#split-documents img')).every(image => image.complete && image.naturalWidth > 0)"), 'thumbnail local images');
   assert.deepEqual(await ui("Array.from(document.querySelectorAll('#split-documents img'), image => image.naturalWidth)"), [3,4,5]);
   assert.equal(await activeTab(), splitIds[0], 'Opening previews does not switch the active document');
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'split-preview-picker.png'), Buffer.from(screenshot.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'split-preview-picker.png'), Buffer.from(screenshot.data, 'base64'));
   }
   await ui("document.querySelector('#split-cancel').click()");
   assert.equal(await tabCount(), 5);
@@ -1715,9 +1715,9 @@ try {
   assert.equal(await ui("document.querySelector('.global-modes').hidden"), false, 'Split mode retains the shared switch');
   assert.equal(await ui("document.querySelectorAll('[role=switch]').length"), 1, 'Only one Visual + Source switch exists, including split mode');
   assert.equal(await ui("document.querySelectorAll('.pane-header button').length"), 0, 'Pane headers do not duplicate view controls');
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'responsive-split.png'), Buffer.from(screenshot.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'responsive-split.png'), Buffer.from(screenshot.data, 'base64'));
   }
   assert.match(await ui("document.querySelector('.paired-tab .tab-select').textContent"), /left\.md.*right\.md/);
   await waitFor(async () => ui("Array.from(document.querySelectorAll('.document-pane .tiptap img')).every(image => image.complete && image.naturalWidth > 0)"), 'both split local images');
@@ -1858,9 +1858,9 @@ try {
   await menuAction('focus');
   assert.equal(await ui("document.querySelectorAll('#canvas > .document-pane').length"), 2);
   await menuAction('focus');
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'paired-split-desktop.png'), Buffer.from(screenshot.data,'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'paired-split-desktop.png'), Buffer.from(screenshot.data,'base64'));
   }
   await menuAction('unsplit');
   assert.equal(await tabCount(), 5);
@@ -1879,7 +1879,7 @@ try {
   await sourceEdit((await paneSource(splitIds[0])) + '\nPending left.');
   await paneMode(splitIds[1], 'source');
   await sourceEdit((await paneSource(splitIds[1])) + '\nPending right.');
-  await waitFor(async () => ui("JSON.parse(localStorage.getItem('markdown-studio-draft-v1') || '{\"documents\":[]}').documents.length === 2"), 'recovery stores both dirty split files');
+  await waitFor(async () => ui("JSON.parse(localStorage.getItem('lekh-draft-v1') || '{\"documents\":[]}').documents.length === 2"), 'recovery stores both dirty split files');
   await main.evaluate('smokeChoices=[1,2]; smokeChoice=2');
   await ui("document.querySelector('.paired-tab .tab-close').click()");
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'cancel closing paired files');
@@ -2059,9 +2059,9 @@ try {
   assert.ok(await ui("[...document.querySelectorAll('.document-tab:not([hidden])')].every(tab => tab.getBoundingClientRect().width <= 80)"), 'Visible tabs shrink to browser-style compact tabs');
   await action('tabs-menu');
   assert.equal(await ui("document.querySelectorAll('#tabs-menu button').length"), await tabCount(), 'Document dropdown lists every tab');
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'responsive-tabs.png'), Buffer.from(screenshot.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'responsive-tabs.png'), Buffer.from(screenshot.data, 'base64'));
   }
   await ui("document.querySelector('#tabs-menu button').click()");
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'document list activation');
@@ -2091,11 +2091,11 @@ try {
   assert.equal(await ui("document.querySelectorAll('[data-command=quote]').length"), 1);
   await menuAction('theme:light');
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'sidebar Light theme');
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     await main.evaluate("smokeElectron.BrowserWindow.getAllWindows()[0].setSize(1320,900)");
     await delay(250);
     const screenshot = await browser.call('Page.captureScreenshot', {format:'png'}, sessionId);
-    await writeFile(path.join(path.dirname(process.env.STUDIO_SCREENSHOT), 'apple-interface-light-desktop.png'), Buffer.from(screenshot.data, 'base64'));
+    await writeFile(path.join(path.dirname(process.env.LEKH_SCREENSHOT), 'apple-interface-light-desktop.png'), Buffer.from(screenshot.data, 'base64'));
   }
   await menuAction('theme:dark');
   await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'sidebar Dark theme');
@@ -2159,7 +2159,7 @@ try {
   assert.equal(await tabCount(), 1);
   console.log('PASS: split-pane link targeting, clean cancellation, Escape, stale-document protection, and read-only Preview Ctrl+click');
 
-  if (process.env.STUDIO_PUBLIC_SCREENSHOTS === '1') {
+  if (process.env.LEKH_PUBLIC_SCREENSHOTS === '1') {
     const images = path.join(root, 'docs', 'images');
     await mkdir(images, {recursive:true});
     if (await ui("document.body.classList.contains('sidebar-hidden')")) await action('sidebar');
@@ -2194,12 +2194,12 @@ try {
     await waitFor(async () => ui("document.querySelector('#app').getAttribute('aria-busy') === 'false'"), 'close README example pair');
     console.log('PASS: README screenshots captured from the actual Light and Dark split application with sample content');
   }
-  if (process.env.STUDIO_SCREENSHOT) {
+  if (process.env.LEKH_SCREENSHOT) {
     await action('visual');
     await main.evaluate(`smokeOpenPath = ${JSON.stringify(copied)}`);
     await action('open');
     const screenshot = await browser.call('Page.captureScreenshot', { format: 'png' }, sessionId);
-    await writeFile(process.env.STUDIO_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
+    await writeFile(process.env.LEKH_SCREENSHOT, Buffer.from(screenshot.data, 'base64'));
     await menuAction('close-tab');
   }
   await action('source');

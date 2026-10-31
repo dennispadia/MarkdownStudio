@@ -1,9 +1,11 @@
 import {
-  AlignmentType, BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun,
-  LevelFormat, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType,
-  type IRunOptions, type ParagraphChild,
+  AlignmentType, Bookmark, BorderStyle, Document, ExternalHyperlink, HeadingLevel, ImageRun,
+  InternalHyperlink, LevelFormat, Packer, Paragraph, Tab, TabStopType, Table, TableCell, TableLayoutType,
+  TableRow, TextRun, UnderlineType, VerticalAlign,
+  WidthType, type ILevelsOptions, type IParagraphOptions, type IRunOptions, type IStylesOptions,
+  type ParagraphChild,
 } from 'docx';
-import type Token from 'markdown-it/lib/token.mjs';
+import Token from 'markdown-it/lib/token.mjs';
 import { escapeHTML, headingAnchor, isSafeLink, parser } from './markdown.js';
 import { readImage } from './images.js';
 import { highlightedHTML, highlightedSegments, syntaxCSS, type CodeSegment } from './highlight.js';
@@ -28,38 +30,115 @@ async function diagramImage(source: string, loader?: DiagramImageLoader) {
   return { ...image, dimensions };
 }
 type Block = Paragraph | Table;
-type List = { kind: 'bullet' | 'ordered'; level: number; reference: string };
+const page = { width: 11906, height: 16838, margin: 1134 };
+const contentWidth = page.width - page.margin * 2;
+const ink = { text: '263238', muted: '607078', accent: '227C78', line: 'DDE5E5', soft: 'F1F5F5', code: 'F3F6F6' };
+const headingSizes = [51, 32, 26, 23, 22, 20];
+const headingSpacing = [
+  { before: 0, after: 330 }, { before: 600, after: 220 }, { before: 430, after: 180 },
+  { before: 360, after: 160 }, { before: 330, after: 140 }, { before: 300, after: 120 },
+];
+const headingLevels = [
+  HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3,
+  HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6,
+];
+const styles: IStylesOptions = {
+  default: {
+    document: {
+      run: { font: 'Segoe UI', size: 22, color: ink.text },
+      paragraph: { spacing: { before: 160, after: 160, line: 444 } },
+    },
+    hyperlink: { run: { color: ink.accent, underline: { type: UnderlineType.SINGLE } } },
+    ...Object.fromEntries(headingSizes.map((size, index) => [`heading${index + 1}`, {
+      run: { font: 'Segoe UI', size, bold: true, color: ink.text },
+      paragraph: { spacing: { ...headingSpacing[index], line: 324 }, keepNext: true, keepLines: true },
+    }])),
+  },
+};
+
+type List = { level: number; reference: string };
+type ListItem = { pending: boolean };
 
 export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagram?: DiagramImageLoader): Promise<Buffer> {
   const tokens = parser.parse(markdown, {});
   if (tokens.filter(token => token.type === 'fence' && isMermaidLanguage(token.info)).length > diagramLimits.diagrams) throw new Error('An export supports at most 32 Mermaid diagrams.');
   const blocks: Block[] = [];
   const lists: List[] = [];
-  const numbering: { reference: string; levels: { level: number; format: typeof LevelFormat.DECIMAL; text: string; start: number; alignment: typeof AlignmentType.START; style: { paragraph: { indent: { left: number; hanging: number } } } }[] }[] = [];
+  const items: ListItem[] = [];
+  const numbering: { reference: string; levels: ILevelsOptions[] }[] = [];
+  const headingBookmarks = new Map<Token, string>();
+  const anchorBookmarks = new Map<string, string>();
+  const usedAnchors = new Map<string, number>();
+  for (const [index, token] of tokens.entries()) {
+    if (token.type !== 'heading_open') continue;
+    const anchor = headingAnchor(tokens[index + 1].content, usedAnchors);
+    const name = `lekh_heading_${index}`;
+    headingBookmarks.set(token, name);
+    anchorBookmarks.set(anchor, name);
+  }
   let heading: (typeof HeadingLevel)[keyof typeof HeadingLevel] | undefined;
+  let bookmark: string | undefined;
   let quote = 0;
-  let itemPending = false;
   let currentTable: TableRow[] | null = null;
+  let tableWidth = contentWidth;
+  let columnWidth = contentWidth;
   let currentRow: TableCell[] = [];
   let currentCell: Paragraph[] | null = null;
   let headerCell = false;
+  let headerRow = false;
+  let cellAlignment: IParagraphOptions['alignment'];
+
+  const indentation = () => 360 * ((lists.at(-1)?.level ?? -1) + 1 + quote);
+  const availableWidth = () => currentCell ? columnWidth - 320 : contentWidth - indentation();
+
+  function appendParagraph(children: ParagraphChild[], options: IParagraphOptions = {}): void {
+    const list = lists.at(-1);
+    const item = items.at(-1);
+    const marker = item?.pending && list && currentCell === null;
+    const left = indentation();
+    const paragraph = new Paragraph({
+      children,
+      widowControl: true,
+      numbering: marker ? { reference: list.reference, level: list.level } : undefined,
+      indent: left && currentCell === null ? { left, ...(marker ? { hanging: 240 } : {}) } : undefined,
+      spacing: list ? { before: 45, after: 45, line: 444 } : undefined,
+      ...(quote && currentCell === null ? {
+        shading: { fill: ink.soft },
+        border: { left: { color: ink.accent, style: BorderStyle.SINGLE, size: 18, space: 12 } },
+      } : {}),
+      ...options,
+    });
+    (currentCell ?? blocks).push(paragraph);
+    if (item) item.pending = false;
+  }
+
+  function imageRun(data: Buffer, type: 'png' | 'jpg' | 'gif', alt: string): ImageRun {
+    const dimensions = imageDimensions(data, type);
+    const scale = Math.min(1, availableWidth() / 15 / dimensions.width, 900 / dimensions.height);
+    return new ImageRun({
+      data, type,
+      transformation: { width: Math.max(1, Math.round(dimensions.width * scale)), height: Math.max(1, Math.round(dimensions.height * scale)) },
+      altText: { title: alt, description: alt, name: alt || 'Image' },
+    });
+  }
 
   async function inline(children: Token[], inherited: IRunOptions = {}): Promise<ParagraphChild[]> {
     const runs: ParagraphChild[] = [];
+    const stack: IRunOptions[] = [];
     let style: IRunOptions = { ...inherited };
     for (let index = 0; index < children.length; index++) {
       const token = children[index];
       switch (token.type) {
-        case 'strong_open': style = { ...style, bold: true }; break;
-        case 'strong_close': style = { ...style, bold: inherited.bold }; break;
-        case 'em_open': style = { ...style, italics: true }; break;
-        case 'em_close': style = { ...style, italics: inherited.italics }; break;
-        case 's_open': style = { ...style, strike: true }; break;
-        case 's_close': style = { ...style, strike: inherited.strike }; break;
+        case 'strong_open': stack.push(style); style = { ...style, bold: true }; break;
+        case 'em_open': stack.push(style); style = { ...style, italics: true }; break;
+        case 's_open': stack.push(style); style = { ...style, strike: true }; break;
+        case 'strong_close':
+        case 'em_close':
+        case 's_close': style = stack.pop() ?? inherited; break;
         case 'text': runs.push(new TextRun({ ...style, text: token.content })); break;
-        case 'code_inline': runs.push(new TextRun({ ...style, text: token.content, font: 'Consolas', shading: { fill: 'F1F3F5' } })); break;
+        case 'code_inline': runs.push(new TextRun({ ...style, text: token.content, font: 'Consolas', size: 19, shading: { fill: ink.code } })); break;
         case 'softbreak': runs.push(new TextRun({ ...style, text: ' ' })); break;
-        case 'hardbreak': runs.push(new TextRun({ break: 1 })); break;
+        case 'hardbreak': runs.push(new TextRun({ ...style, break: 1 })); break;
         case 'link_open': {
           let end = index + 1;
           let depth = 1;
@@ -67,9 +146,20 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
             if (children[end].type === 'link_open') depth++;
             if (children[end].type === 'link_close' && --depth === 0) break;
           }
-          const label = await inline(children.slice(index + 1, end), style);
+          const label = await inline(children.slice(index + 1, end), {
+            ...style, color: ink.accent, underline: { type: UnderlineType.SINGLE },
+          });
           const href = token.attrGet('href') ?? '';
-          if (isSafeLink(href)) runs.push(new ExternalHyperlink({ link: href, children: label }));
+          let target: string | undefined;
+          if (href.startsWith('#')) {
+            try { target = anchorBookmarks.get(decodeURIComponent(href.slice(1))); }
+            catch (error) {
+              if (!(error instanceof URIError)) throw error;
+              console.warn('Word export retained a malformed heading link as text.');
+            }
+          }
+          if (target) runs.push(new InternalHyperlink({ anchor: target, children: label }));
+          else if (isSafeLink(href)) runs.push(new ExternalHyperlink({ link: href, children: label }));
           else runs.push(...label);
           index = end;
           break;
@@ -81,12 +171,7 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
           if (type !== 'png' && type !== 'jpg' && type !== 'gif') {
             throw new Error('Word export supports PNG, JPEG, and GIF images. Please replace WebP images before exporting to Word.');
           }
-          const dimensions = imageDimensions(data, type);
-          const scale = Math.min(1, 600 / dimensions.width, 760 / dimensions.height);
-          runs.push(new ImageRun({
-            data, type, transformation: { width: Math.round(dimensions.width * scale), height: Math.round(dimensions.height * scale) },
-            altText: { title: token.content, description: token.content, name: token.content || 'Image' },
-          }));
+          runs.push(imageRun(data, type, token.content));
           break;
         }
       }
@@ -94,72 +179,101 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
     return runs;
   }
 
-  for (const token of tokens) {
-    if (token.type === 'heading_open') heading = ({
-      h1: HeadingLevel.HEADING_1, h2: HeadingLevel.HEADING_2, h3: HeadingLevel.HEADING_3,
-      h4: HeadingLevel.HEADING_4, h5: HeadingLevel.HEADING_5, h6: HeadingLevel.HEADING_6,
-    })[token.tag];
-    else if (token.type === 'heading_close') heading = undefined;
+  for (const [tokenIndex, token] of tokens.entries()) {
+    if (token.type === 'heading_open') {
+      heading = headingLevels[Number(token.tag.slice(1)) - 1];
+      bookmark = headingBookmarks.get(token);
+    } else if (token.type === 'heading_close') {
+      heading = undefined;
+      bookmark = undefined;
+    }
     else if (token.type === 'blockquote_open') quote++;
     else if (token.type === 'blockquote_close') quote--;
     else if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') {
       const level = Math.min(lists.length, 8);
       const reference = `list-${numbering.length}`;
-      const kind = token.type === 'bullet_list_open' ? 'bullet' : 'ordered';
-      if (kind === 'ordered') numbering.push({
+      const ordered = token.type === 'ordered_list_open';
+      numbering.push({
         reference, levels: Array.from({ length: 9 }, (_, index) => ({
-          level: index, format: LevelFormat.DECIMAL, text: `%${index + 1}.`,
-          start: Number(token.attrGet('start') || 1), alignment: AlignmentType.START,
-          style: { paragraph: { indent: { left: 720 * (index + 1), hanging: 360 } } },
+          level: index, format: ordered ? LevelFormat.DECIMAL : LevelFormat.BULLET,
+          text: ordered ? `%${index + 1}.` : ['\u2022', '\u25e6', '\u25aa'][index % 3],
+          start: ordered && index === level ? Number(token.attrGet('start') || 1) : 1,
+          alignment: AlignmentType.START,
+          style: {
+            run: { font: 'Segoe UI', color: ink.accent },
+            paragraph: { indent: { left: 360 * (index + 1), hanging: 240 } },
+          },
         })),
       });
-      lists.push({ kind, level, reference });
+      lists.push({ level, reference });
     } else if (token.type === 'bullet_list_close' || token.type === 'ordered_list_close') {
       lists.pop();
-    } else if (token.type === 'list_item_open') itemPending = true;
-    else if (token.type === 'list_item_close') itemPending = false;
-    else if (token.type === 'table_open') currentTable = [];
-    else if (token.type === 'tr_open') currentRow = [];
+    } else if (token.type === 'list_item_open') items.push({ pending: true });
+    else if (token.type === 'list_item_close') items.pop();
+    else if (token.type === 'table_open') {
+      currentTable = [];
+      tableWidth = contentWidth - indentation();
+      const headerEnd = tokens.findIndex((next, index) => index > tokenIndex && next.type === 'tr_close');
+      const columns = tokens.slice(tokenIndex, headerEnd).filter(next => next.type === 'th_open').length;
+      columnWidth = Math.floor(tableWidth / Math.max(1, columns));
+    } else if (token.type === 'tr_open') {
+      currentRow = [];
+      headerRow = false;
+    }
     else if (token.type === 'th_open' || token.type === 'td_open') {
       currentCell = [];
       headerCell = token.type === 'th_open';
+      headerRow ||= headerCell;
+      cellAlignment = ({
+        'text-align:left': AlignmentType.LEFT, 'text-align:center': AlignmentType.CENTER,
+        'text-align:right': AlignmentType.RIGHT,
+      })[token.attrGet('style') ?? ''];
     } else if (token.type === 'th_close' || token.type === 'td_close') {
       currentRow.push(new TableCell({
         children: currentCell?.length ? currentCell : [new Paragraph('')],
-        shading: headerCell ? { fill: 'EEF2F6' } : undefined,
+        width: { size: columnWidth, type: WidthType.DXA },
+        shading: headerCell ? { fill: ink.soft } : undefined,
+        verticalAlign: VerticalAlign.TOP,
       }));
       currentCell = null;
-    } else if (token.type === 'tr_close') currentTable?.push(new TableRow({ children: currentRow }));
+      cellAlignment = undefined;
+    } else if (token.type === 'tr_close') currentTable?.push(new TableRow({
+      children: currentRow, tableHeader: headerRow, cantSplit: true,
+    }));
     else if (token.type === 'table_close') {
-      if (currentTable?.length) blocks.push(new Table({ rows: currentTable, width: { size: 100, type: WidthType.PERCENTAGE } }));
+      const border = { color: ink.line, size: 6, style: BorderStyle.SINGLE };
+      if (currentTable?.length) {
+        blocks.push(new Table({
+          rows: currentTable, width: { size: tableWidth, type: WidthType.DXA },
+          columnWidths: currentRow.map(() => columnWidth), layout: TableLayoutType.FIXED,
+          indent: { size: indentation(), type: WidthType.DXA },
+          margins: { top: 120, bottom: 120, left: 160, right: 160 },
+          borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
+        }));
+      }
       currentTable = null;
     } else if (token.type === 'inline') {
-      const list = lists.at(-1);
-      const paragraph = new Paragraph({
-        children: await inline(token.children ?? [], { bold: headerCell && currentCell !== null }),
+      const children = token.children ?? [];
+      const task = items.at(-1)?.pending && lists.length ? /^\[([ xX])\]\s+/.exec(children[0]?.type === 'text' ? children[0].content : '') : null;
+      if (task) children[0].content = children[0].content.slice(task[0].length);
+      const runs = await inline(children, currentCell ? { size: 19, ...(headerCell ? { bold: true } : {}) } : quote ? { color: ink.muted } : {});
+      if (task) {
+        runs.unshift(new TextRun({ children: [task[1].toLowerCase() === 'x' ? '\u2611' : '\u2610', new Tab()], font: 'Segoe UI Symbol', color: ink.accent }));
+        items.at(-1)!.pending = false;
+      }
+      appendParagraph(bookmark ? [new Bookmark({ id: bookmark, children: runs })] : runs, {
         heading,
-        spacing: { after: 160, line: 280 },
-        bullet: itemPending && list?.kind === 'bullet' ? { level: list.level } : undefined,
-        numbering: itemPending && list?.kind === 'ordered' ? { reference: list.reference, level: list.level } : undefined,
-        indent: quote ? { left: 360 * quote } : undefined,
-        border: quote ? { left: { color: '8497AB', style: BorderStyle.SINGLE, size: 16, space: 12 } } : undefined,
+        ...(task ? {
+          indent: { left: indentation(), hanging: 360 },
+          tabStops: [{ type: TabStopType.LEFT, position: indentation() }],
+        } : {}),
+        ...(currentCell ? { alignment: cellAlignment, spacing: { before: 0, after: 0, line: 360 }, keepNext: headerCell } : {}),
+        ...(heading ? { spacing: undefined } : {}),
       });
-      (currentCell ?? blocks).push(paragraph);
-      itemPending = false;
     } else if (token.type === 'fence' || token.type === 'code_block') {
-      const list = lists.at(-1);
       if (token.type === 'fence' && isMermaidLanguage(token.info)) {
-        const { data, dimensions } = await diagramImage(token.content, loadDiagram);
-        const scale = Math.min(1, 600 / dimensions.width, 760 / dimensions.height);
-        blocks.push(new Paragraph({
-          children: [new ImageRun({
-            data, type: 'png',
-            transformation: { width: Math.max(1, Math.round(dimensions.width * scale)), height: Math.max(1, Math.round(dimensions.height * scale)) },
-            altText: { title: 'Mermaid diagram', description: 'Mermaid diagram', name: 'Mermaid diagram' },
-          })],
-          indent: list ? { left: 720 * (list.level + 1) } : undefined,
-          spacing: { after: 160 },
-        }));
+        const { data } = await diagramImage(token.content, loadDiagram);
+        appendParagraph([imageRun(data, 'png', 'Mermaid diagram')], { spacing: { before: 160, after: 160 } });
         continue;
       }
       const lines: CodeSegment[][] = [[]];
@@ -169,24 +283,31 @@ export async function toDocx(markdown: string, loadImage: ImageLoader, loadDiagr
           if (part) lines.at(-1)!.push({ text: part, color: segment.color });
         }
       }
-      for (const line of lines) {
-        blocks.push(new Paragraph({
-          children: (line.length ? line : [{ text: ' ' }]).map(segment => new TextRun({
-            text: segment.text, color: segment.color, font: 'Consolas', size: 19,
-          })),
-          shading: { fill: 'F1F3F5' }, spacing: { after: 0 },
-          indent: list ? { left: 720 * (list.level + 1) } : undefined,
-        }));
+      for (const [index, line] of lines.entries()) {
+        appendParagraph((line.length ? line : [{ text: ' ' }]).map(segment => new TextRun({
+          children: segment.text.split(/(\t)/).map(part => part === '\t' ? new Tab() : part),
+          color: segment.color, font: 'Consolas', size: 19,
+        })), {
+          shading: { fill: ink.code }, spacing: { before: index ? 0 : 160, after: index === lines.length - 1 ? 160 : 0, line: 300 },
+          keepNext: false,
+        });
       }
     } else if (token.type === 'hr') {
-      blocks.push(new Paragraph({ border: { bottom: { color: 'CBD5E1', size: 6, style: BorderStyle.SINGLE } } }));
+      appendParagraph([], { spacing: { before: 240, after: 240 }, border: { bottom: { color: ink.line, size: 6, style: BorderStyle.SINGLE } } });
     }
   }
   return Packer.toBuffer(new Document({
-    creator: productName, title: 'Markdown document',
-    styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
+    creator: productName,
+    title: tokens.find(token => token.type === 'inline' && token.level === 1)?.children?.map(child => child.content).join('') || 'Markdown document',
+    styles,
     numbering: { config: numbering },
-    sections: [{ properties: { page: { margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 } } }, children: blocks.length ? blocks : [new Paragraph('')] }],
+    sections: [{
+      properties: { page: {
+        size: { width: page.width, height: page.height },
+        margin: { top: page.margin, bottom: page.margin, left: page.margin, right: page.margin },
+      } },
+      children: blocks.length ? blocks : [new Paragraph('')],
+    }],
   }));
 }
 
@@ -220,17 +341,37 @@ function checked(width: number, height: number): { width: number; height: number
 
 export const printCSS = `
   @page { size: A4; margin: 20mm; }
-  body { font: 11pt/1.6 "Segoe UI", Arial, sans-serif; color: #17212f; overflow-wrap: anywhere; }
-  h1,h2,h3,h4,h5,h6 { line-height: 1.25; break-after: avoid; margin: 1.3em 0 .5em; }
-  h1 { font-size: 26pt; } h2 { font-size: 19pt; border-bottom: 1px solid #dbe2ea; padding-bottom: .3em; }
-  a { color: #245c9e; } img { max-width: 100%; max-height: 240mm; object-fit: contain; }
-  table { width: 100%; border-collapse: collapse; margin: 1em 0; }
-  th,td { border: 1px solid #bbc6d4; padding: 7px 10px; text-align: left; }
-  th { background: #edf2f7; } thead { display: table-header-group; } tr, img { break-inside: avoid; }
-  blockquote { border-left: 3px solid #91a5bd; margin-left: 0; padding-left: 16px; color: #526579; }
-  pre { background: #f1f4f8; padding: 12px; white-space: pre-wrap; }
-  code { font: 9.5pt/1.5 Consolas, monospace; background: #f1f4f8; }
-  hr { border: 0; border-top: 1px solid #cbd5e1; }
+  * { box-sizing: border-box; }
+  html { background: white; }
+  body { margin: 0; font: 11pt/1.85 "Segoe UI", Arial, sans-serif; color: #${ink.text}; overflow-wrap: anywhere; }
+  body > :first-child { margin-top: 0; }
+  p { margin: .8em 0; orphans: 2; widows: 2; }
+  h1,h2,h3,h4,h5,h6 { font-weight: 600; line-height: 1.35; break-after: avoid; break-inside: avoid; }
+  h1 { font-size: 25.5pt; margin: 0 0 16.5pt; }
+  h2 { font-size: 16pt; margin: 30pt 0 11pt; }
+  h3 { font-size: 13pt; margin: 21.5pt 0 9pt; }
+  h4 { font-size: 11.5pt; margin: 18pt 0 8pt; }
+  h5 { font-size: 11pt; margin: 16.5pt 0 7pt; }
+  h6 { font-size: 10pt; margin: 15pt 0 6pt; }
+  a { color: #${ink.accent}; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  img { max-width: 100%; max-height: 240mm; height: auto; object-fit: contain; }
+  table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 15pt 0; font-size: 9.5pt; line-height: 1.5; }
+  th,td { border: 1px solid #${ink.line}; padding: 6pt 8pt; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  th { background: #${ink.soft}; font-weight: 650; }
+  th p,td p { margin: 0; }
+  thead { display: table-header-group; } tr,img { break-inside: avoid; }
+  ul,ol { padding-left: 18pt; }
+  li { padding-left: 2pt; }
+  li::marker { color: #${ink.accent}; }
+  li > p { margin: 2.25pt 0; }
+  li.task-item { list-style: none; position: relative; }
+  .task-checkbox { position: absolute; left: -18pt; color: #${ink.accent}; font-family: "Segoe UI Symbol", sans-serif; }
+  blockquote { border-left: 3px solid #${ink.accent}; margin: 18pt 0; padding: 2pt 15pt; background: #${ink.soft}; color: #${ink.muted}; }
+  pre { background: #${ink.code}; border: 1px solid #${ink.line}; border-radius: 5px; padding: 10pt; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+  code { font: 9.5pt/1.5 Consolas, monospace; background: #${ink.code}; border-radius: 3px; padding: 1pt 3pt; }
+  pre code { background: none; padding: 0; border-radius: 0; }
+  hr { border: 0; border-top: 1px solid #${ink.line}; margin: 24pt 0; }
+  figure.mermaid-diagram { margin: 12pt 0; }
   ${syntaxCSS('pre')}
 `;
 
@@ -238,7 +379,24 @@ export async function toPrintHTML(markdown: string, documentPath: string | null,
   const tokens = parser.parse(markdown, {});
   if (tokens.filter(token => token.type === 'fence' && isMermaidLanguage(token.info)).length > diagramLimits.diagrams) throw new Error('An export supports at most 32 Mermaid diagrams.');
   const anchors = new Map<string, number>();
+  const listItems: { token: Token; pending: boolean }[] = [];
   for (const [index, token] of tokens.entries()) {
+    if (token.type === 'list_item_open') listItems.push({ token, pending: true });
+    else if (token.type === 'list_item_close') listItems.pop();
+    else if (token.type === 'inline' && listItems.at(-1)?.pending) {
+      const item = listItems.at(-1)!;
+      item.pending = false;
+      const text = token.children?.[0];
+      const task = text?.type === 'text' ? /^\[([ xX])\]\s+/.exec(text.content) : null;
+      if (text && task) {
+        text.content = text.content.slice(task[0].length);
+        item.token.attrJoin('class', 'task-item');
+        const checkbox = new Token('html_inline', '', 0);
+        const checked = task[1].toLowerCase() === 'x';
+        checkbox.content = `<span class="task-checkbox" aria-label="${checked ? 'Completed task' : 'Incomplete task'}">${checked ? '&#x2611;' : '&#x2610;'}</span>`;
+        token.children!.unshift(checkbox);
+      }
+    }
     if (token.type === 'fence' && isMermaidLanguage(token.info)) {
       const { data } = await diagramImage(token.content, loadDiagram);
       token.type = 'html_block';

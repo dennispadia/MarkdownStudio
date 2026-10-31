@@ -20,8 +20,8 @@ test('updating contents preserves surrounding bytes, newline style and heading c
   assert.match(result, /New section/);
   assert.equal(result.replace(/\r\n/g, '').includes('\n'), false);
   assert.equal(updateTableOfContents(result), result);
-  assert.doesNotMatch(parser.render(result), /markdown-studio:toc/);
-  assert.match(parser.render('```html\n' + TOC_START + '\n```'), /markdown-studio:toc/);
+  assert.doesNotMatch(parser.render(result), /lekh:toc/);
+  assert.match(parser.render('```html\n' + TOC_START + '\n```'), /lekh:toc/);
   assert.throws(() => updateTableOfContents('# No marked TOC'), /exactly one/);
   assert.throws(() => updateTableOfContents(`${text}\n${text}`), /exactly one/);
   const sample = '```html\n' + TOC_START + '\nexample\n' + TOC_END + '\n```\n';

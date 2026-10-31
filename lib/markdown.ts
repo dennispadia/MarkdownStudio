@@ -1,9 +1,9 @@
 import MarkdownIt from 'markdown-it';
 
 export const parser = new MarkdownIt({ html: false, linkify: true, breaks: false });
-parser.block.ruler.before('paragraph', 'studio_toc_marker', (state, startLine, _endLine, silent) => {
+parser.block.ruler.before('paragraph', 'lekh_toc_marker', (state, startLine, _endLine, silent) => {
   const line = state.src.slice(state.bMarks[startLine] + state.tShift[startLine], state.eMarks[startLine]);
-  if (!/^<!-- \/?markdown-studio:toc -->$/.test(line)) return false;
+  if (!/^<!-- \/?lekh:toc -->$/.test(line)) return false;
   if (!silent) state.line = startLine + 1;
   return true;
 }, { alt: ['paragraph', 'list', 'blockquote'] });
@@ -42,7 +42,7 @@ export function isSafeLink(url: string): boolean {
 
 export function imageDisplayURL(source: string, documentId = ''): string {
   if (/^data:image\/(?:png|jpeg|gif|webp);base64,/i.test(source)) return source;
-  return `studio-image://local/image?source=${encodeURIComponent(source)}&document=${encodeURIComponent(documentId)}`;
+  return `lekh-image://local/image?source=${encodeURIComponent(source)}&document=${encodeURIComponent(documentId)}`;
 }
 
 export function documentPreviewHTML(markdown: string, documentId: string): string {

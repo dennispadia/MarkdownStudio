@@ -15,7 +15,7 @@ import { fileArguments } from '../lib/launch.js';
 import { productName, productTitle, userDataDirectory } from '../lib/branding.js';
 import type { ContextMenuItem, EditorContext, OpenedFile, Result } from '../src/bridge.js';
 
-protocol.registerSchemesAsPrivileged([{ scheme: 'studio-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: 'lekh-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.setName(productName);
 const profilePath = app.commandLine.getSwitchValue('user-data-dir') || path.join(app.getPath('appData'), userDataDirectory);
 mkdirSync(profilePath, { recursive: true });
@@ -218,7 +218,10 @@ async function exportPDF(content: string, documentPath: string | null, loadDiagr
         await Promise.all(Array.from(document.images, image => image.decode()));
       })()
     `);
-    return await printWindow.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true });
+    return await printWindow.webContents.printToPDF({
+      printBackground: true, preferCSSPageSize: true,
+      generateTaggedPDF: true, generateDocumentOutline: true,
+    });
   } finally { printWindow.destroy(); }
 }
 
@@ -233,7 +236,7 @@ async function exportWithDiagrams(content: string, currentPath: string | null, f
     if (cached) return cached;
     if (!renderer) {
       renderer = new BrowserWindow({
-        show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: 'markdown-studio-diagrams' },
+        show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: 'lekh-diagrams' },
       });
       renderer.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       renderer.webContents.on('will-navigate', event => event.preventDefault());
@@ -245,7 +248,7 @@ async function exportWithDiagrams(content: string, currentPath: string | null, f
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const png: unknown = await Promise.race([
-        renderer.webContents.executeJavaScript(`window.studioRenderDiagram(${JSON.stringify(source)})`),
+        renderer.webContents.executeJavaScript(`window.lekhRenderDiagram(${JSON.stringify(source)})`),
         new Promise<never>((_resolve, reject) => {
           timer = setTimeout(() => {
             renderer?.destroy();
@@ -562,7 +565,7 @@ function createWindow(): void {
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   window.webContents.session.webRequest.onBeforeRequest((details, callback) => {
-    const allowed = ['file:', 'data:', 'studio-image:'].includes(new URL(details.url).protocol);
+    const allowed = ['file:', 'data:', 'lekh-image:'].includes(new URL(details.url).protocol);
     callback({ cancel: !allowed });
   });
   window.on('close', event => {
@@ -620,7 +623,7 @@ function createWindow(): void {
 }
 
 if (primaryInstance) void app.whenReady().then(async () => {
-  if (process.platform === 'win32') app.setAppUserModelId('com.markdownstudio.desktop');
+  if (process.platform === 'win32') app.setAppUserModelId('com.lekh.desktop');
   try {
     const saved: unknown = JSON.parse(await readFile(recentPath(), 'utf8'));
     if (!Array.isArray(saved) || !saved.every(item => typeof item === 'string')) throw new Error('Invalid recent-file list.');
@@ -638,7 +641,7 @@ if (primaryInstance) void app.whenReady().then(async () => {
       dialog.showErrorBox('Recent files could not be loaded', String(error));
     }
   }
-  protocol.handle('studio-image', async request => {
+  protocol.handle('lekh-image', async request => {
     try {
       const parameters = new URL(request.url).searchParams;
       const source = parameters.get('source');

@@ -6,7 +6,7 @@ Set-Location $root
 $manifest = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json
 if (-not $MsiPath) { $MsiPath = Join-Path $root "release\Lekh-Markdown-editor-$($manifest.version)-x64.msi" }
 $MsiPath = (Resolve-Path -LiteralPath $MsiPath).Path
-$temporary = Join-Path ([IO.Path]::GetTempPath()) ("markdown-studio-msi-" + [guid]::NewGuid().ToString('N'))
+$temporary = Join-Path ([IO.Path]::GetTempPath()) ("lekh-msi-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporary | Out-Null
 $installer = $null
 $database = $null
@@ -29,7 +29,7 @@ try {
     $properties = @{}
     foreach ($row in (Read-MsiRows 'SELECT `Property`, `Value` FROM `Property`' 2)) { $properties[$row[0]] = $row[1] }
     if ($properties.ProductName -ne $manifest.build.productName) { throw 'MSI product name mismatch.' }
-    if (-not $properties.UpgradeCode -or $properties.UpgradeCode.Trim('{}') -ne 'E2FD477D-ED35-561D-8A35-B75851090FE9') { throw 'MSI no longer retains the original application upgrade identity.' }
+    if (-not $properties.UpgradeCode -or $properties.UpgradeCode.Trim('{}') -ne 'DCBCF7FA-11DA-4F35-8D27-D066EEC6C582') { throw 'MSI does not match the independent Lekh upgrade identity.' }
     if ($properties.ProductVersion -notin @($manifest.version, "$($manifest.version).0")) { throw 'MSI version mismatch.' }
     if ($properties.ContainsKey('ALLUSERS') -or $properties.MSIINSTALLPERUSER -ne '1') { throw 'MSI is not restricted to the current user.' }
     $summary = $database.SummaryInformation(0)
@@ -37,8 +37,8 @@ try {
         if (([int]$summary.Property(15) -band 8) -eq 0) { throw 'MSI requests elevated privileges instead of limited user privileges.' }
         if ($summary.Property(7) -notmatch '^x64;') { throw 'MSI is not an x64 package.' }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($summary) }
-    $directories = @(Read-MsiRows 'SELECT `Directory_Parent` FROM `Directory` WHERE `Directory` = ''APPLICATIONFOLDER''' 1)
-    if ($directories.Count -ne 1 -or $directories[0][0] -ne 'LocalAppDataFolder') { throw 'MSI application folder is not inside current-user LocalAppData.' }
+    $directories = @(Read-MsiRows 'SELECT `Directory_Parent`, `DefaultDir` FROM `Directory` WHERE `Directory` = ''APPLICATIONFOLDER''' 2)
+    if ($directories.Count -ne 1 -or $directories[0][0] -ne 'LocalAppDataFolder' -or ($directories[0][1] -split '\|')[-1] -cne 'lekh') { throw 'MSI application folder is not the independent current-user Lekh directory.' }
     $shortcuts = @(Read-MsiRows 'SELECT `Directory_` FROM `Shortcut`' 1)
     $shortcutDirectories = @($shortcuts | ForEach-Object { $_[0] })
     if ('DesktopFolder' -notin $shortcutDirectories -or 'ProgramMenuFolder' -notin $shortcutDirectories) { throw 'MSI is missing desktop or Start menu shortcuts.' }

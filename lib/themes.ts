@@ -10,6 +10,5 @@ export function isTheme(value: unknown): value is Theme {
 }
 
 export function restoreTheme(value: unknown): Theme | null {
-  if (value === 'github-dark') return 'dark';
   return isTheme(value) ? value : null;
 }

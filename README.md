@@ -2,174 +2,93 @@
 
 # Lekh लेख
 
-**Lekh: Markdown editor** - formerly Markdown Studio.
+**Lekh: Markdown editor** is a calm, local-first Windows Markdown editor with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
 
-A calm, local-first **Windows Markdown editor** with editable **Visual + Source**, paired split tabs, offline Mermaid diagrams, and **Word/PDF export**.
+**Development version: 0.8.0 — not yet published.** This checkout establishes Lekh as an independent product with its own application, installer, and settings identities. No settings, recovery data, or installation identities are imported from another product.
 
-**[Download Lekh 0.7.1 for Windows x64 (.exe)](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-Markdown-editor-Setup-0.7.1-x64.exe)** · [Release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) · [User guide](docs/USER_GUIDE.md)
+**[Current stable download: Lekh 0.7.1 for Windows x64 (.exe)](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-Markdown-editor-Setup-0.7.1-x64.exe)** · [Stable release notes and source ZIP](https://github.com/dennispadia/lekh/releases/tag/v0.7.1) · [User guide](docs/USER_GUIDE.md)
 
-Version **0.7.1** adds a real offline premium **EXE setup**, with the approved Segoe UI Light wordmark, smaller Sanskrit लेख, and refined quill in Graphite + Teal. A quill writes Lekh's three-part origin story, automatically advancing two seconds after each chapter finishes. Pause/resume, previous/next, complete accessible text, and Windows reduced-motion support are included. Installation never waits for the story. All editor features are unchanged.
+The published 0.7.1 assets remain unchanged. The fresh identities described here apply to the **0.8.0 development checkout**, not to the existing stable binary. No 0.8.0 installer is available from the stable link.
 
-**Published and verified:** the Windows build passed the complete extracted-app desktop suite, native engine/story tests, animated and reduced-motion setup previews, and a real isolated per-user install/registration/uninstall with recovery-profile preservation. The public EXE, source ZIP, and checksum list were independently downloaded and matched GitHub's asset digests and the published SHA-256 checksums. The previous public MSI download is retired; source archives and Git tags remain available.
+Free to use and modify under the [MIT license](LICENSE). **[Open a GitHub issue](https://github.com/dennispadia/lekh/issues)** for bugs, enhancements, and requests. There is no guaranteed response time, resolution, or future maintenance commitment. See [SUPPORT.md](SUPPORT.md).
 
-### Upgrading to Lekh
-
-Your existing preferences, recent files, recovery drafts, and marked tables of contents retain their original storage identities. The EXE wraps the same per-user MSI engine and original upgrade identity. Save and close the existing app before upgrading; setup will ask rather than force-close it. The application executable remains **Lekh - Markdown editor.exe**; Windows file associations and pinned shortcuts may need to be reselected or repinned after upgrading from Markdown Studio. Public setup downloads are named **Lekh-Markdown-editor-Setup-0.7.1-x64.exe**, using GitHub-safe hyphens. Genuine old-version upgrades and repair still need a disposable-VM test matrix.
-
-The installer includes the desktop runtime. No Node.js, Word, Pandoc, or account is required. **The installer is unsigned; Windows or your browser may show a warning.**
-
-**Free to use, modify, and fork under MIT. Shared as-is, with no support or promised maintenance.** Want another feature? Fork the project and build it yourself, optionally with an AI coding assistant. See [SUPPORT.md](SUPPORT.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Included from 0.6.6
-
-- **One Visual + Source switch**, including paired split documents. It reflects and changes only the active document, without duplicate switches or mode bars in pane headers.
-- **Browser-style toolbar overflow:** commands move into **More tools and views (...)** as the window narrows and return when widened. No horizontal toolbar scrollbar is needed.
-- **Shrinking document tabs:** labels shorten as space runs out, the selected tab stays visible, and **Open documents** lists every tab, including those that cannot fit.
-- **Mermaid insertion at the caret:** Visual insertion stays in Visual and places the diagram at the current selection, not the end. Source insertion uses its own caret, preserves editable dual view, and changes only the active split document. One undo removes the insertion.
-
-These are working features retained from the **verified Lekh 0.7.0 installer**. The official build continues running the complete desktop tests against the application extracted from the internal MSI. Premium setup adds early running-app checks without changing the editor.
-
-### Included from 0.6.5
-
-- The single-row toolbar ships in the actual desktop app, with formatting, lists, quotes, links, images, tables, code, rule, table-of-contents, and Mermaid controls.
-- **Split** is directly beside **Visual + Source**: Split pairs two different documents; the switch shows two editable views of one document.
-- The compact right-click menu now ships with twelve direct buttons: Cut, Copy, Paste, Delete, Bold, Italic, Code, Link, Quote, Numbered list, Bullet list, and Task list. Copy / Paste As, Paragraph, Insert, and Table keep their existing choices.
-- Menu actions work in Visual and Source, preserve selection, and target the clicked split pane. Shift+F10, keyboard navigation, Escape focus restoration, spelling suggestions, and viewport-safe submenus are included.
-
-These features remain included in the **verified Lekh 0.7.0 installer**, not design previews.
-
-### Included from 0.6.4
-
-- Readable outline labels show a linked heading's description instead of Markdown link syntax, without changing its links or navigation.
-- Recent Files shows only the five most recently used files, newest first, including existing saved history.
-- Status-bar zoom-out, percentage/reset, and zoom-in controls stay synchronized with View-menu and keyboard zoom.
-- Save confirmations name the actual file, including its new name after Save As: for example, `Notes.md saved`.
-
-These improvements remain included in the **verified Lekh 0.7.0 installer**.
-
-### Included from 0.6.3
-
-Version 0.6.3 includes the approved minimalist layout: original enlarged branding, compact tabs and file actions, a centered text-only Export button, and Graphite + Teal Dark colors. The upper-left hamburger collapses the sidebar into a narrow rail that keeps New, Open, theme, and keyboard shortcuts available.
-
-Start with one blank **Untitled** document, without a Welcome document. Opening a file from Explorer starts directly in that file without an extra blank tab.
-
-Turn on the **Visual + Source** switch for editable Visual on the left and Markdown Source on the right. Changes appear in both panes, with the formatting toolbar available; turning the switch off returns to Visual. Source-only and the existing read-only Source + Preview remain available through **More (...)** and the View menu.
-
-These interface changes remain included in the **verified Lekh 0.7.0 installer**, not just the source checkout. The historical screenshots below show the earlier layout. See [CHANGELOG.md](CHANGELOG.md) for details. Broader DOCX/PDF formatting-fidelity improvements and exact cross-mode reading-position alignment remain pending.
-
-### Included from 0.6.2
-
-- Click a link in Visual mode to edit its text and address without switching to Source. The toolbar link button, **Ctrl+K**, and right-click **Edit link...** work too.
-- **Ctrl+click** opens web/email links through the existing confirmation dialog. Generated table-of-contents links still navigate with an ordinary click.
-- **Remove link** keeps its text. Address-only edits preserve label formatting; link changes support single-step undo/redo and target the correct split pane.
-- Source link insertion replaces selected text exactly once and escapes parentheses and whitespace in addresses.
-
-### Included from 0.6.1
-
-- Double-clicking an associated Markdown file in Windows Explorer opens that file, rather than only the Welcome screen.
-- Further Explorer launches reuse the existing window and open files in tabs. An already-open file is focused without replacing unsaved edits; minimized windows are restored.
-- File requests wait until the editor is ready or its current operation finishes. Unreadable files report an error without blocking other requested files.
-
-Close the app before upgrading with a new installer. For Lekh builds, choose **Open with > Choose another app > Lekh** if Windows no longer remembers your `.md` default.
-
-### Included from 0.6.0
-
-All five additions below remain included in the **Lekh 0.7.0 installer**, not just the source checkout.
-
-| Feature | What you can do |
-| --- | --- |
-| **Source + Preview** | Edit Markdown alongside a read-only live rendering of the same document. Optionally synchronize scrolling in either direction. Each side of a two-file pair can also use this mode. |
-| **Enhanced Find/Replace** | Search with match-case, Unicode whole-word, or regex options. Navigate Previous/Next, see counts and Source highlights, and replace the current match or all matches. Regex replacements support capture groups; expensive searches stop after two seconds instead of blocking the editor. |
-| **Refreshable table of contents** | Use **Insert > Table of contents**, then **Insert > Update table of contents** after changing headings. The marked contents block keeps its links up to date without replacing surrounding source. Duplicate headings receive distinct anchors. |
-| **Image storage choice** | Insert, paste, or drop a supported image, then choose an embedded image or a relative file in the document's **assets** folder. Save the document first to use relative assets; keep that folder with the Markdown when sharing. |
-| **Offline Mermaid diagrams** | Use **Insert > Mermaid diagram** for a starter, or write a fenced `mermaid` block. Supported diagrams render locally in Visual and Preview and become images in Word/PDF exports. Invalid or unsupported diagrams show an explicit error. |
-
-See the [user guide](docs/USER_GUIDE.md#editing-features) for search options and limits, and [Mermaid diagrams](docs/USER_GUIDE.md#mermaid-diagrams) for supported diagram families and restrictions.
-
-## See Lekh in action
-
-Actual 0.7.0 desktop captures using sample documents and an isolated profile, not design mockups.
-
-![Lekh in Light theme with the bilingual Segoe UI Light wordmark and refined quill](docs/images/lekh-light.png)
-
-![Lekh in Graphite + Teal Dark theme with paired, independent documents](docs/images/lekh-dark-split.png)
-
-## Historical 0.6.0 screenshots
-
-Fresh captures of the actual **0.6.0 desktop application**, using sample documents in an isolated profile. These are app screenshots, not mockups; no personal documents are shown.
-
-### Source + Preview: Markdown and the result together
-
-The editable source is on the left; the read-only preview on the right renders the table and Mermaid flowchart. **Sync scrolling** can be turned off.
-
-![Markdown Studio 0.6.0 in Light theme with editable Markdown beside its read-only live preview, a rendered Mermaid workflow, a table, and the Sync scrolling option](docs/images/source-preview.png)
-
-### Visual writing: checklists, formatting, and diagrams
-
-Write naturally in Light theme with the document outline, interactive task checkboxes, formatting controls, and editable Mermaid source with its rendered diagram.
-
-![Markdown Studio 0.6.0 Visual editor in Light theme showing a release checklist, Mermaid source and rendered workflow, document outline, and formatting toolbar](docs/images/light.png)
-
-### Dark: two documents, one paired tab
-
-Keep reference notes beside a draft. Both panes are editable and have independent mode controls; Find, Save, Export, and the outline follow the active pane.
-
-![Markdown Studio 0.6.0 in Dark theme with review notes and a writing plan paired in one tab, independent mode controls, syntax-highlighted code, checklists, and an offline Mermaid diagram](docs/images/dark-split.png)
-
-### Find/Replace: navigate and edit with confidence
-
-This example searches for `Word` or `PDF` with a regex, shows both matches in Source, and prepares a capture-group replacement without changing the document.
-
-![Markdown Studio 0.6.0 Find/Replace bar with a Word-or-PDF regex, capture-group replacement, match-case and regex controls, match counts, navigation, and highlighted Source results](docs/images/find-replace.png)
-
-## More writing features
+## Writing features
 
 | Area | Included tools |
 | --- | --- |
-| **Markdown editing** | Headings, bold, italics, strikethrough, lists, tasks, quotes, links, images, horizontal rules, and code blocks. Use Visual for formatted writing or Source for exact Markdown and unsupported syntax. |
-| **Visual link editing** | Click an existing link to edit its text and address; Ctrl+K, the toolbar, and right-click **Edit link...** work too. Remove a link without deleting its text. Ctrl+click opens links after confirmation. |
-| **Tables** | Choose rows and columns in the Insert table dialog from the toolbar, right-click menu, or **Ctrl+T**. Add/remove rows and columns in Visual mode. |
-| **Code blocks** | Search the offline language catalog by name or alias, apply syntax highlighting, and copy a block's raw code. Code is displayed, never executed. |
-| **Tabs and paired views** | Open multiple documents; use thumbnail cards to pick a split partner. Resize the divider, work independently in each pane, or unsplit without closing files. Each tab keeps its own selection, scroll position, and undo history. |
-| **Word and PDF export** | Export the active document, including unsaved edits, supported images, syntax-highlighted code, and supported Mermaid diagrams. Export creates a separate file; it does not save the Markdown. |
-| **Workspace and navigation** | Light/Dark themes, a resizable/collapsible sidebar with remembered width, a clickable heading outline, collapsible recent files, word count, and Focus mode (**F9**). |
-| **Keyboard and context menus** | Formatting and file shortcuts, a right-click Markdown menu, tooltips with shortcut hints, and an **F1** keyboard reference. |
-| **File safeguards** | Unsaved-change prompts, external-edit detection, atomic saves, recovery drafts, Save As, and Save All. Recovery is not a backup. |
-| **Local-first privacy** | No account, document uploads, cloud sync, or analytics. Remote images are not downloaded; opening an external web/email link requires confirmation. |
+| **Markdown editing** | Headings, bold, italics, strikethrough, lists, tasks, quotes, links, images, rules, and code blocks. Use Visual for formatted writing or Source for exact Markdown and unsupported syntax. |
+| **Visual + Source** | Two editable views of one document, with a shared toolbar. Source-only and read-only Source + Preview are also available. |
+| **Paired split tabs** | Keep two independent documents side by side; commands target the active document. Resize the divider or unsplit without closing files. |
+| **Responsive interface** | One formatting toolbar, More tools and views overflow, shrinking tabs, an Open documents list, and a collapsible sidebar. |
+| **Links and tables** | Edit link text/addresses in place, remove links without deleting text, choose table dimensions, and add/remove table rows and columns. |
+| **Code and diagrams** | Search the offline language catalog, highlight code, copy raw code, and insert editable Mermaid diagrams at the current selection. Code is displayed, never executed. |
+| **Find/Replace** | Match case, Unicode whole words, regex, match counts, navigation, and replacement. |
+| **Word and PDF export** | Export the active document, including unsaved edits, with an explicit heading hierarchy, formatted links, aligned tables, nested lists, task boxes, syntax-colored code, supported images, and Mermaid diagrams. Export does not save the Markdown. |
+| **Workspace** | Light/Dark themes, a resizable sidebar, heading outline, five recent files, zoom controls, word count, and Focus mode (F9). |
+| **Safeguards** | Unsaved-change prompts, external-edit detection, atomic saves, recovery drafts, Save As, and Save All. Recovery is not a backup. |
+| **Keyboard and context menus** | Formatting/file shortcuts, contextual editing commands, spelling suggestions, and an F1 keyboard reference. |
 
-Switching between Visual and Source resets that tab's undo history; switching tabs preserves it. Source + Preview uses the Source history, so returning to Source keeps that history.
+Switching between Visual and Source resets that tab's undo history; switching tabs preserves it. Source + Preview uses the Source history.
+
+### Richer exports in development 0.8.0
+
+- **Explicit typography:** Segoe UI Heading 1–6 sizes, weights, spacing, and colors are defined by Lekh rather than a document consumer's default heading styles. Bold, italic, and strikethrough are preserved; hyperlinks are colored and underlined.
+- **Navigation:** Word exports include heading bookmarks and clickable internal heading links, including table-of-contents links. PDFs include document bookmarks and tagged accessibility.
+- **Structure:** page-width fixed tables preserve Markdown column alignments and use shaded, repeating header rows. Nested lists retain continuation paragraphs and numbering starts; task lists render checked/unchecked boxes.
+- **Code and images:** syntax colors, blank lines, and tabs are preserved in code blocks. Supported images keep their aspect ratio and fit within page bounds.
+- **Print layout:** A4 pages with 20 mm margins and readable light print colors, regardless of the editor's Light/Dark theme.
+
+Word output remains editable and reflows in the receiving application; Word and PDF are **not pixel-identical**. Math, footnotes, and YAML do not have formatted rendering or structured export support. See [export details and limitations](docs/USER_GUIDE.md#images-and-exports).
+
+## Screenshots
+
+The following captures show the Lekh interface with sample documents, not personal files.
+
+![Lekh in Light theme](docs/images/lekh-light.png)
+
+![Lekh in Graphite + Teal Dark theme with paired independent documents](docs/images/lekh-dark-split.png)
 
 ## Install on Windows
 
-**Windows 10/11, x64, with .NET Framework 4.8 or newer** (normally included in current Windows versions). Other operating systems and architectures are not packaged or tested.
+Requires **Windows 10/11 x64 and .NET Framework 4.8 or newer**, normally included in Windows. Other operating systems and architectures are not packaged or tested.
 
-**Release status:** **Lekh 0.7.1 premium EXE** is the latest published, verified installer. All existing editing features are retained. Previous public MSI and Markdown Studio release downloads have been retired; Git tags and source history remain available. The application remains unsigned; no trusted signing provider is configured. See the [code signing policy and preparation status](docs/PUBLISHING.md#code-signing-policy-pending).
+For a published installer, use the **[stable 0.7.1 release](https://github.com/dennispadia/lekh/releases/tag/v0.7.1)**. Its EXE, [checksums](https://github.com/dennispadia/lekh/releases/download/v0.7.1/SHA256SUMS.txt), and source ZIP remain unchanged. This source checkout is development 0.8.0 and requires building locally.
 
-1. **[Download the verified Lekh 0.7.1 Windows x64 setup EXE](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-Markdown-editor-Setup-0.7.1-x64.exe)**, or open [the latest release](https://github.com/dennispadia/lekh/releases/latest) for downloads and release notes.
-2. Double-click the installer to install for your current Windows user. In premium setup, choose **Install Lekh**; no administrator access is requested.
+For a verified installer built from this checkout:
+
+1. Save and close any running Lekh, then choose **Install Lekh** in setup.
+2. Setup installs only for your current Windows user, without requesting administrator access.
 3. Open **Lekh** from the desktop or Start menu.
 
-The premium setup EXE embeds the application and its MSI engine: recipients do **not** need Node.js, npm, Word, Pandoc, or the source code. Share the setup EXE itself, not the editor executable from a developer build. No internet connection is needed during installation.
+The offline setup embeds the runtime and internal MSI; recipients do not need Node.js, npm, Word, Pandoc, or an account. Installation does not wait for the accessible, reduced-motion-aware origin story.
 
-The installer is attached to the GitHub Release, not stored among the source files. [SHA-256 checksums](https://github.com/dennispadia/lekh/releases/download/v0.7.1/SHA256SUMS.txt) and a [clean source ZIP](https://github.com/dennispadia/lekh/releases/download/v0.7.1/Lekh-0.7.1-source.zip) are available with the release.
+### Independent development identities
 
-**Unsigned software:** the application, setup EXE, and internal MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. An installer does not remove those warnings. Only install artifacts you trust, verify the published SHA-256 checksum, and follow your organization's policies; do not disable security protections.
+- Application ID: `com.lekh.desktop`; npm package: `lekh`.
+- Application files: `%LOCALAPPDATA%\lekh`; executable: `Lekh - Markdown editor.exe`.
+- Preferences, recent files, Chromium storage, and recovery drafts: `%APPDATA%\Lekh`.
+- Setup cache/logs: `%LOCALAPPDATA%\Lekh\SetupCache` and `%LOCALAPPDATA%\Lekh\SetupLogs`.
+- MSI upgrade code: `DCBCF7FA-11DA-4F35-8D27-D066EEC6C582`. Keep it stable for future Lekh upgrades.
 
-Uninstall through **Windows Settings > Apps > Installed apps**. Your Markdown documents are not installer-managed files. The app does not intentionally delete its separate settings/recovery profile on uninstall.
+Lekh uses a fresh standalone profile and installation directory. Existing drafts and preferences are **not automatically imported**; saved Markdown files can be opened normally. It does not migrate aliases or replace/uninstall another product. Close Lekh before a future Lekh upgrade; setup asks rather than force-closing the editor. Real upgrade/repair testing remains necessary before publishing a new installer.
+
+**Unsigned software:** application, setup EXE, and internal MSI are not code-signed. Windows, browser, or organization policies may warn about or block them. Verify checksums and follow your organization's policies; do not disable security protections. See [signing status](docs/PUBLISHING.md#code-signing-policy-pending).
+
+Uninstall through **Windows Settings > Apps > Installed apps**. Your Markdown documents are not installer-managed files. The separate settings/recovery profile is not intentionally deleted on uninstall.
 
 ## Start writing
 
-1. Start in the blank Untitled document, open a `.md` file, or choose **New** for another document.
-2. Write in **Visual**, or turn on **Visual + Source** for editable Visual on the left and Markdown on the right. Source-only and read-only Source + Preview remain available through **More (...)** and View.
-3. Use **Ctrl+F** to search, **Ctrl+T** to insert a table, or **F1** for the keyboard reference.
-4. Save the Markdown with **Ctrl+S**. The **Save** arrow provides Save All and Save As.
-5. Use **Export** to create a separate `.docx` or `.pdf` when ready to share.
+1. Start in blank **Untitled**, open a `.md` file, or choose **New**.
+2. Write in **Visual**, or enable **Visual + Source**. Source-only and Source + Preview are under **More (...)** and View.
+3. Use **Ctrl+F** to search, **Ctrl+T** for a table, or **F1** for shortcuts.
+4. Save Markdown with **Ctrl+S**; the Save arrow provides Save All and Save As.
+5. Use **Export** for a separate Word or PDF document.
 
-Use the [complete user guide](docs/USER_GUIDE.md) for tables, images, split panes, recovery, shortcuts, and export limitations.
+See the [user guide](docs/USER_GUIDE.md) for recovery, images, shortcuts, and limitations.
 
-## Build or customize a fork
+## Build and contribute
 
-With Windows x64 and **Node.js 22.15 or newer** (the checked workflow uses Node 22.22.0):
+With Windows x64 and Node.js >=22.15.0 (the workflow uses 22.22.0):
 
 ```powershell
 npm.cmd ci --registry=https://registry.npmjs.org
@@ -179,17 +98,10 @@ npm.cmd run build
 
 Or double-click `Launch.cmd` in a source checkout. If no packaged build exists, its setup script downloads a checksum-verified private Node runtime and builds the app.
 
-See [BUILDING.md](docs/BUILDING.md) for tests, installer builds, source archives, and architecture. See [PUBLISHING.md](docs/PUBLISHING.md) to put your copy on GitHub and publish release downloads.
+See [BUILDING.md](docs/BUILDING.md) for tests and packaging, [PUBLISHING.md](docs/PUBLISHING.md) for release verification, and [CONTRIBUTING.md](CONTRIBUTING.md) for focused changes.
 
 ## Boundaries and privacy
 
-Visual editing may normalize Markdown; use Source for unsupported syntax. Math rendering, automatic updates, cloud sync, and custom export templates are not included. Recovery is not a backup.
+Documents stay on your computer. There are no accounts, document uploads, cloud sync, or analytics. Remote images are not downloaded; opening an external web/email link requires confirmation and uses another application. Developer setup downloads tools and dependencies, not your documents.
 
-Documents stay on your computer. Remote images are not downloaded. Opening an external web/email link requires confirmation and uses another application. Development dependencies and build tools require internet access. See the [user guide](docs/USER_GUIDE.md#privacy).
-
-## License and support
-
-- [MIT license](LICENSE): permits use, modification, redistribution, and forks, subject to its terms.
-- [Third-party notices](THIRD_PARTY_NOTICES.md): dependencies retain their own licenses.
-- [No support](SUPPORT.md): no help desk, response commitment, or promised fixes.
-- [Forking guidance](CONTRIBUTING.md): independent, AI-assisted customization is welcome; upstream contributions are not being solicited.
+Visual editing may normalize Markdown; use Source for unsupported syntax. Math rendering, automatic updates, cloud sync, and custom export templates are not included. Keep backups: recovery is not a backup.

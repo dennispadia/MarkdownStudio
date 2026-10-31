@@ -78,6 +78,7 @@ namespace Lekh.Setup
         }
         private static void Identity()
         {
+            Check(SetupPolicy.UpgradeCode == "DCBCF7FA-11DA-4F35-8D27-D066EEC6C582", "Independent stable Lekh upgrade identity.");
             SetupPolicy.ValidateProperties(Properties());
             Check(true, "Braced stable upgrade identity.");
             Dictionary<string, string> values = Properties();
@@ -95,11 +96,13 @@ namespace Lekh.Setup
             }
             values = Properties(); values["ALLUSERS"] = "2";
             Reject(() => SetupPolicy.ValidateProperties(values), "Machine-wide MSI rejected.");
+            values = Properties(); values["UpgradeCode"] = "DB607F2E-1890-4740-9DA3-51B6EEDD16AE";
+            Reject(() => SetupPolicy.ValidateProperties(values), "Another product cannot share Lekh's installer.");
             Check(SetupPolicy.IsInstalledApp(SetupPolicy.AppPath), "Current app detection.");
             string directory = Path.GetDirectoryName(SetupPolicy.AppPath);
-            Check(SetupPolicy.IsInstalledApp(Path.Combine(directory, "Markdown Studio.exe")), "Legacy running app detection.");
+            Check(!SetupPolicy.IsInstalledApp(Path.Combine(directory, "Other editor.exe")), "Independent application identity.");
             Check(!SetupPolicy.IsInstalledApp(Path.Combine(Path.GetTempPath(), BuildInfo.ExecutableName)), "Other copies not confused with installed app.");
-            Check(BuildInfo.PayloadHash.Length == 64 && BuildInfo.InstallDirectory == "markdown-studio", "Build identity.");
+            Check(BuildInfo.PayloadHash.Length == 64 && BuildInfo.InstallDirectory == "lekh", "Build identity.");
         }
         private static void Animation()
         {

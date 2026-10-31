@@ -6,14 +6,14 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { configurePerUserMsi } = require('../scripts/configure-msi.cjs') as { configurePerUserMsi: (xml: string) => string };
 
-const original = `<Product UpgradeCode="E2FD477D-ED35-561D-8A35-B75851090FE9">
+const original = `<Product UpgradeCode="DCBCF7FA-11DA-4F35-8D27-D066EEC6C582">
 <Package Compressed="yes" InstallerVersion="500"/>
 <Property Id="ALLUSERS" Secure="yes" Value="2"/>
 <Directory Id="ProgramFiles64Folder"><Directory Id="APPLICATIONFOLDER"/></Directory>
 <ComponentGroup Directory="APPLICATIONFOLDER">
 <Component><File Source="$(var.appDir)\\app.exe" KeyPath="yes" Id="mainExecutable">
 <Shortcut Id="desktopShortcut" Directory="DesktopFolder" Advertise="yes"/>
-<Shortcut Id="startMenuShortcut" Directory="ProgramMenuFolder" Advertise="yes"><ShortcutProperty Key="System.AppUserModel.ID" Value="com.markdownstudio.desktop"/></Shortcut>
+<Shortcut Id="startMenuShortcut" Directory="ProgramMenuFolder" Advertise="yes"><ShortcutProperty Key="System.AppUserModel.ID" Value="com.lekh.desktop"/></Shortcut>
 </File></Component>
 <Component><File Source="$(var.appDir)\\LICENSE.md" KeyPath="yes"/></Component>
 <Component Directory="resources"><File Source="$(var.appDir)\\resources\\app.asar" KeyPath="yes"/></Component>
@@ -41,7 +41,7 @@ test('per-user components use stable HKCU key paths, folder cleanup and direct s
   assert.match(actual, /Directory="resources" On="uninstall"/);
   assert.equal((actual.match(/Advertise="no" Target="\[#mainExecutable\]"/g) ?? []).length, 2);
   assert.doesNotMatch(actual, /Advertise="yes"|<File[^>]*>[\s\S]*?<Shortcut[\s\S]*?<\/File>/);
-  assert.match(actual, /ShortcutProperty Key="System.AppUserModel.ID" Value="com.markdownstudio.desktop"/);
+  assert.match(actual, /ShortcutProperty Key="System.AppUserModel.ID" Value="com.lekh.desktop"/);
   assert.equal(configurePerUserMsi(original), actual);
   const reordered = configurePerUserMsi(original.replace(
     '<Component><File Source="$(var.appDir)\\LICENSE.md" KeyPath="yes"/></Component>',
@@ -49,7 +49,7 @@ test('per-user components use stable HKCU key paths, folder cleanup and direct s
   ));
   for (const registry of actual.match(/<RegistryValue[^>]+\/>/g) ?? []) assert.ok(reordered.includes(registry));
   for (const guid of guids) assert.ok(reordered.includes(guid));
-  const fork = configurePerUserMsi(original.replace('E2FD477D-ED35-561D-8A35-B75851090FE9', 'DB607F2E-1890-4740-9DA3-51B6EEDD16AE'));
+  const fork = configurePerUserMsi(original.replace('DCBCF7FA-11DA-4F35-8D27-D066EEC6C582', 'DB607F2E-1890-4740-9DA3-51B6EEDD16AE'));
   for (const guid of guids) assert.ok(!fork.includes(guid));
   assert.throws(() => configurePerUserMsi(original.replace('UpgradeCode=', 'Unknown=')), /upgrade identity/);
   assert.throws(() => configurePerUserMsi(original.replace('KeyPath="yes"', 'KeyPath="no"')), /keyed file/);
@@ -61,11 +61,14 @@ test('distribution uses the public npm registry and ships notices without develo
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
   assert.equal(lock.version, manifest.version);
   assert.equal(lock.packages[''].version, manifest.version);
-  assert.equal(manifest.name, 'markdown-studio');
-  assert.equal(manifest.build.appId, 'com.markdownstudio.desktop');
+  assert.equal(manifest.name, 'lekh');
+  assert.equal(lock.name, manifest.name);
+  assert.equal(lock.packages[''].name, manifest.name);
+  assert.equal(manifest.version, '0.8.0');
+  assert.equal(manifest.build.appId, 'com.lekh.desktop');
   assert.equal(manifest.build.productName, 'Lekh - Markdown editor');
   assert.equal(manifest.build.msi.shortcutName, 'Lekh');
-  assert.equal(manifest.build.msi.upgradeCode, 'E2FD477D-ED35-561D-8A35-B75851090FE9');
+  assert.equal(manifest.build.msi.upgradeCode, 'DCBCF7FA-11DA-4F35-8D27-D066EEC6C582');
   assert.equal(manifest.build.msi.artifactName, 'Lekh-Markdown-editor-${version}-${arch}.${ext}');
   assert.equal(manifest.build.msi.perMachine, false);
   assert.equal(manifest.build.msi.runAfterFinish, false);
@@ -215,7 +218,7 @@ test('real setup installation is explicitly opted in on a clean hosted runner an
   assert.ok(hosted.includes('Test-ExactMsiRegistration $productCode $context'));
   assert.doesNotMatch(verify, /HKCU:|HKLM:|Get-ItemProperty|\$registryPath|ProductState\(/,
     'registration verification must not assume a registry location or installation context');
-  assert.ok(hosted.includes("Join-Path $env:APPDATA 'Markdown Studio'"));
+  assert.ok(hosted.includes("Join-Path $env:APPDATA 'Lekh'"));
   assert.ok(hosted.includes("'/x', $productCode, '/qn', '/norestart'"));
   assert.ok(hosted.includes('if ($attempted -and $setupExited)'));
   assert.ok(hosted.includes('user profile sentinel preserved'));
