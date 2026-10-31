@@ -213,6 +213,74 @@ function Assert-AppNotRunning {
         throw 'Lekh is running; refusing to close it or perform maintenance.'
     }
 }
+function Assert-CleanApplicationDirectory([string]$Path, [string]$ExpectedCacheHash, [string]$Version) {
+    if ($ExpectedCacheHash -notmatch '^[0-9A-Fa-f]{64}$' -or $Version -notmatch '^\d+\.\d+\.\d+$') {
+        throw 'A verified current MSI hash and version are required to recognize setup residue.'
+    }
+    function Assert-PlainEntry($Entry, [bool]$Directory) {
+        if (($Entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Unsafe application directory: reparse point at $($Entry.FullName)."
+        }
+        if ($Entry.PSIsContainer -ne $Directory) {
+            throw "Unsafe application directory: unexpected file/directory type at $($Entry.FullName)."
+        }
+    }
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $applicationRoot = $null
+    $ancestor = [IO.DirectoryInfo]::new($fullPath)
+    while ($null -ne $ancestor) {
+        $entry = $null
+        try { $entry = Get-Item -LiteralPath $ancestor.FullName -Force }
+        catch [Management.Automation.ItemNotFoundException] { }
+        if ($null -ne $entry) {
+            Assert-PlainEntry $entry $true
+            if ($ancestor.FullName -ieq $fullPath) { $applicationRoot = $entry }
+        }
+        $ancestor = $ancestor.Parent
+    }
+    if ($null -eq $applicationRoot) { return }
+
+    # Windows treats the MSI's "lekh" and the bootstrapper's "Lekh" as the same directory.
+    # Only the exact retained layout authored by Payload.Extract and the bootstrapper is allowed.
+    # Never delete or broadly ignore these directories: their contents must be recognized too.
+    foreach ($entry in @(Get-ChildItem -LiteralPath $fullPath -Force)) {
+        Assert-PlainEntry $entry $true
+        if ($entry.Name -ine 'SetupCache' -and $entry.Name -ine 'SetupLogs') {
+            throw "Unsafe application directory: unexpected root entry $($entry.Name)."
+        }
+        foreach ($session in @(Get-ChildItem -LiteralPath $entry.FullName -Force)) {
+            Assert-PlainEntry $session $true
+            $files = @(Get-ChildItem -LiteralPath $session.FullName -Force)
+            if ($entry.Name -ieq 'SetupCache') {
+                if ($session.Name -notmatch '^[0-9a-f]{32}$' -or $files.Count -ne 1 -or $files[0].Name -ine 'Lekh.msi') {
+                    throw "Unsafe application directory: unexpected setup cache layout at $($session.FullName)."
+                }
+                Assert-PlainEntry $files[0] $false
+                if ((Get-FileHash -LiteralPath $files[0].FullName -Algorithm SHA256).Hash -ine $ExpectedCacheHash) {
+                    throw "Unsafe application directory: setup cache checksum mismatch at $($files[0].FullName)."
+                }
+            } else {
+                if ($session.Name -notmatch '^\d{8}-\d{6}-[0-9a-f]{32}$' -or $files.Count -ne 2) {
+                    throw "Unsafe application directory: unexpected setup log layout at $($session.FullName)."
+                }
+                foreach ($file in $files) {
+                    Assert-PlainEntry $file $false
+                    if ($file.Name -inotmatch '^(setup|windows-installer)\.log$' -or $file.Length -eq 0) {
+                        throw "Unsafe application directory: unexpected setup log file at $($file.FullName)."
+                    }
+                }
+                if (@($files | Where-Object { $_.Name -ieq 'setup.log' }).Count -ne 1 -or
+                    @($files | Where-Object { $_.Name -ieq 'windows-installer.log' }).Count -ne 1) {
+                    throw "Unsafe application directory: missing expected setup logs at $($session.FullName)."
+                }
+                $firstLine = Get-Content -LiteralPath (Join-Path $session.FullName 'setup.log') -TotalCount 1
+                if ($firstLine -cnotmatch ('^\S+ Starting Lekh Setup ' + [regex]::Escape($Version) + '\. Current-user, offline installation\.$')) {
+                    throw "Unsafe application directory: unrecognized setup log identity at $($session.FullName)."
+                }
+            }
+        }
+    }
+}
 function Assert-ProfilePreserved {
     foreach ($path in $profileHashes.Keys) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
@@ -302,7 +370,8 @@ try {
     $new = Read-ValidatedMsi $newMsi $manifest.version
     if ($old.ProductCode -ieq $new.ProductCode) { throw 'Major upgrade must have different old and new ProductCodes.' }
     $builtMsi = Join-Path $root "release\Lekh-Markdown-editor-$($manifest.version)-x64.msi"
-    if ((Get-FileHash -LiteralPath $newMsi -Algorithm SHA256).Hash -cne
+    $newMsiHash = (Get-FileHash -LiteralPath $newMsi -Algorithm SHA256).Hash
+    if ($newMsiHash -cne
         (Get-FileHash -LiteralPath $builtMsi -Algorithm SHA256).Hash) { throw 'New EXE embeds a different MSI from the verified build.' }
     foreach ($product in @($old, $new)) {
         Assert-Absent $product.ProductCode
@@ -311,7 +380,7 @@ try {
     if (@([UpgradeVerificationInstaller]::RelatedProducts($upgradeCode)).Count -ne 0) {
         throw 'Existing related MSI registration; refusing upgrade validation on a non-clean runner.'
     }
-    if (Test-Path -LiteralPath $installDirectory) { throw 'Existing application directory; refusing to replace an installation.' }
+    Assert-CleanApplicationDirectory $installDirectory $newMsiHash $manifest.version
     Assert-AppNotRunning
     $settings = Join-Path $profileDirectory 'settings.json'
     if (Test-Path -LiteralPath $settings) { throw 'Existing profile settings; refusing to overwrite user data.' }
@@ -375,6 +444,7 @@ try {
         try {
             if (@([UpgradeVerificationInstaller]::RelatedProducts($upgradeCode)).Count -ne 0) { throw 'Related MSI registration remains after cleanup.' }
             if (Test-Path -LiteralPath (Join-Path $installDirectory "$($manifest.build.productName).exe")) { throw 'Installed executable remains after cleanup.' }
+            Assert-CleanApplicationDirectory $installDirectory $newMsiHash $manifest.version
         } catch { $cleanupErrors.Add("Final installation absence check: $_") }
     }
     try {
